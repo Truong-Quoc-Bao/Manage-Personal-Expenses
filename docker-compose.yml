@@ -1,0 +1,259 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: finance-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin
+      MONGO_INITDB_DATABASE: analytics_db
+    ports:
+      - "${MONGODB_PORT}:27017"
+    volumes:
+      - mongodb-data:/data/db
+    networks:
+      - finance-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: finance-redis
+    ports:
+      - "${REDIS_PORT}:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - finance-network
+    command: redis-server --appendonly yes
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: finance-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    ports:
+      - "${RABBITMQ_PORT}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT}:15672" #UI
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - finance-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth-service:
+    build:
+      context: ./backend/auth_service
+      dockerfile: Dockerfile
+      target: development
+    container_name: finance-auth-service
+    env_file:
+      - .env
+    volumes:
+      - ./backend/auth_service/src:/src
+      - /src/AuthService.API/bin
+      - /src/AuthService.API/obj
+      - /src/AuthService.Application/bin
+      - /src/AuthService.Application/obj
+    ports:
+      - "${AUTH_SERVICE_PORT}:3006"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:3006
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - finance-network
+
+  user-service:
+    build:
+      context: ./backend/user_service
+      dockerfile: Dockerfile
+    container_name: finance-user-service
+    env_file:
+      - .env
+    ports:
+      - "${USER_SERVICE_PORT}:3001"
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - redis
+      - rabbitmq
+    networks:
+      - finance-network
+    volumes:
+      - ./backend/user_service:/app
+      - /app/node_modules
+
+  account-service:
+    build:
+      context: ./backend/account_service
+      dockerfile: Dockerfile
+    container_name: finance-account-service
+    env_file:
+      - .env
+    ports:
+      - "${ACCOUNT_SERVICE_PORT}:3002"
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - redis
+      - rabbitmq
+    networks:
+      - finance-network
+    volumes:
+      - ./backend/account_service:/app
+      - /app/node_modules
+
+  transaction-service:
+    build:
+      context: ./backend/transaction_service
+      dockerfile: Dockerfile
+      target: development
+    container_name: finance-transaction-service
+    env_file:
+      - .env
+    volumes:
+      - ./backend/transaction_service/src:/src
+      - /src/TransactionService.API/bin
+      - /src/TransactionService.API/obj
+      - /src/TransactionService.Application/bin
+      - /src/TransactionService.Application/obj
+    ports:
+      - "${TRANSACTION_SERVICE_PORT}:3007"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:3007
+    depends_on:
+      - redis
+      - rabbitmq
+    networks:
+      - finance-network
+
+  category-service:
+    build:
+      context: ./backend/category_service
+      dockerfile: Dockerfile
+    container_name: finance-category-service
+    env_file:
+      - .env
+    ports:
+      - "${CATEGORY_SERVICE_PORT}:3003"
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - redis
+      - rabbitmq
+    networks:
+      - finance-network
+    volumes:
+      - ./backend/category_service:/app
+      - /app/node_modules
+
+  analytics-service:
+    build:
+      context: ./backend/analytics_service
+      dockerfile: Dockerfile
+    container_name: finance-analytics-service
+    env_file:
+      - .env
+    ports:
+      - "${ANALYTICS_SERVICE_PORT}:3004"
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - mongodb
+      - redis
+      - rabbitmq
+    networks:
+      - finance-network
+    volumes:
+      - ./backend/analytics_service:/app
+      - /app/node_modules
+
+  notification-service:
+    build:
+      context: ./backend/notification_service
+      dockerfile: Dockerfile
+    container_name: finance-notification-service
+    env_file:
+      - .env
+    ports:
+      - "${NOTIFICATION_SERVICE_PORT}:3005"
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - redis
+      - rabbitmq
+    networks:
+      - finance-network
+    volumes:
+      - ./backend/notification_service:/app
+      - /app/node_modules
+
+  gateway:
+    build:
+      context: ./backend/gateway
+      dockerfile: Dockerfile
+    container_name: finance-gateway
+    env_file:
+      - .env
+    ports:
+      - "${GATEWAY_PORT}:3000"
+    environment:
+      - NODE_ENV=development
+      - JWT_SECRET=${JWT_SECRET}
+      - AUTH_SERVICE_URL=${AUTH_SERVICE_URL}
+      - USER_SERVICE_URL=${USER_SERVICE_URL}
+      - ACCOUNT_SERVICE_URL=${ACCOUNT_SERVICE_URL}
+      - TRANSACTION_SERVICE_URL=${TRANSACTION_SERVICE_URL}
+      - CATEGORY_SERVICE_URL=${CATEGORY_SERVICE_URL}
+      - ANALYTICS_SERVICE_URL=${ANALYTICS_SERVICE_URL}
+      - NOTIFICATION_SERVICE_URL=${NOTIFICATION_SERVICE_URL}
+    depends_on:
+      - auth-service
+      - user-service
+      - account-service
+      - transaction-service
+      - category-service
+      - analytics-service
+      - notification-service
+    networks:
+      - finance-network
+    volumes:
+      - ./backend/gateway:/app
+      - /app/node_modules
+
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile
+  #   container_name: finance-frontend
+  #   ports:
+  #     - "5173:5173"
+  #   environment:
+  #     - VITE_API_URL=http://localhost:3000/api
+  #     - VITE_ENV=development
+  #   depends_on:
+  #     - gateway
+  #   networks:
+  #     - finance-network
+  #   volumes:
+  #     - ./frontend:/app
+  #     - /app/node_modules
+
+networks:
+  finance-network:
+    driver: bridge
+
+volumes:
+  mongodb-data:
+  redis-data:
+  rabbitmq-data:
