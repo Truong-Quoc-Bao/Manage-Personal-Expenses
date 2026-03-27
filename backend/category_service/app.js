@@ -12,5 +12,5 @@ app.get('/health', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Analytics service is running on port ${PORT}`);
+    console.log(`Category service is running on port ${PORT}`);
 });
