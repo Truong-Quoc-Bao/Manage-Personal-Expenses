@@ -2,14 +2,13 @@ const { getCategories } = require("../services/category.service");
 
 const getCategoryList = async (req, res, next) => {
   try {
-    const type = req.query.type;
+    // const type = req.query;
     const userId = "e67f2863-5f03-4dff-b247-478b140ab6c4";
 
-    const categories = await getCategories({ userId, type });
+    const categories = await getCategories({ userId });
 
-    console.log("QUERY:", req.query);
+    console.log("QUERY:", req.query); //không cần input nên ko query
     return res.status(200).json({
-        
       success: true,
       message: "Get categories successfully",
       data: categories,

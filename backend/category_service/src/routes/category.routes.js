@@ -8,7 +8,7 @@ const router = express.Router();
 // GET /api/categories?type=income
 router.get(
   "/categories",
-//   validateGetCategories,
+  // validateGetCategories,
   getCategoryList
 );
 
