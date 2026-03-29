@@ -4,7 +4,78 @@ const {
   createAccount,
   findAccountAccountName,
   findAccountByUserId,
+  updateAccountRepo,
+  findAccountByAccountId,
 } = require("../repositories/account.repository");
+
+const updateAccountServices = async ({
+  userId,
+  accountId,
+  accountName,
+  type,
+}) => {
+  if (!accountId) {
+    const error = new Error("accountId is required");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (accountName === undefined || accountName === null) {
+    const error = new Error("accountName is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!String(accountName).trim()) {
+    const error = new Error("accountName cannot be empty");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (!type) {
+    const error = new Error("type is required");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (!Object.values(AccountType).includes(type)) {
+    const error = new Error("Invalid account type");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const AccountUnique = await findAccountByAccountId({ accountId });
+
+  if (!AccountUnique) {
+    const error = new Error("account not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (AccountUnique.user_id !== userId) {
+    const error = new Error(
+      "You do not have permission to update this account"
+    );
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const existingNameAccount = await findAccountAccountName({
+    accountName,
+    userId,
+  });
+
+  if (existingNameAccount) {
+    const error = new Error("Account name of this user already exists");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const updateAccount = await updateAccountRepo({
+    accountId,
+    accountName,
+    type,
+  });
+
+  return updateAccount;
+};
 
 const getAccountsServices = async ({ userId }) => {
   if (!userId) {
@@ -75,9 +146,12 @@ const createNewAccount = async ({
     throw error;
   }
 
-  const existingNameAccount = await findAccountAccountName({ accountName });
+  const existingNameAccount = await findAccountAccountName({
+    accountName,
+    userId,
+  });
 
-  if (existingNameAccount && existingNameAccount.user_id === userId) {
+  if (existingNameAccount) {
     const error = new Error("Account name of this user already exists");
     error.statusCode = 400;
     throw error;
@@ -97,4 +171,5 @@ const createNewAccount = async ({
 module.exports = {
   createNewAccount,
   getAccountsServices,
+  updateAccountServices,
 };

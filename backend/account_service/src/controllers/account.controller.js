@@ -1,7 +1,33 @@
 const {
   createNewAccount,
   getAccountsServices,
+  updateAccountServices,
 } = require("../services/account.service");
+
+const updateAccountController = async (req, res, next) => {
+  try {
+    const accountId = req.query.accountId;
+
+    const userId = req.user?.userId || req.query.userId;
+
+    const { accountName, type } = req.body;
+
+    const updateAccount = await updateAccountServices({
+      userId,
+      accountId,
+      accountName,
+      type,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Update account successfully",
+      data: updateAccount,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 const getAccountsController = async (req, res, next) => {
   try {
@@ -43,4 +69,8 @@ const CreateAccount = async (req, res, next) => {
   }
 };
 
-module.exports = { CreateAccount, getAccountsController };
+module.exports = {
+  CreateAccount,
+  getAccountsController,
+  updateAccountController,
+};
