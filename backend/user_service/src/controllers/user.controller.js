@@ -21,10 +21,10 @@ const getProfile = async (req, res, next) => {
 
 const updateUser = async (req, res, next) => {
   try {
-    const { userName } = req.body;
+    const { userName, birth } = req.body;
     const userId = req.user?.userId || req.query.userId;
 
-    const update = await updateUserProfile({ userId, userName });
+    const update = await updateUserProfile({ userId, userName, birth });
 
     return res.status(200).json({
       success: true,
