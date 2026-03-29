@@ -6,7 +6,20 @@ const {
   findAccountByUserId,
   updateAccountRepo,
   findAccountByAccountId,
+  deleteAccountRepo,
 } = require("../repositories/account.repository");
+
+const deleteAccountServices = async ({ accountId }) => {
+  if (!accountId) {
+    const error = new Error("accountId is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const deleteAccount = await deleteAccountRepo({ accountId });
+
+  return deleteAccount;
+};
 
 const updateAccountServices = async ({
   userId,
@@ -172,4 +185,5 @@ module.exports = {
   createNewAccount,
   getAccountsServices,
   updateAccountServices,
+  deleteAccountServices,
 };

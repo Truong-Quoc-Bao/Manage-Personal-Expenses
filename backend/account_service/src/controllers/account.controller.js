@@ -2,7 +2,23 @@ const {
   createNewAccount,
   getAccountsServices,
   updateAccountServices,
+  deleteAccountServices,
 } = require("../services/account.service");
+
+const deleteAccountController = async (req, res, next) => {
+  try {
+    const accountId = req.query.accountId;
+
+    const deleteAccount = await deleteAccountServices({ accountId });
+
+    return res.status(200).json({
+      success: true,
+      message: "delete account successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 const updateAccountController = async (req, res, next) => {
   try {
@@ -73,4 +89,5 @@ module.exports = {
   CreateAccount,
   getAccountsController,
   updateAccountController,
+  deleteAccountController,
 };

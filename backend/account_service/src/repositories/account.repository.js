@@ -1,5 +1,13 @@
 const prisma = require("../config/database");
 
+const deleteAccountRepo = async ({ accountId }) => {
+  return prisma.account.delete({
+    where: {
+      account_id: accountId,
+    },
+  });
+};
+
 const findAccountByAccountId = async ({ accountId }) => {
   return prisma.account.findUnique({
     where: {
@@ -101,4 +109,5 @@ module.exports = {
   findAccountByUserId,
   updateAccountRepo,
   findAccountByAccountId,
+  deleteAccountRepo,
 };
