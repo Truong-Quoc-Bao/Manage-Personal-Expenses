@@ -1,5 +1,8 @@
 const { getCategories } = require("../services/category.service");
 const { creaCategories } = require("../services/category.service");
+const { updCategories } = require("../services/category.service");
+// const { creaCategories } = require("../services/category.service");
+
 
 
 const getCategoryList = async (req, res, next) => {
@@ -43,6 +46,25 @@ const createCategory = async (req, res, next) => {
 };
 
 
+
+const updateCategory = async (req, res, next) => {
+  try {
+    const userId = "e67f2863-5f03-4dff-b247-478b140ab6c4";
+    const category = req.body;
+    const catid = req.params.id;
+    const categories = await updCategories({ userId, catid ,cat: category });
+
+    return res.status(200).json({
+      success: true,
+      message: "PUT categories successfully",
+      data: categories,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
 module.exports = {
-  getCategoryList,createCategory
+  getCategoryList,createCategory,updateCategory
 };
