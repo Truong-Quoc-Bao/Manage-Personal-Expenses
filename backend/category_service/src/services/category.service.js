@@ -1,6 +1,6 @@
 const { findCategories } = require("../repositories/category.repository");
 
-const getCategories = async ({ userId, type = null }) => {
+const getCategories = async ({ userId}) => {
   // validate type
   // if (!type) {
   //   const error = new Error("type is required");
@@ -14,7 +14,7 @@ const getCategories = async ({ userId, type = null }) => {
   //   throw error;
   // }
 
-  const categories = await findCategories({ userId, type });
+  const categories = await findCategories({ userId });
 
   return categories;
 };

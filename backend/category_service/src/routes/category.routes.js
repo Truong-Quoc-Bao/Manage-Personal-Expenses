@@ -6,10 +6,6 @@ const { validateGetCategories } = require("../validator/category.validator");
 const router = express.Router();
 
 // GET /api/categories?type=income
-router.get(
-  "/categories",
-  // validateGetCategories,
-  getCategoryList
-);
+router.get("/categories",getCategoryList);
 
 module.exports = router;

@@ -7,7 +7,7 @@ const getCategoryList = async (req, res, next) => {
 
     const categories = await getCategories({ userId });
 
-    console.log("QUERY:", req.query); //không cần input nên ko query
+    console.log("QUERY:", req.query); 
     return res.status(200).json({
       success: true,
       message: "Get categories successfully",
