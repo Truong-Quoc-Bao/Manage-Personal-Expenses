@@ -9,7 +9,7 @@ const findUserById = async (userId) => {
       user_id: true,
       user_name: true,
       email: true,
-      age: true,
+      birth: true,
       created_at: true,
       updated_at: true,
     },
@@ -24,26 +24,33 @@ const findUserByUserName = async (userName) => {
       user_id: true,
       user_name: true,
       email: true,
-      age: true,
+      birth: true,
       created_at: true,
       updated_at: true,
     },
   });
 };
 
-const updateUser = async ({ userId, userName }) => {
+const updateUser = async ({ userId, userName, birth }) => {
+  const data = {};
+
+  if (userName !== undefined) {
+    data.user_name = userName;
+  }
+
+  if (birth !== undefined) {
+    data.birth = new Date(birth);
+  }
   return prisma.user.update({
     where: {
       user_id: userId,
     },
-    data: {
-      user_name: userName,
-    },
+    data,
     select: {
       user_id: true,
       user_name: true,
       email: true,
-      age: true,
+      birth: true,
       created_at: true,
       updated_at: true,
     },
