@@ -1,4 +1,6 @@
 const { findCategories } = require("../repositories/category.repository");
+const { createCategories } = require("../repositories/category.repository");
+
 
 const getCategories = async ({ userId}) => {
   // validate type
@@ -19,6 +21,16 @@ const getCategories = async ({ userId}) => {
   return categories;
 };
 
+const creaCategories = async ({ userId , cat}) => {
+
+
+  const categories = await createCategories({ userId ,cat});
+
+  return categories;
+};
+
+
+
 module.exports = {
-  getCategories,
+  getCategories,creaCategories
 };
