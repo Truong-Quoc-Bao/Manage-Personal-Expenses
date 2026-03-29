@@ -19,7 +19,6 @@ const findOneCategory = async (category_id) => {
   });
 };
 
-
 const createCategories = async ({ userId , cat }) => {
   return prisma.category.create({
     data: {
@@ -32,12 +31,6 @@ const createCategories = async ({ userId , cat }) => {
       is_system: false,
       created_at: new Date(),
     },
-
-
-
-    // orderBy: {
-    //   created_at: "desc",
-    // },
   });
 };
 
@@ -63,6 +56,14 @@ const updateCategory = async ({ userId , category_id, cat }) => {
     // },
   });
 };
+
+const deleteCategory = async (categoryId) => {
+  return prisma.category.delete({
+    where: {
+      category_id: categoryId,
+    }
+  });
+};
 module.exports = {
-  findCategories,createCategories,updateCategory,findOneCategory
+  findCategories,createCategories,updateCategory,findOneCategory,deleteCategory
 };

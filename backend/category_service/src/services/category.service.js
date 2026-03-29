@@ -2,6 +2,8 @@ const { findCategories } = require("../repositories/category.repository");
 const { createCategories } = require("../repositories/category.repository");
 const { updateCategory } = require("../repositories/category.repository");
 const { findOneCategory } = require("../repositories/category.repository");
+const { deleteCategory } = require("../repositories/category.repository");
+
 
 
 
@@ -56,7 +58,20 @@ const updCategories = async ({ userId , catid, cat}) => {
   return categories;
 };
 
+const delCategoryService = async ({ categoryId }) => {
+  const category = await findOneCategory(categoryId);
+
+  if (!category) {
+    const error = new Error("Category not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const categories = await deleteCategory(categoryId);
+  return categories;
+};
+
 
 module.exports = {
-  getCategories,creaCategories,updCategories
+  getCategories,creaCategories,updCategories,delCategoryService
 };
