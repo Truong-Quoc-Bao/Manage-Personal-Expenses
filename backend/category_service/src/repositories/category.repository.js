@@ -11,6 +11,15 @@ const findCategories = async ({ userId }) => {
   });
 };
 
+const findOneCategory = async (category_id) => {
+  return prisma.category.findUnique({
+    where: {
+      category_id: category_id,
+    }
+  });
+};
+
+
 const createCategories = async ({ userId , cat }) => {
   return prisma.category.create({
     data: {
@@ -32,6 +41,28 @@ const createCategories = async ({ userId , cat }) => {
   });
 };
 
+const updateCategory = async ({ userId , category_id, cat }) => {
+  return prisma.category.update({
+    where: {
+      category_id: category_id,
+    },
+    data: {
+      user_id: userId,
+      icon_id: cat.icon_id,
+      category_name: cat.category_name,
+      type: cat.type,
+      color: cat.color,
+      is_system: cat.is_system,
+      created_at: cat.created_at,
+    }
+
+
+
+    // orderBy: {
+    //   created_at: "desc",
+    // },
+  });
+};
 module.exports = {
-  findCategories,createCategories
+  findCategories,createCategories,updateCategory,findOneCategory
 };
