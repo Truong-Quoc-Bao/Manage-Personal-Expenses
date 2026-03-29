@@ -3,7 +3,20 @@ const { AccountType, CurrencyType } = require("@prisma/client");
 const {
   createAccount,
   findAccountAccountName,
+  findAccountByUserId,
 } = require("../repositories/account.repository");
+
+const getAccountsServices = async ({ userId }) => {
+  if (!userId) {
+    const error = new Error("userId is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const accounts = await findAccountByUserId({ userId });
+
+  return accounts;
+};
 
 const createNewAccount = async ({
   userId,
@@ -83,4 +96,5 @@ const createNewAccount = async ({
 
 module.exports = {
   createNewAccount,
+  getAccountsServices,
 };
