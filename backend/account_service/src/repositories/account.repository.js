@@ -1,5 +1,20 @@
 const prisma = require("../config/database");
 
+const findAccountByUserId = async ({ userId }) => {
+  return prisma.account.findMany({
+    where: {
+      user_id: userId,
+    },
+    select: {
+      account_name: true,
+      type: true,
+      balance: true,
+      currency: true,
+      created_at: true,
+      updated_at: true,
+    },
+  });
+};
 const findAccountAccountName = async ({ accountName }) => {
   return prisma.account.findFirst({
     where: {
@@ -45,4 +60,5 @@ const createAccount = async ({
 module.exports = {
   createAccount,
   findAccountAccountName,
+  findAccountByUserId,
 };
