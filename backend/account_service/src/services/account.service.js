@@ -7,7 +7,28 @@ const {
   updateAccountRepo,
   findAccountByAccountId,
   deleteAccountRepo,
+  findTotalByUserId,
 } = require("../repositories/account.repository");
+
+const getTotalBalanceService = async ({ userId }) => {
+  if (!userId) {
+    const error = new Error("userId is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const accounts = await findTotalByUserId({ userId });
+
+  const totalBalance = accounts.reduce((sum, account) => {
+    return sum + Number(account.balance || 0);
+  }, 0);
+
+  return {
+    user_id: userId,
+    total_balance: totalBalance,
+    accounts,
+  };
+};
 
 const deleteAccountServices = async ({ accountId }) => {
   if (!accountId) {
@@ -186,4 +207,5 @@ module.exports = {
   getAccountsServices,
   updateAccountServices,
   deleteAccountServices,
+  getTotalBalanceService,
 };

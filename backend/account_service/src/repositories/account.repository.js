@@ -1,5 +1,18 @@
 const prisma = require("../config/database");
 
+const findTotalByUserId = async ({ userId }) => {
+  return prisma.account.findMany({
+    where: {
+      user_id: userId,
+    },
+    select: {
+      account_name: true,
+      type: true,
+      balance: true,
+    },
+  });
+};
+
 const deleteAccountRepo = async ({ accountId }) => {
   return prisma.account.delete({
     where: {
@@ -110,4 +123,5 @@ module.exports = {
   updateAccountRepo,
   findAccountByAccountId,
   deleteAccountRepo,
+  findTotalByUserId,
 };

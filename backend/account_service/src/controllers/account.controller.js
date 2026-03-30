@@ -3,7 +3,24 @@ const {
   getAccountsServices,
   updateAccountServices,
   deleteAccountServices,
+  getTotalBalanceService,
 } = require("../services/account.service");
+
+const getTotalBalanceController = async (req, res, next) => {
+  try {
+    const userId = req.user?.userId || req.query.userId;
+
+    const result = await getTotalBalanceService({ userId });
+
+    return res.status(200).json({
+      success: true,
+      message: "Get total balance successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 const deleteAccountController = async (req, res, next) => {
   try {
@@ -90,4 +107,5 @@ module.exports = {
   getAccountsController,
   updateAccountController,
   deleteAccountController,
+  getTotalBalanceController,
 };
