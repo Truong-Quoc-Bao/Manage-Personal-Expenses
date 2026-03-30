@@ -24,6 +24,9 @@ const updateUser = async (req, res, next) => {
     const { userName, birth } = req.body;
     const userId = req.user?.userId || req.query.userId;
 
+    console.log("userName =", userName);
+    console.log("birth =", birth);
+
     const update = await updateUserProfile({ userId, userName, birth });
 
     return res.status(200).json({

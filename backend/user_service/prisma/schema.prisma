@@ -19,6 +19,7 @@ model User {
   user_name  String?   @db.VarChar(100)
   email      String?   @db.VarChar(150)
   birth      DateTime? @db.Date
+  telegram_id  BigInt?   @unique
   created_at DateTime  @default(now()) @db.Timestamp(6)
   updated_at DateTime  @default(now()) @db.Timestamp(6)
 
