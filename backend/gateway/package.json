@@ -19,6 +19,7 @@
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "http-proxy-middleware": "^3.0.5",
-    "morgan": "^1.10.1"
+    "morgan": "^1.10.1",
+    "rabbitmq-client": "file:../shared/rabbitmq-client"
   }
 }

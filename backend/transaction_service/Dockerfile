@@ -1,26 +1,26 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-WORKDIR /src
-
-COPY ./src/TransactionService.API/*.csproj ./TransactionService.API/
-COPY ./src/TransactionService.Application/*.csproj ./TransactionService.Application/
-COPY ./src/TransactionService.Core/*.csproj ./TransactionService.Core/
-COPY ./src/TransactionService.Infrastructure/*.csproj ./TransactionService.Infrastructure/
-
-COPY ./src .
-
-WORKDIR /src/TransactionService.API
-RUN dotnet restore
-
-RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false
-
-FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
 
+COPY ["backend/shared/dotnet-shared/RabbitMQ.Client.Shared/RabbitMQ.Client.Shared.csproj", "backend/shared/dotnet-shared/RabbitMQ.Client.Shared/"]
+COPY ["backend/transaction_service/src/TransactionService.API/TransactionService.API.csproj", "backend/transaction_service/src/TransactionService.API/"]
+COPY ["backend/transaction_service/src/TransactionService.Application/TransactionService.Application.csproj", "backend/transaction_service/src/TransactionService.Application/"]
+COPY ["backend/transaction_service/src/TransactionService.Core/TransactionService.Core.csproj", "backend/transaction_service/src/TransactionService.Core/"]
+COPY ["backend/transaction_service/src/TransactionService.Infrastructure/TransactionService.Infrastructure.csproj", "backend/transaction_service/src/TransactionService.Infrastructure/"]
+
+RUN dotnet restore "backend/transaction_service/src/TransactionService.API/TransactionService.API.csproj"
+
+COPY backend/shared/dotnet-shared/ ./backend/shared/dotnet-shared/
+COPY backend/transaction_service/ ./backend/transaction_service/
+
+WORKDIR "/app/backend/transaction_service/src/TransactionService.API"
+RUN dotnet publish "TransactionService.API.csproj" -c Release -o /app/publish /p:UseAppHost=false
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+WORKDIR /app
 COPY --from=build /app/publish .
 
 EXPOSE 3007
 ENV ASPNETCORE_URLS=http://+:3007
-
 ENTRYPOINT ["dotnet", "TransactionService.API.dll"]
 
 
@@ -29,18 +29,20 @@ ENTRYPOINT ["dotnet", "TransactionService.API.dll"]
 # =============================================
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS development
 
-WORKDIR /src
+WORKDIR /app
 
-COPY ./src/TransactionService.API/*.csproj ./TransactionService.API/
-COPY ./src/TransactionService.Application/*.csproj ./TransactionService.Application/
-COPY ./src/TransactionService.Core/*.csproj ./TransactionService.Core/
-COPY ./src/TransactionService.Infrastructure/*.csproj ./TransactionService.Infrastructure/
+COPY ["backend/shared/dotnet-shared/RabbitMQ.Client.Shared/RabbitMQ.Client.Shared.csproj", "backend/shared/dotnet-shared/RabbitMQ.Client.Shared/"]
+COPY ["backend/transaction_service/src/TransactionService.API/TransactionService.API.csproj", "backend/transaction_service/src/TransactionService.API/"]
+COPY ["backend/transaction_service/src/TransactionService.Application/TransactionService.Application.csproj", "backend/transaction_service/src/TransactionService.Application/"]
+COPY ["backend/transaction_service/src/TransactionService.Core/TransactionService.Core.csproj", "backend/transaction_service/src/TransactionService.Core/"]
+COPY ["backend/transaction_service/src/TransactionService.Infrastructure/TransactionService.Infrastructure.csproj", "backend/transaction_service/src/TransactionService.Infrastructure/"]
 
-RUN dotnet restore "./TransactionService.API/TransactionService.API.csproj"
+RUN dotnet restore "backend/transaction_service/src/TransactionService.API/TransactionService.API.csproj"
 
-COPY ./src ./
+COPY backend/shared/dotnet-shared/ ./backend/shared/dotnet-shared/
+COPY backend/transaction_service/ ./backend/transaction_service/
 
-WORKDIR /src/TransactionService.API
+WORKDIR "/app/backend/transaction_service/src/TransactionService.API"
 
 EXPOSE 3007
 ENV ASPNETCORE_ENVIRONMENT=Development

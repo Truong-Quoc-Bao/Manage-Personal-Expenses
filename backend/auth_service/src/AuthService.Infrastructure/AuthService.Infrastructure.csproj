@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AuthService.Core\AuthService.Core.csproj" />
+    <ProjectReference Include="..\..\..\shared\dotnet-shared\RabbitMQ.Client.Shared\RabbitMQ.Client.Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>

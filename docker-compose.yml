@@ -47,18 +47,19 @@ services:
 
   auth-service:
     build:
-      context: ./backend/auth_service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/auth_service/Dockerfile
       target: development
     container_name: finance-auth-service
     env_file:
       - .env
     volumes:
-      - ./backend/auth_service/src:/src
-      - /src/AuthService.API/bin
-      - /src/AuthService.API/obj
-      - /src/AuthService.Application/bin
-      - /src/AuthService.Application/obj
+      - ./backend/auth_service:/app/backend/auth_service
+      - ./backend/shared/dotnet-shared:/app/backend/shared/dotnet-shared
+      - /app/backend/auth_service/src/AuthService.API/bin
+      - /app/backend/auth_service/src/AuthService.API/obj
+      - /app/backend/auth_service/src/AuthService.Application/bin
+      - /app/backend/auth_service/src/AuthService.Application/obj
     ports:
       - "${AUTH_SERVICE_PORT}:3006"
     environment:
@@ -74,8 +75,8 @@ services:
 
   user-service:
     build:
-      context: ./backend/user_service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/user_service/Dockerfile
     container_name: finance-user-service
     env_file:
       - .env
@@ -89,13 +90,15 @@ services:
     networks:
       - finance-network
     volumes:
-      - ./backend/user_service:/app
-      - /app/node_modules
+      - ./backend/user_service:/app/backend/user_service
+      - ./backend/shared/rabbitmq-client:/app/backend/shared/rabbitmq-client
+      - /app/backend/user_service/node_modules
+      - /app/backend/shared/rabbitmq-client/node_modules
 
   account-service:
     build:
-      context: ./backend/account_service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/account_service/Dockerfile
     container_name: finance-account-service
     env_file:
       - .env
@@ -109,23 +112,26 @@ services:
     networks:
       - finance-network
     volumes:
-      - ./backend/account_service:/app
-      - /app/node_modules
+      - ./backend/account_service:/app/backend/account_service
+      - ./backend/shared/rabbitmq-client:/app/backend/shared/rabbitmq-client
+      - /app/backend/account_service/node_modules
+      - /app/backend/shared/rabbitmq-client/node_modules
 
   transaction-service:
     build:
-      context: ./backend/transaction_service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/transaction_service/Dockerfile
       target: development
     container_name: finance-transaction-service
     env_file:
       - .env
     volumes:
-      - ./backend/transaction_service/src:/src
-      - /src/TransactionService.API/bin
-      - /src/TransactionService.API/obj
-      - /src/TransactionService.Application/bin
-      - /src/TransactionService.Application/obj
+      - ./backend/transaction_service:/app/backend/transaction_service
+      - ./backend/shared/dotnet-shared:/app/backend/shared/dotnet-shared
+      - /app/backend/transaction_service/src/TransactionService.API/bin
+      - /app/backend/transaction_service/src/TransactionService.API/obj
+      - /app/backend/transaction_service/src/TransactionService.Application/bin
+      - /app/backend/transaction_service/src/TransactionService.Application/obj
     ports:
       - "${TRANSACTION_SERVICE_PORT}:3007"
     environment:
@@ -139,8 +145,8 @@ services:
 
   category-service:
     build:
-      context: ./backend/category_service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/category_service/Dockerfile
     container_name: finance-category-service
     env_file:
       - .env
@@ -154,13 +160,15 @@ services:
     networks:
       - finance-network
     volumes:
-      - ./backend/category_service:/app
-      - /app/node_modules
+      - ./backend/category_service:/app/backend/category_service
+      - ./backend/shared/rabbitmq-client:/app/backend/shared/rabbitmq-client
+      - /app/backend/category_service/node_modules
+      - /app/backend/shared/rabbitmq-client/node_modules
 
   analytics-service:
     build:
-      context: ./backend/analytics_service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/analytics_service/Dockerfile
     container_name: finance-analytics-service
     env_file:
       - .env
@@ -175,13 +183,15 @@ services:
     networks:
       - finance-network
     volumes:
-      - ./backend/analytics_service:/app
-      - /app/node_modules
+      - ./backend/analytics_service:/app/backend/analytics_service
+      - ./backend/shared/rabbitmq-client:/app/backend/shared/rabbitmq-client
+      - /app/backend/analytics_service/node_modules
+      - /app/backend/shared/rabbitmq-client/node_modules
 
   notification-service:
     build:
-      context: ./backend/notification_service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/notification_service/Dockerfile
     container_name: finance-notification-service
     env_file:
       - .env
@@ -195,13 +205,15 @@ services:
     networks:
       - finance-network
     volumes:
-      - ./backend/notification_service:/app
-      - /app/node_modules
+      - ./backend/notification_service:/app/backend/notification_service
+      - ./backend/shared/rabbitmq-client:/app/backend/shared/rabbitmq-client
+      - /app/backend/notification_service/node_modules
+      - /app/backend/shared/rabbitmq-client/node_modules
 
   gateway:
     build:
-      context: ./backend/gateway
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/gateway/Dockerfile
     container_name: finance-gateway
     env_file:
       - .env
@@ -228,8 +240,10 @@ services:
     networks:
       - finance-network
     volumes:
-      - ./backend/gateway:/app
-      - /app/node_modules
+      - ./backend/gateway:/app/backend/gateway
+      - ./backend/shared/rabbitmq-client:/app/backend/shared/rabbitmq-client
+      - /app/backend/gateway/node_modules
+      - /app/backend/shared/rabbitmq-client/node_modules
 
   # frontend:
   #   build:

@@ -21,6 +21,7 @@
     "express-mongo-sanitize": "^2.2.0",
     "joi": "^18.0.2",
     "mongoose": "^9.3.1",
+    "rabbitmq-client": "file:../shared/rabbitmq-client",
     "uuid": "^13.0.0"
   }
 }
