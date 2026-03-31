@@ -3,18 +3,61 @@ const prisma = require("../config/database");
 const findUserById = async (userId) => {
   return prisma.user.findUnique({
     where: {
-      userId,
+      user_id: userId,
     },
     select: {
-      userId: true,
-      userName: true,
+      user_id: true,
+      user_name: true,
       email: true,
-      createdAt: true,
-      updatedAt: true,
+      birth: true,
+      created_at: true,
+      updated_at: true,
+    },
+  });
+};
+const findUserByUserName = async (userName) => {
+  return prisma.user.findFirst({
+    where: {
+      user_name: userName,
+    },
+    select: {
+      user_id: true,
+      user_name: true,
+      email: true,
+      birth: true,
+      created_at: true,
+      updated_at: true,
     },
   });
 };
 
+const updateUser = async ({ userId, userName, birth }) => {
+  const data = {};
+
+  if (userName !== undefined) {
+    data.user_name = userName;
+  }
+
+  if (birth !== undefined) {
+    data.birth = new Date(birth);
+  }
+  return prisma.user.update({
+    where: {
+      user_id: userId,
+    },
+    data,
+    select: {
+      user_id: true,
+      user_name: true,
+      email: true,
+      birth: true,
+      created_at: true,
+      updated_at: true,
+    },
+  });
+};
 module.exports = {
   findUserById,
+  findUserByUserName,
+  updateUser,
 };

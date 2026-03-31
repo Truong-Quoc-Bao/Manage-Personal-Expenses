@@ -14,7 +14,7 @@ app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
-app.use("/api/users", userRoutes);
+app.use("/", userRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err);
