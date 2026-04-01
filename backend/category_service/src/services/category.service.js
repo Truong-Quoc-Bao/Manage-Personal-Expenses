@@ -29,6 +29,7 @@ const getCategories = async ({ userId}) => {
 
 const creaCategories = async ({ userId , cat}) => {
 
+  console.log("Creating service category with data:", { userId, cat }); // Debug log to check input data
 
   const categories = await createCategories({ userId ,cat});
 

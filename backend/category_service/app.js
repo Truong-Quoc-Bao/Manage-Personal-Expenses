@@ -25,12 +25,14 @@ const express = require("express");
 const app = express();
 const PORT = process.env.PORT;
 
-// import routes
-const categoryRoutes = require("./src/routes/category.routes");
+
 
 // middlewares
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// import routes
+const categoryRoutes = require("./src/routes/category.routes");
 
 // health check
 app.get("/health", (req, res) => {
