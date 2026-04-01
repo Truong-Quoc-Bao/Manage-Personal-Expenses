@@ -6,11 +6,12 @@ const {
   deleteAccountController,
   getTotalBalanceController,
 } = require("../controllers/account.controller");
+const validate = require("../middlewares/validation.middleware");
 
 const router = express.Router();
-router.post("/accounts", CreateAccount);
+router.post("/accounts", validate(), CreateAccount);
 router.get("/accounts", getAccountsController);
-router.put("/accounts", updateAccountController);
+router.put("/accounts", validate(), updateAccountController);
 router.delete("/accounts", deleteAccountController);
 router.get("/accounts/total-balance", getTotalBalanceController);
 module.exports = router;

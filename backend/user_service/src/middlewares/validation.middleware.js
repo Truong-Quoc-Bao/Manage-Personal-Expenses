@@ -1,6 +1,9 @@
-const validate = (schema) => {
+const { userValidation } = require("../validator");
+
+const validate = () => {
   return (req, res, next) => {
     const errors = [];
+    const schema = userValidation.userValidation;
 
     for (const key of ["body", "query", "params"]) {
       if (schema[key]) {

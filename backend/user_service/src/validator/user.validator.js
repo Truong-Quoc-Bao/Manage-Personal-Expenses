@@ -21,7 +21,7 @@ const bannedWords = [
   "đụ mẹ",
 ];
 
-const updateProfile = {
+const userValidation = {
   body: Joi.object({
     userName: Joi.string()
       .max(100)
@@ -54,5 +54,5 @@ const updateProfile = {
 };
 
 module.exports = {
-  updateProfile,
+  userValidation,
 };
