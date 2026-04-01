@@ -30,6 +30,8 @@ const createCategory = async (req, res, next) => {
     // const type = req.query;
     const userId = "e67f2863-5f03-4dff-b247-478b140ab6c4";
     const category = req.body;
+    console.log("Creating controller category with data:", { userId, cat: category }); // Debug log to check input data
+
     const categories = await creaCategories({ userId, cat: category });
 
     // console.log("QUERY:", req.query); 

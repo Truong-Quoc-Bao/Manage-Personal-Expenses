@@ -20,9 +20,10 @@ const findOneCategory = async (category_id) => {
 };
 
 const createCategories = async ({ userId , cat }) => {
+  console.log("Creating repo category with data:", { userId, cat }); // Debug log to check input data
   return prisma.category.create({
     data: {
-    //   category_id: crypto.randomUUID(),
+      // category_id: crypto.randomUUID(),
       user_id: userId,
       icon_id: cat.icon_id,
       category_name: cat.category_name,
