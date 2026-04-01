@@ -53,26 +53,38 @@ const updateAccountServices = async ({
     error.statusCode = 400;
     throw error;
   }
-  if (accountName === undefined || accountName === null) {
-    const error = new Error("accountName is required");
+  if (accountName === undefined && type === undefined) {
+    const error = new Error(
+      "At least one field (accountName or type) is required"
+    );
     error.statusCode = 400;
     throw error;
   }
 
-  if (!String(accountName).trim()) {
-    const error = new Error("accountName cannot be empty");
-    error.statusCode = 400;
-    throw error;
+  if (accountName !== undefined) {
+    if (accountName === null || !String(accountName).trim()) {
+      const error = new Error("accountName cannot be empty");
+      error.statusCode = 400;
+      throw error;
+    }
+    const existingNameAccount = await findAccountAccountName({
+      accountName,
+      userId,
+    });
+
+    if (existingNameAccount) {
+      const error = new Error("Account name of this user already exists");
+      error.statusCode = 400;
+      throw error;
+    }
   }
-  if (!type) {
-    const error = new Error("type is required");
-    error.statusCode = 400;
-    throw error;
-  }
-  if (!Object.values(AccountType).includes(type)) {
-    const error = new Error("Invalid account type");
-    error.statusCode = 400;
-    throw error;
+
+  if (type !== undefined) {
+    if (!Object.values(AccountType).includes(type)) {
+      const error = new Error("Invalid account type");
+      error.statusCode = 400;
+      throw error;
+    }
   }
 
   const AccountUnique = await findAccountByAccountId({ accountId });
@@ -88,17 +100,6 @@ const updateAccountServices = async ({
       "You do not have permission to update this account"
     );
     error.statusCode = 403;
-    throw error;
-  }
-
-  const existingNameAccount = await findAccountAccountName({
-    accountName,
-    userId,
-  });
-
-  if (existingNameAccount) {
-    const error = new Error("Account name of this user already exists");
-    error.statusCode = 400;
     throw error;
   }
 
