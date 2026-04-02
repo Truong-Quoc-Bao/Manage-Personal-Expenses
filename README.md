@@ -1,7 +1,6 @@
-# File Tree: DA
+# File Tree: Personal Finance Management
 
-**Generated:** 3/26/2026, 3:46:18 PM
-**Root Path:** `f:\Project_Dat\SGU\DACN\DA`
+**Generated:** 3/29/2026, 4:14:18 PM
 
 ```
 ├── 📁 backend
@@ -24,6 +23,20 @@
 │   │   │   │   │   └── 📄 transaction-updated.consumer.js
 │   │   │   │   └── 📁 publishers
 │   │   │   │       └── 📄 balance-update.publisher.js
+│   │   │   ├── 📁 generated
+│   │   │   │   └── 📁 prisma
+│   │   │   │       ├── 📁 internal
+│   │   │   │       │   ├── 📄 class.ts
+│   │   │   │       │   ├── 📄 prismaNamespace.ts
+│   │   │   │       │   └── 📄 prismaNamespaceBrowser.ts
+│   │   │   │       ├── 📁 models
+│   │   │   │       │   └── 📄 Account.ts
+│   │   │   │       ├── 📄 browser.ts
+│   │   │   │       ├── 📄 client.ts
+│   │   │   │       ├── 📄 commonInputTypes.ts
+│   │   │   │       ├── 📄 enums.ts
+│   │   │   │       ├── 📄 models.ts
+│   │   │   │       └── 📄 query_engine-windows.dll.node
 │   │   │   ├── 📁 middlewares
 │   │   │   │   ├── 📄 auth.middleware.js
 │   │   │   │   ├── 📄 error.middleware.js
@@ -40,12 +53,12 @@
 │   │   │   │   └── 📄 index.js
 │   │   │   ├── 📁 utils
 │   │   │   │   └── 📄 index.js
-│   │   │   ├── 📁 validators
-│   │   │   │   └── 📄 index.js
-│   │   │   └── 📄 app.js
+│   │   │   └── 📁 validators
+│   │   │       └── 📄 index.js
 │   │   ├── 📁 tests
 │   │   ├── ⚙️ .gitignore
 │   │   ├── 🐳 Dockerfile
+│   │   ├── 📄 app.js
 │   │   ├── ⚙️ package-lock.json
 │   │   ├── ⚙️ package.json
 │   │   └── 📄 prisma.config.ts
@@ -77,9 +90,8 @@
 │   │   │   │   └── 📄 index.js
 │   │   │   ├── 📁 utils
 │   │   │   │   └── 📄 index.js
-│   │   │   ├── 📁 validators
-│   │   │   │   └── 📄 analytics.validator.js
-│   │   │   └── 📄 app.js
+│   │   │   └── 📁 validators
+│   │   │       └── 📄 analytics.validator.js
 │   │   ├── 📁 tests
 │   │   ├── 🐳 Dockerfile
 │   │   ├── 📄 app.js
@@ -117,12 +129,16 @@
 │   │   │   │   │   └── 📄 AuthSession.cs
 │   │   │   │   ├── 📁 Interfaces
 │   │   │   │   │   ├── 📄 IAuthRepository.cs
+│   │   │   │   │   ├── 📄 IRabbitMQPublisher.cs
 │   │   │   │   │   └── 📄 ITokenService.cs
 │   │   │   │   ├── 📄 AuthService.Core.csproj
 │   │   │   │   └── 📄 Class1.cs
 │   │   │   └── 📁 AuthService.Infrastructure
 │   │   │       ├── 📁 Data
-│   │   │       │   └── 📄 AppDbContext.cs
+│   │   │       │   ├── 📄 AuthDbContext.cs
+│   │   │       │   └── 📄 AuthDbContextFactory.cs
+│   │   │       ├── 📁 Extensions
+│   │   │       │   └── 📄 ServiceCollectionExtensions.cs
 │   │   │       ├── 📁 MessageBroker
 │   │   │       │   └── 📄 RabbitMQPublisher.cs
 │   │   │       ├── 📄 AuthService.Infrastructure.csproj
@@ -142,6 +158,21 @@
 │   │   │   │   └── 📄 category.dto.js
 │   │   │   ├── 📁 events
 │   │   │   │   └── 📄 index.js
+│   │   │   ├── 📁 generated
+│   │   │   │   └── 📁 prisma
+│   │   │   │       ├── 📁 internal
+│   │   │   │       │   ├── 📄 class.ts
+│   │   │   │       │   ├── 📄 prismaNamespace.ts
+│   │   │   │       │   └── 📄 prismaNamespaceBrowser.ts
+│   │   │   │       ├── 📁 models
+│   │   │   │       │   ├── 📄 Category.ts
+│   │   │   │       │   └── 📄 Icon.ts
+│   │   │   │       ├── 📄 browser.ts
+│   │   │   │       ├── 📄 client.ts
+│   │   │   │       ├── 📄 commonInputTypes.ts
+│   │   │   │       ├── 📄 enums.ts
+│   │   │   │       ├── 📄 models.ts
+│   │   │   │       └── 📄 query_engine-windows.dll.node
 │   │   │   ├── 📁 middlewares
 │   │   │   │   ├── 📄 auth.middleware.js
 │   │   │   │   ├── 📄 error.middleware.js
@@ -157,13 +188,13 @@
 │   │   │   │   └── 📄 index.js
 │   │   │   ├── 📁 utils
 │   │   │   │   └── 📄 index.js
-│   │   │   ├── 📁 validator
-│   │   │   │   ├── 📄 category.validator.js
-│   │   │   │   └── 📄 index.js
-│   │   │   └── 📄 app.js
+│   │   │   └── 📁 validator
+│   │   │       ├── 📄 category.validator.js
+│   │   │       └── 📄 index.js
 │   │   ├── 📁 tests
 │   │   ├── ⚙️ .gitignore
 │   │   ├── 🐳 Dockerfile
+│   │   ├── 📄 app.js
 │   │   ├── ⚙️ package-lock.json
 │   │   ├── ⚙️ package.json
 │   │   └── 📄 prisma.config.ts
@@ -174,15 +205,15 @@
 │   │   │   │   ├── 📄 rate-limit.config.js
 │   │   │   │   └── 📄 routes.config.js
 │   │   │   ├── 📁 middleware
-│   │   │   │   └── 📄 auth.middleware.js
+│   │   │   │   ├── 📄 auth.middleware.js
+│   │   │   │   ├── 📄 cors.middleware.js
+│   │   │   │   └── 📄 rate-limit.middleware.js
 │   │   │   ├── 📁 routes
 │   │   │   │   └── 📄 index.js
-│   │   │   ├── 📁 utils
-│   │   │   │   └── 📄 proxy.util.js
-│   │   │   ├── 📄 app.js
-│   │   │   ├── 📄 cors.middleware.js
-│   │   │   └── 📄 rate-limit.middleware.js
+│   │   │   └── 📁 utils
+│   │   │       └── 📄 proxy.util.js
 │   │   ├── 🐳 Dockerfile
+│   │   ├── 📄 app.js
 │   │   ├── ⚙️ package-lock.json
 │   │   └── ⚙️ package.json
 │   ├── 📁 notification_service
@@ -222,21 +253,31 @@
 │   │   │   │   └── 📄 index.js
 │   │   │   ├── 📁 utils
 │   │   │   │   └── 📄 index.js
-│   │   │   ├── 📁 validator
-│   │   │   │   └── 📄 index.js
-│   │   │   └── 📄 app.js
+│   │   │   └── 📁 validator
+│   │   │       └── 📄 index.js
 │   │   ├── 📁 tests
 │   │   ├── 🐳 Dockerfile
+│   │   ├── 📄 app.js
 │   │   ├── ⚙️ package-lock.json
 │   │   └── ⚙️ package.json
 │   ├── 📁 shared
+│   │   ├── 📁 common-utils
+│   │   ├── 📁 dotnet-shared
+│   │   │   └── 📁 RabbitMQ.Client.Shared
+│   │   │       ├── 📄 Class1.cs
+│   │   │       ├── 📄 IRabbitMQClient.cs
+│   │   │       ├── 📄 RabbitMQ.Client.Shared.csproj
+│   │   │       └── 📄 RabbitMQClient.cs
+│   │   └── 📁 rabbitmq-client
+│   │       ├── 📁 src
+│   │       │   └── 📄 index.js
+│   │       ├── ⚙️ package-lock.json
+│   │       └── ⚙️ package.json
 │   ├── 📁 transaction_service
 │   │   ├── 📁 src
 │   │   │   ├── 📁 TransactionService.API
 │   │   │   │   ├── 📁 Controllers
 │   │   │   │   │   └── 📄 TransactionsController.cs
-│   │   │   │   ├── 📁 Extensions
-│   │   │   │   │   └── 📄 ServiceCollectionExtension.cs
 │   │   │   │   ├── 📁 Filters
 │   │   │   │   │   └── 📄 ValidationFilter
 │   │   │   │   ├── 📁 Middlewares
@@ -263,7 +304,6 @@
 │   │   │   │   │   ├── 📄 CreateTransactionDto.cs
 │   │   │   │   │   └── 📄 TransactionDto.cs
 │   │   │   │   ├── 📁 Entities
-│   │   │   │   │   ├── 📄 Account.cs
 │   │   │   │   │   └── 📄 Transaction.cs
 │   │   │   │   ├── 📁 Exceptions
 │   │   │   │   │   └── 📄 BusinessException.cs
@@ -275,11 +315,21 @@
 │   │   │   │   └── 📄 TransactionService.Core.csproj
 │   │   │   └── 📁 TransactionService.Infrastructure
 │   │   │       ├── 📁 Data
-│   │   │       │   └── 📁 Repositories
-│   │   │       │       └── 📄 TransactionRepository.cs
+│   │   │       │   ├── 📁 Repositories
+│   │   │       │   │   └── 📄 TransactionRepository.cs
+│   │   │       │   ├── 📄 TransactionDbContexFactory.cs
+│   │   │       │   └── 📄 TransactionDbContext.cs
+│   │   │       ├── 📁 Extensions
+│   │   │       │   └── 📄 ServiceCollectionExtension.cs
 │   │   │       ├── 📁 MessageBroker
 │   │   │       │   ├── 📄 RabbitMQConfig.cs
 │   │   │       │   └── 📄 RabbitMQPublisher.cs
+│   │   │       ├── 📁 src
+│   │   │       │   ├── 📁 TransactionService
+│   │   │       │   │   └── 📁 Infrastructure
+│   │   │       │   │       └── 📁 Data
+│   │   │       │   └── 📁 TransactionService.Infrastructure
+│   │   │       │       └── 📁 Data
 │   │   │       ├── 📄 Class1.cs
 │   │   │       └── 📄 TransactionService.Infrastructure.csproj
 │   │   ├── 📁 tests
@@ -297,6 +347,8 @@
 │       │   ├── 📁 dtos
 │       │   │   └── 📄 user.dto.js
 │       │   ├── 📁 events
+│       │   │   ├── 📁 consumer
+│       │   │   │   └── 📄 user-create.consumer.js
 │       │   │   └── 📄 index.js
 │       │   ├── 📁 middlewares
 │       │   │   ├── 📄 auth.middleware.js
@@ -313,16 +365,19 @@
 │       │   │   └── 📄 user.types.js
 │       │   ├── 📁 utils
 │       │   │   └── 📄 index.js
-│       │   ├── 📁 validator
-│       │   │   ├── 📄 index.js
-│       │   │   └── 📄 user.validator.js
-│       │   └── 📄 app.js
+│       │   └── 📁 validator
+│       │       ├── 📄 index.js
+│       │       └── 📄 user.validator.js
 │       ├── 📁 tests
 │       ├── ⚙️ .gitignore
 │       ├── 🐳 Dockerfile
+│       ├── 📄 app.js
 │       ├── ⚙️ package-lock.json
 │       ├── ⚙️ package.json
 │       └── 📄 prisma.config.ts
+├── 📁 data
+│   ├── 📄 transactions_2025_jan_oct.sql
+│   └── 📄 transactions_v2.sql
 ├── 📁 frontend
 │   ├── 📁 public
 │   │   └── 🖼️ vite.svg
@@ -340,8 +395,10 @@
 │   ├── ⚙️ package-lock.json
 │   ├── ⚙️ package.json
 │   └── 📄 vite.config.js
+├── ⚙️ .dockerignore
 ├── ⚙️ .gitignore
 ├── 📝 README.md
 ├── ⚙️ docker-compose.yml
+├── ⚙️ package-lock.json
 └── 📄 schema_test.sql
 ```

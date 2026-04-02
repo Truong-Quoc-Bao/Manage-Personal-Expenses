@@ -2,11 +2,18 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY ["backend/shared/rabbitmq-client/package*.json", "backend/shared/rabbitmq-client/"]
+COPY ["backend/category_service/package*.json", "backend/category_service/"]
 
-RUN npm ci
+RUN cd backend/shared/rabbitmq-client && npm install
+RUN cd backend/category_service && npm install
 
-COPY . .
+COPY ["backend/shared/rabbitmq-client/", "backend/shared/rabbitmq-client/"]
+COPY ["backend/category_service/", "backend/category_service/"]
+
+RUN cd backend/category_service && npx prisma generate
+
+WORKDIR /app/backend/category_service
 
 EXPOSE 3003
 

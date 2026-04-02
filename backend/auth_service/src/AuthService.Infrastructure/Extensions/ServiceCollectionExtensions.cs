@@ -3,6 +3,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using AuthService.Infrastructure.Data;
+using RabbitMQ.Client.Shared;
+using AuthService.Core.Interfaces;
+using AuthService.Infrastructure.MessageBroker;
+using AuthService.Core.Entities;
 
 namespace AuthService.Infrastructure.Extensions
 {
@@ -11,6 +15,11 @@ namespace AuthService.Infrastructure.Extensions
         public static IServiceCollection AddAuthInfrastructure(this IServiceCollection services, IConfiguration configuration)
         {
             var connectionString = configuration.GetConnectionString("DefaultConnection");
+            var rabbitMQConnectionString = configuration.GetConnectionString("RabbitMQConnection");
+
+            services.AddSingleton<IRabbitMQClient>(sp => new RabbitMQClient(rabbitMQConnectionString));
+
+            services.AddScoped<IRabbitMQPublisher, RabbitMQPublisher>();
 
             services.AddDbContext<AuthDbContext>(options =>
             {
@@ -21,8 +30,9 @@ namespace AuthService.Infrastructure.Extensions
                 });
             });
 
-            services.AddIdentityCore<IdentityUser>()
-                .AddTokenProvider<DataProtectorTokenProvider<IdentityUser>>("PSNM")
+            services.AddIdentityCore<ApplicationUser>()
+                .AddRoles<IdentityRole>()
+                .AddTokenProvider<DataProtectorTokenProvider<ApplicationUser>>("PSNM")
                 .AddEntityFrameworkStores<AuthDbContext>()
                 .AddDefaultTokenProviders();
 

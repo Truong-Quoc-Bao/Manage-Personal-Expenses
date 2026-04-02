@@ -21,6 +21,8 @@
   <ItemGroup>
     <ProjectReference Include="..\TransactionService.Application\TransactionService.Application.csproj" />
     <ProjectReference Include="..\TransactionService.Infrastructure\TransactionService.Infrastructure.csproj" />
+    <ProjectReference Include="..\TransactionService.Core\TransactionService.Core.csproj" />
+    <ProjectReference Include="..\..\..\shared\dotnet-shared\RabbitMQ.Client.Shared\RabbitMQ.Client.Shared.csproj" />
   </ItemGroup>
 
 </Project>

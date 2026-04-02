@@ -3,6 +3,7 @@ require("dotenv").config({ path: path.resolve(__dirname, ".env") });
 const express = require("express");
 const app = express();
 const PORT = process.env.PORT;
+const rabbitMQClient = require("./src/events");
 
 const accountRouter = require("./src/routes/account.routes");
 
@@ -24,6 +25,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
+  await rabbitMQClient.startRabbitMQ();
   console.log(`Account service is running on port ${PORT}`);
 });

@@ -2,11 +2,16 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY ["backend/shared/rabbitmq-client/package*.json", "backend/shared/rabbitmq-client/"]
+COPY ["backend/gateway/package*.json", "backend/gateway/"]
 
-RUN npm ci
+RUN cd backend/shared/rabbitmq-client && npm install
+RUN cd backend/gateway && npm install
 
-COPY . .
+COPY ["backend/shared/rabbitmq-client/", "backend/shared/rabbitmq-client/"]
+COPY ["backend/gateway/", "backend/gateway/"]
+
+WORKDIR /app/backend/gateway
 
 EXPOSE 3000
 

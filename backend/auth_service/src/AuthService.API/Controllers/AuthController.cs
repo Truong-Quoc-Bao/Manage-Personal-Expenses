@@ -1,11 +1,21 @@
 using Microsoft.AspNetCore.Mvc;
-// using AuthService.API.Services;
+using AuthService.Infrastructure.MessageBroker;
+using AuthService.Core.DTOs;
+using AuthService.Core.Interfaces;
 
 namespace AuthService.API.Controllers
 {
     [ApiController]
     public class AuthController : ControllerBase
     {
+        private readonly IRabbitMQPublisher _rabbitMQPublisher;
+        private readonly IAuthService _authService;
+
+        public AuthController(IRabbitMQPublisher rabbitMQPublisher, IAuthService authService)
+        {
+            this._rabbitMQPublisher = rabbitMQPublisher;
+            this._authService = authService;
+        }
 
         [HttpGet("health")]
         public IActionResult HealthCheck()
@@ -14,39 +24,24 @@ namespace AuthService.API.Controllers
             return Ok("Auth Service is healthy.");
         }
 
-        [HttpGet("health2")]
-        public IActionResult HealthCheck2()
+        [HttpPost("test-publish")]
+        public async Task<IActionResult> TestPublish()
         {
-            Console.WriteLine("🔥 HIT HEALTH2");
-            return Ok("Auth Service is healthy2.");
+            var testMessage = new { Text = "Hello from Auth Service!", Timestamp = DateTime.UtcNow };
+            await _rabbitMQPublisher.PublishAsync(testMessage, "user.user_create");
+            return Ok("Test message published to RabbitMQ.");
         }
 
-        [HttpGet("health3")]
-        public IActionResult HealthCheck3()
+        [HttpPost("register")]
+        public async Task<IActionResult> Register([FromBody] RegisterRequestDto registerRequest)
         {
-            Console.WriteLine("🔥 HIT HEALTH3");
-            return Ok("Auth Service is healthy3.");
+            var result = await _authService.RegisterUserAsync(registerRequest);
+            if (result.Succeeded)
+            {
+                return Ok("User registered successfully.");
+            }
+            return BadRequest(result.Errors);
         }
 
-        [HttpGet("health4")]
-        public IActionResult HealthCheck4()
-        {
-            Console.WriteLine("🔥 HIT HEALTH4");
-            return Ok("Auth Service is healthy4.");
-        }
-
-        [HttpGet("health5")]
-        public IActionResult HealthCheck5()
-        {
-            Console.WriteLine("🔥 HIT HEALTH5");
-            return Ok("Auth Service is healthy5.");
-        }
-
-        [HttpGet("health6")]
-        public IActionResult HealthCheck6()
-        {
-            Console.WriteLine("🔥 HIT HEALTH6");
-            return Ok("Auth Service is healthy6.");
-        }
     }
 }

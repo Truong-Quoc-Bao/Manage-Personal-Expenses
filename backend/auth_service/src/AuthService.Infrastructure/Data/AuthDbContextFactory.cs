@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
+using System.IO;
 
 namespace AuthService.Infrastructure.Data
 {
@@ -8,11 +9,13 @@ namespace AuthService.Infrastructure.Data
     {
         public AuthDbContext CreateDbContext(string[] args)
         {
-            var configuration = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile("appsettings.json")
-                .Build();
+            string path = Path.Combine(Directory.GetCurrentDirectory(), "../AuthService.API");
 
+            IConfigurationRoot configuration = new ConfigurationBuilder()
+                .SetBasePath(path)
+                .AddJsonFile("appsettings.json")
+                .AddJsonFile("appsettings.Development.json", optional: true)
+                .Build();
             var connectionString = configuration.GetConnectionString("DefaultConnection");
             var optionsBuilder = new DbContextOptionsBuilder<AuthDbContext>();
             optionsBuilder.UseNpgsql(connectionString, npgsqlOptions =>

@@ -5,7 +5,6 @@ const app = express();
 const cors = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const morgan = require('morgan');
-const http = require('http');
 const PORT = process.env.PORT;
 
 
