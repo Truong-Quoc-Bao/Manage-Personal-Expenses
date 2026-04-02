@@ -129,6 +129,7 @@
 │   │   │   │   │   └── 📄 AuthSession.cs
 │   │   │   │   ├── 📁 Interfaces
 │   │   │   │   │   ├── 📄 IAuthRepository.cs
+│   │   │   │   │   ├── 📄 IRabbitMQPublisher.cs
 │   │   │   │   │   └── 📄 ITokenService.cs
 │   │   │   │   ├── 📄 AuthService.Core.csproj
 │   │   │   │   └── 📄 Class1.cs
@@ -260,6 +261,18 @@
 │   │   ├── ⚙️ package-lock.json
 │   │   └── ⚙️ package.json
 │   ├── 📁 shared
+│   │   ├── 📁 common-utils
+│   │   ├── 📁 dotnet-shared
+│   │   │   └── 📁 RabbitMQ.Client.Shared
+│   │   │       ├── 📄 Class1.cs
+│   │   │       ├── 📄 IRabbitMQClient.cs
+│   │   │       ├── 📄 RabbitMQ.Client.Shared.csproj
+│   │   │       └── 📄 RabbitMQClient.cs
+│   │   └── 📁 rabbitmq-client
+│   │       ├── 📁 src
+│   │       │   └── 📄 index.js
+│   │       ├── ⚙️ package-lock.json
+│   │       └── ⚙️ package.json
 │   ├── 📁 transaction_service
 │   │   ├── 📁 src
 │   │   │   ├── 📁 TransactionService.API
@@ -334,6 +347,8 @@
 │       │   ├── 📁 dtos
 │       │   │   └── 📄 user.dto.js
 │       │   ├── 📁 events
+│       │   │   ├── 📁 consumer
+│       │   │   │   └── 📄 user-create.consumer.js
 │       │   │   └── 📄 index.js
 │       │   ├── 📁 middlewares
 │       │   │   ├── 📄 auth.middleware.js
@@ -350,10 +365,9 @@
 │       │   │   └── 📄 user.types.js
 │       │   ├── 📁 utils
 │       │   │   └── 📄 index.js
-│       │   ├── 📁 validator
-│       │   │   ├── 📄 index.js
-│       │   │   └── 📄 user.validator.js
-│       │   └── 📄 app.js
+│       │   └── 📁 validator
+│       │       ├── 📄 index.js
+│       │       └── 📄 user.validator.js
 │       ├── 📁 tests
 │       ├── ⚙️ .gitignore
 │       ├── 🐳 Dockerfile
@@ -361,6 +375,9 @@
 │       ├── ⚙️ package-lock.json
 │       ├── ⚙️ package.json
 │       └── 📄 prisma.config.ts
+├── 📁 data
+│   ├── 📄 transactions_2025_jan_oct.sql
+│   └── 📄 transactions_v2.sql
 ├── 📁 frontend
 │   ├── 📁 public
 │   │   └── 🖼️ vite.svg
@@ -378,8 +395,10 @@
 │   ├── ⚙️ package-lock.json
 │   ├── ⚙️ package.json
 │   └── 📄 vite.config.js
+├── ⚙️ .dockerignore
 ├── ⚙️ .gitignore
 ├── 📝 README.md
 ├── ⚙️ docker-compose.yml
+├── ⚙️ package-lock.json
 └── 📄 schema_test.sql
 ```

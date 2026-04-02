@@ -1,5 +1,4 @@
 const rabbitMQClient = require("../../../shared/rabbitmq-client");
-
 async function startRabbitMQ() {
     try {
         await rabbitMQClient.connect();
@@ -10,4 +9,6 @@ async function startRabbitMQ() {
     }
 }
 
-module.exports = { startRabbitMQ };
+module.exports = {
+    startRabbitMQ,
+}

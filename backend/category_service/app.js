@@ -20,6 +20,7 @@
 
 const path = require("path");
 require("dotenv").config({ path: path.resolve(__dirname, ".env") });
+const rabbitMQClient = require("./src/events");
 
 const express = require("express");
 const app = express();
@@ -41,6 +42,7 @@ app.get("/health", (req, res) => {
 app.use("/", categoryRoutes);
 
 // start server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
+  await rabbitMQClient.startRabbitMQ();
   console.log(`Category service is running on port ${PORT}`);
 });

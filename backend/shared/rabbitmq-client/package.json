@@ -12,6 +12,7 @@
   "type": "commonjs",
   "dependencies": {
     "amqp-connection-manager": "^5.0.0",
-    "amqplib": "^1.0.2"
+    "amqplib": "^1.0.2",
+    "dotenv": "^17.3.1"
   }
 }

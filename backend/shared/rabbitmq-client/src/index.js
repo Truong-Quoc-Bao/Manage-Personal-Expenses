@@ -6,9 +6,7 @@ class RabbitMQClient {
     constructor() {
         this.connection = null;
         this.pubChannelWrapper = null;
-        // this.channel = null;
         this.url = process.env.RABBITMQ_URL;
-        this.exchange = process.env.RABBITMQ_EXCHANGE;
         this.retryAttempts = parseInt(process.env.RABBITMQ_RETRY_ATTEMPTS);
         this.retryDelay = parseInt(process.env.RABBITMQ_RETRY_DELAY);
     }
@@ -23,13 +21,7 @@ class RabbitMQClient {
 
         this.pubChannelWrapper = this.connection.createChannel({
             json: true,
-            setup: async (channel) => {
-                for (const ex of this.exchanges) {
-                    await channel.assertExchange(ex, 'topic', { durable: true });
-                    console.log(`[RabbitMQ] Exchange "${this.exchange}" is ready`);
-                }
-            }
-        })
+        });
 
         await this.pubChannelWrapper.waitForConnect();
     }
@@ -39,7 +31,13 @@ class RabbitMQClient {
 
         try {
             const exchangeName = routingKey.split('.')[0] + '.events';
-            await this.pubChannelWrapper.publish(exchangeName, routingKey, message);
+            await this.pubChannelWrapper.addSetup(async (channel) => {
+                await channel.assertExchange(exchangeName, 'topic', { durable: true });
+            });
+
+            await this.pubChannelWrapper.publish(exchangeName, routingKey, message, {
+                persistent: true
+            });
             console.log(`[RabbitMQ] Published message to "${routingKey}":`, message);
         } catch (err) {
             console.error(`[RabbitMQ] Publish error:`, err);
@@ -49,13 +47,13 @@ class RabbitMQClient {
 
     async consume(queueName, routingKeys, callback) {
         const keys = Array.isArray(routingKeys) ? routingKeys : [routingKeys];
-        
+
 
         const consumerChannel = this.connection.createChannel({
             setup: async (channel) => {
-                
+
                 await channel.assertQueue(queueName, { durable: true });
-                
+
                 for (const key of keys) {
                     let exchangeName = key.split('.')[0] + '.events';
                     await channel.assertExchange(exchangeName, 'topic', { durable: true });

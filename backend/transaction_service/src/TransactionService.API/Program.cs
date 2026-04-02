@@ -1,3 +1,8 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+using TransactionService.Infrastructure.Extensions;
+using TransactionService.API.Workers;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -6,6 +11,9 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddControllers();
+
+builder.Services.AddTransactionInfrastructure(builder.Configuration);
+builder.Services.AddHostedService<TransactionBackgroundWorker>();
 
 var app = builder.Build();
 
@@ -18,6 +26,5 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
 app.Run();
 

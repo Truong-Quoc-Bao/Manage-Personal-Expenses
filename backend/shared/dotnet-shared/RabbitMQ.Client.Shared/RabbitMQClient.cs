@@ -18,11 +18,26 @@ namespace RabbitMQ.Client.Shared
 
         private async Task EnsureConnectionAsync()
         {
-            if (_connection != null || _connection.IsOpen) return;
+            if (_connection != null && _connection.IsOpen) return;
         
+            if (string.IsNullOrEmpty(_connectionString))
+            {
+                throw new ArgumentNullException("RabbitMQ ConnectionString is missing!");
+            }
+
             var factory = new ConnectionFactory() { Uri = new Uri(_connectionString) };
-            _connection = await factory.CreateConnectionAsync();
-            _channel = await _connection.CreateChannelAsync();
+
+            try 
+            {
+                _connection = await factory.CreateConnectionAsync();
+                _channel = await _connection.CreateChannelAsync();
+                Console.WriteLine("[RabbitMQ] Connected successfully!");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[RabbitMQ Error] Could not connect: {ex.Message}");
+                throw;
+            }
         }
 
         public async Task PublishAsync<T>(T message, string routingKey)
