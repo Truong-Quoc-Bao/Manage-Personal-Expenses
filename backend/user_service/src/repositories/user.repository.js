@@ -15,10 +15,45 @@ const findUserById = async (userId) => {
     },
   });
 };
+
 const findUserByUserName = async (userName) => {
   return prisma.user.findFirst({
     where: {
       user_name: userName,
+    },
+    select: {
+      user_id: true,
+      user_name: true,
+      email: true,
+      birth: true,
+      created_at: true,
+      updated_at: true,
+    },
+  });
+};
+
+const checkExistingUser = async (user) => {
+  return prisma.user.findMany({
+    where: {
+      OR: [
+        { user_id: user.userId },
+        { email: user.email },
+      ],
+    },
+    select: {
+      user_id: true,
+      email: true,
+    },
+  })
+};
+
+const createUser = async (user) => {
+  return prisma.user.create({
+    data: {
+      user_id: user.userId,
+      user_name: user.userName,
+      email: user.email,
+      created_at: user.createdAt,
     },
     select: {
       user_id: true,
@@ -60,4 +95,6 @@ module.exports = {
   findUserById,
   findUserByUserName,
   updateUser,
+  checkExistingUser,
+  createUser,
 };

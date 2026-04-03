@@ -7,6 +7,6 @@ namespace AuthService.Core.Interfaces
     public interface IAuthService
     {
         Task<IdentityResult> RegisterUserAsync(RegisterRequestDto registerRequest);
-        Task<IdentityResult> UpdateStatusUserAsync(UserRegistrationFailedEvent userRegistrationFailedEvent);
+        Task<IdentityResult> UpdateStatusUserAsync(UserRegistrationConsumeEvent userRegistrationFailedEvent);
     }
 }

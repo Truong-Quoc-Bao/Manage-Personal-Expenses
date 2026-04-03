@@ -9,6 +9,9 @@ namespace AuthService.Core.DTOs
         public string email { get; set; }
 
         [Required]
+        public string user_name { get; set; }
+
+        [Required]
         [DataType(DataType.Password)]
         [MinLength(6)]
         public string password { get; set; }

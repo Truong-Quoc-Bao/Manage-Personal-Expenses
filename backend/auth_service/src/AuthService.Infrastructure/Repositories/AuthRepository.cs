@@ -18,15 +18,21 @@ namespace AuthService.Infrastructure.Repositories
             return await _userManager.AddToRoleAsync(user, role);
         }
 
+
+        public async Task<ApplicationUser?> FindByIdUserAsync(string userId)
+        {
+            var existingUser = await _userManager.FindByIdAsync(userId);    
+            return existingUser;
+        }
+
+        public async Task<ApplicationUser?> FindByEmailUserAsync(string email)
+        {
+            var existingUser = await _userManager.FindByEmailAsync(email);    
+            return existingUser;
+        }
+
         public async Task<IdentityResult> UpdateStatusUserAsync(ApplicationUser user)
         {
-            var existingUser = await _userManager.FindByIdAsync(user.Id);
-            if (existingUser == null)
-            {
-                return IdentityResult.Failed(new IdentityError { Description = "User not found." });
-            }
-
-            existingUser.Status = user.Status;
 
             return await _userManager.UpdateAsync(existingUser);
         }

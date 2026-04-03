@@ -19,6 +19,13 @@ namespace AuthService.Application.Services
 
         public async Task<IdentityResult> RegisterUserAsync(RegisterRequestDto registerRequest)
         {
+            var existingUser = await _authRepository.FindByEmailUserAsync(registerRequest.email);
+
+            if (existingUser != null)
+            {
+                return IdentityResult.Failed(new IdentityError { Description = "Email already in use." });
+            }
+
             var user = new ApplicationUser
             {
                 UserName = registerRequest.email,
@@ -34,11 +41,12 @@ namespace AuthService.Application.Services
                 result = await _authRepository.AddToRoleAsync(user, "User");
                 if(result.Succeeded)
                 {
-                    var userCreatedEvent = new 
+                    var userCreatedEvent = new UserRegistrationPublishEvent
                     {
-                        UserId = user.Id,
-                        Email = user.Email,
-                        Timestamp = DateTime.UtcNow
+                        userId = user.Id,
+                        userName = registerRequest.user_name,
+                        email = user.Email,
+                        createdAt = DateTime.UtcNow
                     };
                     await _rabbitMQPublisher.PublishAsync(userCreatedEvent, "user.user_create");
                 }
@@ -48,20 +56,34 @@ namespace AuthService.Application.Services
             return result;
         }
 
-        public async Task<IdentityResult> UpdateStatusUserAsync(UserRegistrationEvent userRegistrationEvent)
+        public async Task<IdentityResult> UpdateStatusUserAsync(UserRegistrationConsumeEvent userRegistrationEvent)
         {
-            var user = new ApplicationUser
+            var userFindByEmail = await _authRepository.FindByEmailUserAsync(userRegistrationEvent.Email);
+            var userFindById = await _authRepository.FindByIdUserAsync(userRegistrationEvent.UserId);
+
+            if (userFindByEmail == null && userFindById == null)
             {
-                Id = userRegistrationEvent.UserId,
-                Status = userRegistrationEvent.Status switch
-                {
-                    "Success" => UserStatus.Active,
-                    "Fail" => UserStatus.Rejected,
-                    _ => UserStatus.Pending
-                }
+                throw new KeyNotFoundException($"User existing not found.");
+            }
+
+            var user = userFindByEmail ?? userFindById;
+
+            user.Status = userRegistrationEvent.Status switch
+            {
+                "Success" => UserStatus.Active,
+                "Fail" => UserStatus.Rejected,
+                _ => UserStatus.Pending
             };
 
-            return await _authRepository.UpdateStatusUserAsync(user);
+            var result = await _authRepository.UpdateStatusUserAsync(user);
+
+            if (!result.Succeeded)
+            {
+                var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                throw new Exception($"Failed to update user status: {errors}");
+            }
+
+            return result;
         }
     }
 }

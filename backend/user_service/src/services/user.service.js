@@ -3,7 +3,13 @@ const {
   findUserById,
   updateUser,
   findUserByUserName,
+  checkExistingUser,
+  createUser,
 } = require("../repositories/user.repository");
+
+const UserPublishEvent = require("../dtos/user.publish.event");
+const {USER_STATUS} = require("../types/user.types");
+const rabbitMQ = require("../shared/rabbitmq-client");
 
 const getUserProfile = async (userId) => {
   if (!userId) {
@@ -82,7 +88,23 @@ const updateUserProfile = async ({ userId, userName, birth }) => {
 
   return update;
 };
+
+const createUser = async (user) => {
+  const existingUser = await checkExistingUser(user);
+
+  if (existingUser) {
+    const userPublishStatusEvent = new UserPublishEvent.UserPublishStatusEvent(existingUser, USER_STATUS.FAILED);
+    await rabbitMQ.publish("user.user_created_status", new UserPublishEvent(userPublishStatusEvent));
+    
+  }else {
+    const userPublishStatusEvent = new UserPublishEvent.UserPublishStatusEvent(existingUser, USER_STATUS.SUCCESS);
+    await rabbitMQ.publish("user.user_created_status", new UserPublishEvent(userPublishStatusEvent));
+    return newUser;
+  }
+};
+
 module.exports = {
   getUserProfile,
   updateUserProfile,
+  createUser
 };
