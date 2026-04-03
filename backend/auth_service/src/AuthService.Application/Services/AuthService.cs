@@ -48,12 +48,17 @@ namespace AuthService.Application.Services
             return result;
         }
 
-        public async Task<IdentityResult> UpdateStatusUserAsync(UserRegistrationFailedEvent userRegistrationFailedEvent)
+        public async Task<IdentityResult> UpdateStatusUserAsync(UserRegistrationEvent userRegistrationEvent)
         {
             var user = new ApplicationUser
             {
-                Id = userRegistrationFailedEvent.UserId,
-                Status = UserStatus.Rejected,
+                Id = userRegistrationEvent.UserId,
+                Status = userRegistrationEvent.Status switch
+                {
+                    "Success" => UserStatus.Active,
+                    "Fail" => UserStatus.Rejected,
+                    _ => UserStatus.Pending
+                }
             };
 
             return await _authRepository.UpdateStatusUserAsync(user);

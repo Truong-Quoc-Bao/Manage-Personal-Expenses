@@ -18,13 +18,24 @@ namespace AuthService.API.Workers
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            await _rabbitMQClient.ConsumeAsync<object>("user.user_create.queue", new[] { "user.user_create" }, async (message) =>
+            await _rabbitMQClient.ConsumeAsync<UserRegistrationEvent>("user.user_create.queue", new[] { "user.user_created_fail", "user.user_created_success" }, async (message) =>
             {
-                Console.WriteLine($"Received message: {message}");
-                await Task.CompletedTask;
+                using (var scope = _serviceProvider.CreateScope())
+                {
+                    switch (message.Status)
+                    {
+                        case "Success":
+                            var _authService = scope.ServiceProvider.GetRequiredService<IAuthService>();
+                            await _authService.UpdateStatusUserAsync(message);
+                            break;
+                        case "Fail":
+                            await _authService.UpdateStatusUserAsync(message);
+                            break;
+                    }
+                }
             });
 
-            await _rabbitMQClient.ConsumeAsync<UserRegistrationFailedEvent>("user   .user_create.queue", new[] { "user.user_create_fail" }, async (message) =>
+            await _rabbitMQClient.ConsumeAsync<UserRegistrationFailedEvent>("user.user_create.queue", new[] { "user.user_create_fail" }, async (message) =>
             {
                 var userRejected = new UserRegistrationFailedEvent
                 {
