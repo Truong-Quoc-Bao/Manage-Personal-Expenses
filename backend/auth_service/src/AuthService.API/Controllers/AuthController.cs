@@ -43,5 +43,15 @@ namespace AuthService.API.Controllers
             return BadRequest(result.Errors);
         }
 
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginRequestDto loginRequest)
+        {
+            var loginResponse = await _authService.LoginUserAsync(loginRequest);
+            if (loginResponse != null)
+            {
+                return Ok(loginResponse);
+            }
+            return Unauthorized();
+        }
     }
 }

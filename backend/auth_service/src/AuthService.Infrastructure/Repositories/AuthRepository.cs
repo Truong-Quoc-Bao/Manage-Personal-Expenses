@@ -36,5 +36,10 @@ namespace AuthService.Infrastructure.Repositories
 
             return await _userManager.UpdateAsync(existingUser);
         }
+
+        public async Task<bool> CheckPasswordAsync(ApplicationUser user, string password)
+        {
+            return await _userManager.CheckPasswordAsync(user, password);
+        }
     }
 }
