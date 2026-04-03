@@ -18,7 +18,7 @@ namespace AuthService.API.Workers
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            await _rabbitMQClient.ConsumeAsync<UserRegistrationEvent>("user.user_create.queue", new[] { "user.user_created_fail", "user.user_created_success" }, async (message) =>
+            await _rabbitMQClient.ConsumeAsync<UserRegistrationConsumeEvent>("user.user_create.queue", new[] { "user.user_created_status" }, async (message) =>
             {
                 using (var scope = _serviceProvider.CreateScope())
                 {
