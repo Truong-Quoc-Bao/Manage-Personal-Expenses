@@ -20,6 +20,7 @@ builder.Services.AddAuthInfrastructure(builder.Configuration);
 builder.Services.AddHostedService<AuthBackgroundWorker>();
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<IAuthService, AuthLogic>();
+builder.Services.AddScoped<ITokenService, TokenService>();
 
 
 var app = builder.Build();

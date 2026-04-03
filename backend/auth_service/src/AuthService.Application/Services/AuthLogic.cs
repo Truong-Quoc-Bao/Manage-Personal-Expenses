@@ -6,15 +6,17 @@ using Microsoft.AspNetCore.Identity;
 
 namespace AuthService.Application.Services 
 {
-    public class AuthService : IAuthService
+    public class AuthLogic : IAuthService
     {
         private readonly IAuthRepository _authRepository;
         private readonly IRabbitMQPublisher _rabbitMQPublisher;
+        private readonly ITokenService _tokenService;
         
-        public AuthService(IAuthRepository authRepository, IRabbitMQPublisher rabbitMQPublisher)
+        public AuthLogic(IAuthRepository authRepository, IRabbitMQPublisher rabbitMQPublisher, ITokenService tokenService)
         {
             _authRepository = authRepository;
             _rabbitMQPublisher = rabbitMQPublisher;
+            _tokenService = tokenService;
         }
 
         public async Task<IdentityResult> RegisterUserAsync(RegisterRequestDto registerRequest)
@@ -84,6 +86,27 @@ namespace AuthService.Application.Services
             }
 
             return result;
+        }
+
+        public async Task<LoginResponseDto> LoginUserAsync(LoginRequestDto loginRequest)
+        {
+            var user = await _authRepository.FindByEmailUserAsync(loginRequest.email);
+
+            if (user == null || user.Status != UserStatus.Active)
+            {
+                throw new UnauthorizedAccessException("Invalid email or password");
+            }
+
+            var passwordValid = await _authRepository.CheckPasswordAsync(user, loginRequest.password);
+
+            if (!passwordValid)
+            {
+                throw new UnauthorizedAccessException("Invalid email or password");
+            }
+
+            var token = _tokenService.GenerateToken(user);
+
+            return new LoginResponseDto { Token = token };
         }
     }
 }
