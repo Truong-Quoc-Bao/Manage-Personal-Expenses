@@ -1,6 +1,6 @@
 using TransactionService.Core.Interfaces;
 using RabbitMQ.Client.Shared;
-using Micorosoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 using System.Text;
 using System.Text.Json;
 
@@ -14,8 +14,8 @@ namespace TransactionService.Infrastructure.MessageBroker
         {
             _rabbitMQClient = rabbitMQClient;
         }
-
-        public void Publish<T>(T message, string routingKey)
+        
+        public async Task PublishAsync<T>(T message, string routingKey)
         {
             await _rabbitMQClient.PublishAsync(message, routingKey);
         }
