@@ -13,7 +13,7 @@ namespace TransactionService.API.Workers
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            await _rabbitMQClient.ConsumingAsync<object>("transaction.transaction_create.queue", new[] {"transaction.transaction_create"}, async (message) =>
+            await _rabbitMQClient.ConsumeAsync<object>("transaction.transaction_create.queue", new[] {"transaction.transaction_create"}, async (message) =>
             {
                 Console.WriteLine($"Received message: {message}");
                 await Task.CompletedTask;

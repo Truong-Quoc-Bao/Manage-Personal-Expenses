@@ -1,5 +1,7 @@
 using TransactionService.Infrastructure.Data;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using RabbitMQ.Client.Shared;
@@ -13,9 +15,9 @@ namespace TransactionService.Infrastructure.Extensions
         public static IServiceCollection AddTransactionInfrastructure(this IServiceCollection services, IConfiguration configuration)
         {
             var connectionString = configuration.GetConnectionString("DefaultConnection");
-            var rabbitMQConnectString = configuration.GetConnectionString("RabbitMQConnection");
+            var rabbitMQConnectionString = configuration.GetConnectionString("RabbitMQConnection");
 
-            services.AddSingleton<IRabbitMQClient>(sp => new RabbitMQClient(rabbitMQConnectString));
+            services.AddSingleton<IRabbitMQClient>(sp => new RabbitMQClient(rabbitMQConnectionString));
 
             services.AddScoped<IRabbitMQPublisher, RabbitMQPublisher>();
 

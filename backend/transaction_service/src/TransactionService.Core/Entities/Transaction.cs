@@ -10,6 +10,9 @@ namespace TransactionService.Core.Entities
         [Column("trans_id")]
         public Guid TransId { get; set; } = Guid.NewGuid();
 
+        [Column("user_id")]
+        public Guid UserId { get; set; }
+
         [Column("account_id")]
         public Guid AccountId { get; set; }
 
