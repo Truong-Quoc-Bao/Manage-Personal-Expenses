@@ -3,6 +3,12 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace TransactionService.Core.Entities
 {
+    public enum TransactionType
+    {
+        Income,
+        Expense
+    }
+
     [Table("transactions")]
     public class Transaction
     {
@@ -22,9 +28,8 @@ namespace TransactionService.Core.Entities
         [Column("amount")]
         public decimal Amount { get; set; }
 
-        [MaxLength(50)]
         [Column("transaction_type")]
-        public string? TransactionType { get; set; }
+        public TransactionType TransactionType { get; set; } = TransactionType.Expense;
 
         [MaxLength(255)]
         [Column("description")]

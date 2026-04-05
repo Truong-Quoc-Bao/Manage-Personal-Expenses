@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+option csharp_namespace = "TransactionService.Infrastructure.Protos";
+
+service CategoryProtoService {
+  rpc GetCategoryStatus (GetCategoryRequest) returns (CategoryResponse);
+}
+
+message GetCategoryRequest {
+  string category_id = 1;
+}
+
+message CategoryResponse {
+  bool exists = 1;
+  string message = 3;
+}

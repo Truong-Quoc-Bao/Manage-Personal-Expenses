@@ -104,6 +104,7 @@ services:
       - .env
     ports:
       - "${ACCOUNT_SERVICE_PORT}:3002"
+      - "${GRPC_ACCOUNT_SERVICE_PORT}:50051"
     environment:
       - NODE_ENV=development
     depends_on:
@@ -114,6 +115,7 @@ services:
     volumes:
       - ./backend/account_service:/app/backend/account_service
       - ./backend/shared/rabbitmq-client:/app/backend/shared/rabbitmq-client
+      - ./backend/shared/protos:/app/backend/shared/protos
       - /app/backend/account_service/node_modules
       - /app/backend/shared/rabbitmq-client/node_modules
 
@@ -128,6 +130,7 @@ services:
     volumes:
       - ./backend/transaction_service:/app/backend/transaction_service
       - ./backend/shared/dotnet-shared:/app/backend/shared/dotnet-shared
+      - ./backend/shared/protos:/app/backend/shared/protos
       - /app/backend/transaction_service/src/TransactionService.API/bin
       - /app/backend/transaction_service/src/TransactionService.API/obj
       - /app/backend/transaction_service/src/TransactionService.Application/bin
@@ -152,6 +155,7 @@ services:
       - .env
     ports:
       - "${CATEGORY_SERVICE_PORT}:3003"
+      - "${GRPC_CATEGORY_SERVICE_PORT}:50052"
     environment:
       - NODE_ENV=development
     depends_on:
@@ -162,6 +166,7 @@ services:
     volumes:
       - ./backend/category_service:/app/backend/category_service
       - ./backend/shared/rabbitmq-client:/app/backend/shared/rabbitmq-client
+      - ./backend/shared/protos:/app/backend/shared/protos
       - /app/backend/category_service/node_modules
       - /app/backend/shared/rabbitmq-client/node_modules
 
