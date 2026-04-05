@@ -210,6 +210,28 @@ services:
       - /app/backend/notification_service/node_modules
       - /app/backend/shared/rabbitmq-client/node_modules
 
+  budget-service:
+    build:
+      context: .
+      dockerfile: backend/budget_service/Dockerfile
+    container_name: finance-budget-service
+    env_file:
+      - .env
+    ports:
+      - "${BUDGET_SERVICE_PORT}:3008"
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - redis
+      - rabbitmq
+    networks:
+      - finance-network
+    volumes:
+      - ./backend/budget_service:/app/backend/budget_service
+      - ./backend/shared/rabbitmq-client:/app/backend/shared/rabbitmq-client
+      - /app/backend/budget_service/node_modules
+      - /app/backend/shared/rabbitmq-client/node_modules
+
   gateway:
     build:
       context: .
