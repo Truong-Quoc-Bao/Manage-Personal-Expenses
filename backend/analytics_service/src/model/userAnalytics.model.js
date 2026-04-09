@@ -11,8 +11,8 @@ const CurrentMonthSchema = new Schema(
     month:        { type: Number, required: true, min: 1, max: 12 },
     income:       { type: Number, default: 0 },
     expense:      { type: Number, default: 0 },
-    savings:      { type: Number, default: 0 },   // income - expense
-    savings_rate: { type: Number, default: 0 },   // savings / income * 100
+    savings:      { type: Number, default: 0 },
+    savings_rate: { type: Number, default: 0 },
   },
   { _id: false }
 );
@@ -21,34 +21,30 @@ const TopCategorySchema = new Schema(
   {
     category_id:   { type: String, required: true },
     category_name: { type: String, required: true },
-    total_spent:   { type: Number, default: 0 },
-    percentage:    { type: Number, default: 0 },  // % of total expense
+    total_amount:  { type: Number, default: 0 }, // ✅ sửa đúng theo DB
   },
   { _id: false }
 );
 
 const AiInsightsSchema = new Schema(
   {
-    anomaly_detected:             { type: Boolean, default: false },
-    anomaly_description:          { type: String,  default: '' },
-    saving_tip:                   { type: String,  default: '' },
-    predicted_expense_next_month: { type: Number,  default: 0 },
-    last_analyzed_at:             { type: Date,    default: null },
+    generated: { type: Boolean, default: false }, // ✅ match DB
+    content:   { type: String, default: null },   // ✅ match DB
   },
   { _id: false }
 );
 
 const StreakSchema = new Schema(
   {
-    under_budget_days:           { type: Number, default: 0 },
-    consecutive_savings_months:  { type: Number, default: 0 },
+    saving_months: { type: Number, default: 0 },  // ✅ match DB
+    unit:          { type: String, default: 'months' }, // ✅ match DB
   },
   { _id: false }
 );
 
 // ── Main schema ──────────────────────────────────────────────
 
-const UserAnalyticsSchema = new Schema(
+const user_analytics = new Schema(
   {
     user_id: {
       type:     String,
@@ -57,21 +53,16 @@ const UserAnalyticsSchema = new Schema(
       index:    true,
     },
 
-    // Rolling lifetime totals
     total_income:    { type: Number, default: 0 },
     total_expense:   { type: Number, default: 0 },
-    current_balance: { type: Number, default: 0 }, // total_income - total_expense
+    current_balance: { type: Number, default: 0 },
 
-    // Snapshot for the current month
     current_month: { type: CurrentMonthSchema, default: () => ({}) },
 
-    // Top 5 spending categories this month
     top_categories: { type: [TopCategorySchema], default: [] },
 
-    // AI/NLP insight flags
     ai_insights: { type: AiInsightsSchema, default: () => ({}) },
 
-    // Gamification streaks
     streak: { type: StreakSchema, default: () => ({}) },
   },
   {
@@ -82,7 +73,7 @@ const UserAnalyticsSchema = new Schema(
 );
 
 // ── Indexes ──────────────────────────────────────────────────
-UserAnalyticsSchema.index({ 'current_month.year': 1, 'current_month.month': 1 });
-UserAnalyticsSchema.index({ updated_at: -1 });
+user_analytics.index({ 'current_month.year': 1, 'current_month.month': 1 });
+user_analytics.index({ updated_at: -1 });
 
-module.exports = mongoose.model('UserAnalytics', UserAnalyticsSchema);
+module.exports = mongoose.model('UserAnalytics', user_analytics);
