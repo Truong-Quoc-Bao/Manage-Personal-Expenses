@@ -1,23 +1,47 @@
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+
 const express = require('express');
 const app = express();
 const PORT = process.env.PORT;
 
 const connectDB = require('./src/config/database');
 const rabbitMQClient = require('./src/events');
+const router = require('./src/routes/analytics.routes');
 
+
+const API_PREFIX = process.env.API_PREFIX || "";
+
+app.use(API_PREFIX, router);
+
+// ── Middlewares ───────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'ok' });
+// ── Routes import ─────────────────────────────
+// const router = require('./src/routes/analytics.routes');
+
+// health check
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
 });
+
+
+// ── Test API (optional) ───────────────────────
+app.get('/test', (req, res) => {
+    res.json({
+        message: 'Analytics service is working 🚀'
+    });
+});
+
+// ── Main routes ───────────────────────────────
+app.use("/", router);
+// routes
 
 const startServer = async () => {
     try {
         await connectDB(); // 👈 connect Mongo trước
-        await rabbitMQClient.startRabbitMQ();
+        // await rabbitMQClient.startRabbitMQ();
 
         app.listen(PORT, () => {
             console.log(`Analytics service is running on port ${PORT}`);
@@ -34,5 +58,4 @@ startServer();
 //     await rabbitMQClient.startRabbitMQ();
 //     console.log(`Analytics service is running on port ${PORT}`);
 // });
-
 
