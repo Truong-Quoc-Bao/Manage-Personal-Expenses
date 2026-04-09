@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Money Guard Dashboard - AI của Bảo</title>
+    <link rel="stylesheet" href="style.css" />
+    <!-- Thư viện vẽ biểu đồ -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Thư viện render markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  </head>
+  <body>
+    <div class="app-wrapper">
+      <!-- PHẦN 1: DASHBOARD BÊN TRÁI -->
+      <div class="dashboard-container">
+        <div class="dashboard-header">
+          <h1>📊 Tổng quan tài chính</h1>
+          <p id="current-date"></p>
+        </div>
+
+        <div class="balance-cards">
+          <div class="card balance">
+            <span>💰 Số dư hiện tại</span>
+            <h2 id="total-balance">0đ</h2>
+          </div>
+          <div class="income-expense">
+            <div class="card income">
+              <span>📈 Thu nhập tháng này</span>
+              <h3 id="total-income">0đ</h3>
+            </div>
+            <div class="card expense">
+              <span>📉 Chi tiêu tháng này</span>
+              <h3 id="total-expense">0đ</h3>
+            </div>
+          </div>
+        </div>
+
+        <div
+          class="bank-link-card"
+          style="
+            padding: 20px;
+            background: #fff;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+            text-align: center;
+          "
+        >
+          <h3 style="margin-bottom: 10px; font-size: 16px">🏦 Kết nối ngân hàng</h3>
+          <p style="font-size: 13px; color: #666; margin-bottom: 15px">
+            Liên kết để Moni tự động ghi sổ mỗi khi bạn quẹt thẻ.
+          </p>
+
+          <!-- NÚT CHÍNH CỦA BẢO -->
+          <button
+            id="btn-link"
+            onclick="startLinking()"
+            class="btn-primary"
+            style="width: 100%; cursor: pointer"
+          >
+            🔗 Liên kết Ngân hàng ngay
+          </button>
+        </div>
+        <div class="chart-section">
+          <h3>Phân tích chi tiêu</h3>
+          <div class="chart-container-wrapper">
+            <!-- Biểu đồ -->
+            <canvas id="expenseChart"></canvas>
+
+            <div id="no-data-msg">
+              <span style="font-size: 50px">🍃</span>
+              <p style="color: #888; font-style: italic">Chưa có dữ liệu tháng này Bảo ơi...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PHẦN 2: CHATBOT BÊN PHẢI (Giữ nguyên logic của bạn) -->
+      <div class="chat-container">
+        <div class="chat-header">
+          <h2>🤖 Trợ lý Money Guard</h2>
+          <a
+            href="https://t.me/truongquocbao_bot?start=1"
+            target="_blank"
+            class="tele-btn"
+            id="telegram-link"
+          >
+            <img
+              src="data:image/png;base64,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"
+              alt="Telegram Icon"
+            />
+            Kết nối Telegram
+          </a>
+        </div>
+
+        <div id="chat-messages" class="chat-messages"></div>
+
+        <!-- Preview Ảnh -->
+        <div id="image-preview-container" style="display: none">
+          <img id="image-preview-img" src="" />
+          <button type="button" id="remove-img-btn">×</button>
+        </div>
+
+        <form id="chat-form" class="chat-input">
+          <input type="file" id="file-input" accept="image/*" style="display: none" />
+          <button type="button" id="upload-btn">📷</button>
+          <input
+            type="text"
+            id="user-input"
+            placeholder="Hỏi Money Guard: 'Tháng này tiêu bao nhiêu?'"
+            autocomplete="off"
+          />
+          <button type="submit">Gửi</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Script kết nối -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
