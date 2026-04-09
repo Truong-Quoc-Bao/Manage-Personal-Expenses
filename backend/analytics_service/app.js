@@ -7,13 +7,19 @@ const PORT = process.env.PORT;
 
 const connectDB = require('./src/config/database');
 const rabbitMQClient = require('./src/events');
+const router = require('./src/routes/analytics.routes');
+
+
+const API_PREFIX = process.env.API_PREFIX || "";
+
+app.use(API_PREFIX, router);
 
 // ── Middlewares ───────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ── Routes import ─────────────────────────────
-const userAnalyticsRoutes = require('./src/routes/analytics.routes');
+// const router = require('./src/routes/analytics.routes');
 
 // health check
 app.get("/health", (req, res) => {
@@ -29,13 +35,13 @@ app.get('/test', (req, res) => {
 });
 
 // ── Main routes ───────────────────────────────
-app.use("/", userAnalyticsRoutes);
+app.use("/", router);
 // routes
 
 const startServer = async () => {
     try {
         await connectDB(); // 👈 connect Mongo trước
-        await rabbitMQClient.startRabbitMQ();
+        // await rabbitMQClient.startRabbitMQ();
 
         app.listen(PORT, () => {
             console.log(`Analytics service is running on port ${PORT}`);

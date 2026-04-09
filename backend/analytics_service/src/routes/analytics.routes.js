@@ -7,6 +7,7 @@ const { getUserAnalytics, getAllUserAnalytics } = require('../controllers/analyt
 
 // GET /api/user-analytics/:userId
 router.get('/', getAllUserAnalytics);
+
 router.get('/:userId', getUserAnalytics);
 
 
