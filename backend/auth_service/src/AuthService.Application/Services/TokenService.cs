@@ -4,6 +4,7 @@ using AuthService.Core.Entities;
 using AuthService.Core.Interfaces;
 using System.Security.Claims;
 using System.Text;
+using Microsoft.Extensions.Configuration;
 
 namespace AuthService.Application.Services
 {
@@ -23,7 +24,7 @@ namespace AuthService.Application.Services
             claims.Add(new Claim("email", user.Email));
             claims.Add(new Claim("user_id", user.Id.ToString()));
 
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:SecretKey"]));
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
             var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var token = new JwtSecurityToken(
