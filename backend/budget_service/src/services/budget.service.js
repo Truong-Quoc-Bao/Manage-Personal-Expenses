@@ -5,7 +5,73 @@ const {
   findBudgetByBudgetId,
   createBudgetId,
   findDateByCategory,
+  updateBudget,
 } = require("../repositories/budget.repository");
+
+const updateBudgetService = async ({
+  userId,
+  budgetId,
+  categoryId,
+  amountLimit,
+  date,
+}) => {
+  if (!userId) {
+    const error = new Error("userId is required");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (!budgetId) {
+    const error = new Error("budgetId is required");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (!categoryId) {
+    const error = new Error("category is required");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (!amountLimit) {
+    const error = new Error("amountLimit is required");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (!date) {
+    const error = new Error("date is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const checkBudget = await findBudgetByBudgetId({ userId, budgetId });
+
+  if (!checkBudget) {
+    const error = new Error("Budget_id is not found");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const checkCategory = await findCategoryByIdAndUserId({ categoryId, userId });
+
+  if (!checkCategory) {
+    const error = new Error("Category does not exist");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (amountLimit <= 0) {
+    const error = new Error("AmountLimit can not be less than 0");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const budgets = await updateBudget({
+    userId,
+    budgetId,
+    categoryId,
+    amountLimit,
+    date,
+  });
+  return budgets;
+};
 
 const createBudgetService = async ({
   userId,
@@ -94,4 +160,5 @@ module.exports = {
   getBudgetByUserIdService,
   getBudgetByBudgetIdService,
   createBudgetService,
+  updateBudgetService,
 };
