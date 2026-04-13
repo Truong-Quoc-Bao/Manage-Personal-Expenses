@@ -34,6 +34,13 @@ const buildDateFilter = (date) => {
   return null;
 };
 
+const deleteBudget = async ({ budgetId }) => {
+  return prisma.budget.delete({
+    where: {
+      budget_id: budgetId,
+    },
+  });
+};
 const updateBudget = async ({ budgetId, categoryId, amountLimit, date }) => {
   return prisma.budget.update({
     where: {
@@ -120,4 +127,5 @@ module.exports = {
   createBudgetId,
   findDateByCategory,
   updateBudget,
+  deleteBudget,
 };

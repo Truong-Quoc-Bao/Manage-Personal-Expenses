@@ -6,7 +6,26 @@ const {
   createBudgetId,
   findDateByCategory,
   updateBudget,
+  deleteBudget,
 } = require("../repositories/budget.repository");
+
+const deleteBudgetService = async ({ userId, budgetId }) => {
+  if (!userId) {
+    const error = new Error("userId is required");
+    error.statusCode = 400;
+    throw error;
+  }
+  const checkBudget = await findBudgetByBudgetId({ userId, budgetId });
+
+  if (!checkBudget) {
+    const error = new Error("Budget_id is not found");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const budgets = await deleteBudget({ budgetId });
+  return budgets;
+};
 
 const updateBudgetService = async ({
   userId,
@@ -161,4 +180,5 @@ module.exports = {
   getBudgetByBudgetIdService,
   createBudgetService,
   updateBudgetService,
+  deleteBudgetService,
 };

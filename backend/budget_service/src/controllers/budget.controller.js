@@ -3,7 +3,27 @@ const {
   getBudgetByBudgetIdService,
   createBudgetService,
   updateBudgetService,
+  deleteBudgetService,
 } = require("../services/budget.service");
+
+const deleteBudgetController = async (req, res, next) => {
+  try {
+    const userId = req.user?.userId || req.query.userId;
+    const budgetId = req.params.id;
+
+    const budgets = await deleteBudgetService({
+      userId,
+      budgetId,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Delete budget successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 const updateBudgetController = async (req, res, next) => {
   try {
@@ -97,4 +117,5 @@ module.exports = {
   getBudgetByBudgetIdController,
   createBudgetController,
   updateBudgetController,
+  deleteBudgetController,
 };
