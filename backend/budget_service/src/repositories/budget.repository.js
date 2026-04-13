@@ -1,3 +1,4 @@
+const { date } = require("joi");
 const prisma = require("../config/database");
 
 const buildDateFilter = (date) => {
@@ -33,15 +34,39 @@ const buildDateFilter = (date) => {
   return null;
 };
 
-const findBudgetByBudgetId = async ({ userId, budgetId }) => {
+const findDateByCategory = async ({ userId, categoryId, date }) => {
   return prisma.budget.findFirst({
     where: {
       user_id: userId,
-      user_id: budgetId,
+      category_id: categoryId,
+      date: date,
     },
   });
 };
 
+const findBudgetByBudgetId = async ({ userId, budgetId }) => {
+  return prisma.budget.findFirst({
+    where: {
+      user_id: userId,
+      budget_id: budgetId,
+    },
+  });
+};
+const createBudgetId = async ({ userId, categoryId, amountLimit, date }) => {
+  return prisma.budget.create({
+    data: {
+      user_id: userId,
+      category_id: categoryId,
+      amount_limit: amountLimit,
+      date: date,
+    },
+    select: {
+      budget_id: true,
+      amount_limit: true,
+      date: true,
+    },
+  });
+};
 const findBudgets = async ({ userId, categoryId, date }) => {
   const where = {
     user_id: userId,
@@ -60,6 +85,8 @@ const findBudgets = async ({ userId, categoryId, date }) => {
   });
 };
 
+// MQ budget -> category
+
 const findCategoryByIdAndUserId = async ({ categoryId, userId }) => {
   return prisma.budget.findFirst({
     where: {
@@ -73,4 +100,6 @@ module.exports = {
   findBudgets,
   findCategoryByIdAndUserId,
   findBudgetByBudgetId,
+  createBudgetId,
+  findDateByCategory,
 };
