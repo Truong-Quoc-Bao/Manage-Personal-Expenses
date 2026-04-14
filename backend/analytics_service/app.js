@@ -12,13 +12,12 @@ const router = require('./src/routes/analytics.routes');
 
 const API_PREFIX = process.env.API_PREFIX || "";
 
-app.use(API_PREFIX, router);
-
 // ── Middlewares ───────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ── Routes import ─────────────────────────────
+app.use(API_PREFIX, router);
 // const router = require('./src/routes/analytics.routes');
 
 // health check

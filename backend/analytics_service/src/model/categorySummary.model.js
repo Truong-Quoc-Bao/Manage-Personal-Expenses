@@ -1,93 +1,212 @@
 'use strict';
 
+/**
+ * ============================================================
+ * Model: CategorySummary
+ * Collection: category_summary
+ * Unique key: (account_id, category_id, year, month)
+ * ============================================================
+ *
+ * Tổng hợp chi tiêu theo danh mục, theo tháng, cho từng ví.
+ * daily_breakdown: mảng { day, amount } — số ngày có giao dịch.
+ */
+
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
-// ── Sub-schemas ──────────────────────────────────────────────
+// ── Sub-schemas ───────────────────────────────────────────────
 
 const DailyBreakdownSchema = new Schema(
   {
-    day:    { type: Number, required: true, min: 1, max: 31 },
+    day:    { type: Number, required: true },   // 1–31
     amount: { type: Number, default: 0 },
-    count:  { type: Number, default: 0 },
   },
   { _id: false }
 );
 
-// ── Main schema ──────────────────────────────────────────────
-
-const CategorySummarySchema = new Schema(
+// ── Main schema ───────────────────────────────────────────────
+const category_summary = new Schema(
   {
-    user_id: {
-      type:     String,
+    /** UUID ví */
+    account_id: {
+      type: String,
       required: true,
-      index:    true,
+      trim: true,
     },
 
-    category_id:   { type: String, required: true },
-    category_name: { type: String, required: true },
+    /** UUID danh mục */
+    category_id: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    /** Tên danh mục (denormalized) */
+    category_name: {
+      type: String,
+      default: null,
+    },
+
+    /** Loại danh mục */
     category_type: {
-      type:     String,
-      required: true,
-      enum:     ['income', 'expense', 'saving', 'investment'],
+      type: String,
+      enum: ['income', 'expense', 'saving', 'investment'],
+      default: 'expense',
     },
-    category_icon:  { type: String, default: '' },
-    category_color: { type: String, default: '#6B7280' }, // hex for charts
 
-    // Period
-    year:  { type: Number, required: true },
-    month: { type: Number, required: true, min: 1, max: 12 },
+    /** Năm (YYYY) */
+    year: {
+      type: Number,
+      required: true,
+    },
 
-    // Aggregated amounts
-    total_amount:      { type: Number, default: 0 },
-    transaction_count: { type: Number, default: 0 },
-    average_per_tx:    { type: Number, default: 0 },
-    max_single_tx:     { type: Number, default: 0 },
-    min_single_tx:     { type: Number, default: 0 },
+    /** Tháng (1–12) */
+    month: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 12,
+    },
 
-    // Budget tracking
-    budget_limit:    { type: Number, default: 0 },
-    budget_used_pct: { type: Number, default: 0 }, // total_amount / budget_limit * 100
-    is_over_budget:  { type: Boolean, default: false },
+    /** Tổng tiền trong tháng */
+    total_amount: {
+      type: Number,
+      default: 0,
+    },
 
-    // Daily breakdown array (for time-series micro-chart)
-    daily_breakdown: { type: [DailyBreakdownSchema], default: [] },
+    /** Số lượng giao dịch trong tháng */
+    transaction_count: {
+      type: Number,
+      default: 0,
+    },
 
-    // Month-over-month comparison
-    prev_month_amount: { type: Number, default: 0 },
-    mom_change_pct:    { type: Number, default: 0 }, // % change vs previous month
+    /** Hạn mức ngân sách (0 = không đặt) */
+    budget_limit: {
+      type: Number,
+      default: 0,
+    },
+
+    /** true nếu total_amount > budget_limit (và budget_limit > 0) */
+    is_over_budget: {
+      type: Boolean,
+      default: false,
+    },
+
+    /** Breakdown chi tiêu theo từng ngày trong tháng */
+    daily_breakdown: {
+      type: [DailyBreakdownSchema],
+      default: [],
+    },
   },
   {
-    timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
-    versionKey: false,
     collection: 'category_summary',
+    timestamps: { createdAt: false, updatedAt: 'updated_at' },
+    versionKey: false,
   }
 );
 
-// ── Indexes ──────────────────────────────────────────────────
-
-// Primary query: user's categories for a given month
-CategorySummarySchema.index(
-  { user_id: 1, year: -1, month: -1 },
-  { name: 'idx_user_month' }
+// ── Indexes (mirrors init_mongo.js) ──────────────────────────
+category_summary.index(
+  { account_id: 1, year: -1, month: -1 },
+  { name: 'idx_account_month' }
 );
-
-// Unique constraint: one doc per user × category × month
-CategorySummarySchema.index(
-  { user_id: 1, category_id: 1, year: -1, month: -1 },
-  { unique: true, name: 'idx_user_category_month' }
+category_summary.index(
+  { account_id: 1, category_id: 1, year: -1, month: -1 },
+  { unique: true, name: 'idx_account_category_month' }
 );
-
-// Filter by category type (income vs expense)
-CategorySummarySchema.index(
-  { user_id: 1, category_type: 1, year: -1, month: -1 },
-  { name: 'idx_user_type_month' }
+category_summary.index(
+  { account_id: 1, category_type: 1, year: -1, month: -1 },
+  { name: 'idx_account_type_month' }
 );
-
-// Budget alert queries
-CategorySummarySchema.index(
-  { is_over_budget: 1, user_id: 1 },
+category_summary.index(
+  { is_over_budget: 1, account_id: 1 },
   { name: 'idx_over_budget' }
 );
 
-module.exports = mongoose.model('CategorySummary', CategorySummarySchema);
+// ── Middleware ────────────────────────────────────────────────
+/** Tự động cập nhật is_over_budget trước khi lưu */
+category_summary.pre('save', function (next) {
+  if (this.budget_limit > 0) {
+    this.is_over_budget = this.total_amount > this.budget_limit;
+  } else {
+    this.is_over_budget = false;
+  }
+  next();
+});
+
+// ── Static helpers ────────────────────────────────────────────
+/**
+ * Lấy tất cả summary của một account trong một tháng.
+ * @param {string} accountId
+ * @param {number} year
+ * @param {number} month
+ */
+category_summary.statics.findByAccountMonth = function (accountId, year, month) {
+  return this.find({ account_id: accountId, year, month }).sort({ total_amount: -1 });
+};
+
+/**
+ * Lấy summary theo account + category + khoảng thời gian (nhiều tháng).
+ * @param {string} accountId
+ * @param {string} categoryId
+ * @param {number} fromYear
+ * @param {number} fromMonth
+ * @param {number} toYear
+ * @param {number} toMonth
+ */
+category_summary.statics.findTrend = function (
+  accountId,
+  categoryId,
+  fromYear,
+  fromMonth,
+  toYear,
+  toMonth
+) {
+  return this.find({
+    account_id:  accountId,
+    category_id: categoryId,
+    $or: [
+      { year: { $gt: fromYear, $lt: toYear } },
+      { year: fromYear, month: { $gte: fromMonth } },
+      { year: toYear,   month: { $lte: toMonth } },
+    ],
+  }).sort({ year: 1, month: 1 });
+};
+
+/**
+ * Lấy danh sách danh mục vượt budget của một account.
+ * @param {string} accountId
+ */
+category_summary.statics.findOverBudget = function (accountId) {
+  return this.find({ account_id: accountId, is_over_budget: true }).sort({ year: -1, month: -1 });
+};
+
+/**
+ * Upsert (update or insert) một category summary.
+ * Dùng sau khi có giao dịch mới.
+ * @param {string} accountId
+ * @param {string} categoryId
+ * @param {number} year
+ * @param {number} month
+ * @param {{ amountDelta: number, countDelta: number }} delta
+ */
+category_summary.statics.applyTransactionDelta = function (
+  accountId,
+  categoryId,
+  year,
+  month,
+  { amountDelta, countDelta }
+) {
+  return this.findOneAndUpdate(
+    { account_id: accountId, category_id: categoryId, year, month },
+    {
+      $inc: {
+        total_amount:      amountDelta,
+        transaction_count: countDelta,
+      },
+    },
+    { new: true, upsert: true }
+  );
+};
+
+module.exports = mongoose.model('CategorySummary', category_summary);

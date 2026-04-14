@@ -47,8 +47,6 @@ const createCategory = async (req, res, next) => {
   }
 };
 
-
-
 const updateCategory = async (req, res, next) => {
   try {
     const userId = "e67f2863-5f03-4dff-b247-478b140ab6c4";

@@ -7,4 +7,6 @@ module.exports = {
   DashboardCache:  require('./dashboardCache.model'),
   SpendingTrend:   require('./spendingTrend.model'),
   AnomalyLog:      require('./anomalyLog.model'),
+  Account:         require('./account.model'),
+  Transaction:     require('./transaction.model'),
 };

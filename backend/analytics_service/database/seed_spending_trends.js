@@ -1,8 +1,8 @@
 db.spending_trends.insertMany([
   {
-    "user_id": "user_7dc770af",
+    "account_id": "7dc770af-615f-48a7-9c24-8baa3caf5571",
     "category_id": "7b926e06-f682-4e15-a412-554daa9b012d",
-    "category_name": "Di chuyển",
+    "category_name": "Transport",
     "category_type": "expense",
     "monthly_data": [
       {
@@ -90,9 +90,9 @@ db.spending_trends.insertMany([
     }
   },
   {
-    "user_id": "user_7dc770af",
+    "account_id": "7dc770af-615f-48a7-9c24-8baa3caf5571",
     "category_id": "970eb25c-2af8-44f3-a762-a4b9a218668e",
-    "category_name": "Ăn uống",
+    "category_name": "Food",
     "category_type": "expense",
     "monthly_data": [
       {
@@ -180,9 +180,9 @@ db.spending_trends.insertMany([
     }
   },
   {
-    "user_id": "user_e5217da4",
+    "account_id": "e5217da4-46b7-434f-ba84-69aab89f0dd2",
     "category_id": "7b926e06-f682-4e15-a412-554daa9b012d",
-    "category_name": "Di chuyển",
+    "category_name": "Transport",
     "category_type": "expense",
     "monthly_data": [
       {
@@ -270,9 +270,9 @@ db.spending_trends.insertMany([
     }
   },
   {
-    "user_id": "user_e5217da4",
+    "account_id": "e5217da4-46b7-434f-ba84-69aab89f0dd2",
     "category_id": "87880d53-4827-4f06-8b0c-9c62de6692d9",
-    "category_name": "Mua sắm",
+    "category_name": "Shopping",
     "category_type": "expense",
     "monthly_data": [
       {
@@ -360,9 +360,9 @@ db.spending_trends.insertMany([
     }
   },
   {
-    "user_id": "user_e5217da4",
+    "account_id": "e5217da4-46b7-434f-ba84-69aab89f0dd2",
     "category_id": "970eb25c-2af8-44f3-a762-a4b9a218668e",
-    "category_name": "Ăn uống",
+    "category_name": "Food",
     "category_type": "expense",
     "monthly_data": [
       {
@@ -450,9 +450,9 @@ db.spending_trends.insertMany([
     }
   },
   {
-    "user_id": "user_a534f72c",
+    "account_id": "a534f72c-cac3-4387-8ec6-358438385953",
     "category_id": "13a008d9-04c7-498f-9557-8dcbed643cb1",
-    "category_name": "Cà phê & Đồ uống",
+    "category_name": "Coffee",
     "category_type": "expense",
     "monthly_data": [
       {
@@ -540,7 +540,7 @@ db.spending_trends.insertMany([
     }
   },
   {
-    "user_id": "user_d722044d",
+    "account_id": "d722044d-7259-4a95-9a9f-930935073828",
     "category_id": "c6e31bec-9e96-4981-832d-e8a38feaa9e6",
     "category_name": "Di chuyển",
     "category_type": "expense",
@@ -630,7 +630,7 @@ db.spending_trends.insertMany([
     }
   },
   {
-    "user_id": "user_d722044d",
+    "account_id": "d722044d-7259-4a95-9a9f-930935073828",
     "category_id": "615b0d7a-5ace-4297-a404-0d67b7b0087a",
     "category_name": "Ăn uống",
     "category_type": "expense",
@@ -720,9 +720,9 @@ db.spending_trends.insertMany([
     }
   },
   {
-    "user_id": "user_e8217da4",
+    "account_id": "e8217da4-46b7-434f-ba84-69aab89f0dd0",
     "category_id": "87880d53-4827-4f06-8b0c-9c62de6692d9",
-    "category_name": "Mua sắm",
+    "category_name": "Shopping",
     "category_type": "expense",
     "monthly_data": [
       {
@@ -810,9 +810,9 @@ db.spending_trends.insertMany([
     }
   },
   {
-    "user_id": "user_e8217da4",
+    "account_id": "e8217da4-46b7-434f-ba84-69aab89f0dd0",
     "category_id": "d8588605-fa23-4b66-a81a-babc39f54ab8",
-    "category_name": "Lương",
+    "category_name": "Salary",
     "category_type": "income",
     "monthly_data": [
       {
@@ -900,9 +900,9 @@ db.spending_trends.insertMany([
     }
   },
   {
-    "user_id": "user_92408ebb",
+    "account_id": "92408ebb-8c11-4bdf-a008-8ad2fcbc3686",
     "category_id": "c8798f26-d478-4bd7-a1bc-7335850d8dd0",
-    "category_name": "Ăn uống",
+    "category_name": "Food",
     "category_type": "expense",
     "monthly_data": [
       {
@@ -990,7 +990,7 @@ db.spending_trends.insertMany([
     }
   },
   {
-    "user_id": "user_92408ebb",
+    "account_id": "92408ebb-8c11-4bdf-a008-8ad2fcbc3686",
     "category_id": "a7b488f0-14bb-4fb0-9aff-3296ebd9ec9b",
     "category_name": "Du lịch",
     "category_type": "expense",
@@ -1065,9 +1065,9 @@ db.spending_trends.insertMany([
     }
   },
   {
-    "user_id": "user_a834f72c",
+    "account_id": "a834f72c-cac3-4387-8ec6-358438385954",
     "category_id": "9dec18f6-2f93-4ee9-a402-9e6ae2cce8f8",
-    "category_name": "Thu nhập phụ",
+    "category_name": "Freelance",
     "category_type": "income",
     "monthly_data": [
       {
@@ -1155,7 +1155,7 @@ db.spending_trends.insertMany([
     }
   },
   {
-    "user_id": "user_a834f72c",
+    "account_id": "a834f72c-cac3-4387-8ec6-358438385954",
     "category_id": "bc0f56d8-1a77-4024-93d8-ae709d297cc7",
     "category_name": "Game & Ứng dụng",
     "category_type": "expense",
@@ -1245,7 +1245,7 @@ db.spending_trends.insertMany([
     }
   },
   {
-    "user_id": "user_a834f72c",
+    "account_id": "a834f72c-cac3-4387-8ec6-358438385954",
     "category_id": "1117481a-dd27-4615-9201-9a1cfec45c0e",
     "category_name": "Hóa đơn & Tiện ích",
     "category_type": "expense",
@@ -1305,7 +1305,7 @@ db.spending_trends.insertMany([
     }
   },
   {
-    "user_id": "user_93408ebb",
+    "account_id": "93408ebb-8c11-4bdf-a008-8ad2fcbc3687",
     "category_id": "d990a4a7-a436-4a6c-895e-0e71c2bbe88e",
     "category_name": "Mua sắm",
     "category_type": "expense",
@@ -1395,7 +1395,7 @@ db.spending_trends.insertMany([
     }
   },
   {
-    "user_id": "user_93408ebb",
+    "account_id": "93408ebb-8c11-4bdf-a008-8ad2fcbc3687",
     "category_id": "a7b488f0-14bb-4fb0-9aff-3296ebd9ec9b",
     "category_name": "Du lịch",
     "category_type": "expense",
@@ -1470,9 +1470,9 @@ db.spending_trends.insertMany([
     }
   },
   {
-    "user_id": "user_93408ebb",
+    "account_id": "93408ebb-8c11-4bdf-a008-8ad2fcbc3687",
     "category_id": "18af69dc-a994-4213-aef1-a0c3e51ce711",
-    "category_name": "Lương",
+    "category_name": "Salary",
     "category_type": "income",
     "monthly_data": [
       {
@@ -1560,9 +1560,9 @@ db.spending_trends.insertMany([
     }
   },
   {
-    "user_id": "user_d922044d",
+    "account_id": "d922044d-7259-4a95-9a9f-930935073821",
     "category_id": "9b870dba-7323-4dfe-9da5-54dfef366f52",
-    "category_name": "Giải trí",
+    "category_name": "Entertainment",
     "category_type": "expense",
     "monthly_data": [
       {
@@ -1650,9 +1650,9 @@ db.spending_trends.insertMany([
     }
   },
   {
-    "user_id": "user_d922044d",
+    "account_id": "d922044d-7259-4a95-9a9f-930935073821",
     "category_id": "cf4dfdab-3dda-4ae1-a1b2-09364b6c5d01",
-    "category_name": "Lương",
+    "category_name": "Salary",
     "category_type": "income",
     "monthly_data": [
       {
@@ -1695,9 +1695,9 @@ db.spending_trends.insertMany([
     }
   },
   {
-    "user_id": "user_d4ffbef0",
+    "account_id": "d4ffbef0-8bcc-445e-9ea3-7bc854e2ad76",
     "category_id": "cf4dfdab-3dda-4ae1-a1b2-09364b6c5d01",
-    "category_name": "Lương",
+    "category_name": "Salary",
     "category_type": "income",
     "monthly_data": [
       {
@@ -1755,9 +1755,9 @@ db.spending_trends.insertMany([
     }
   },
   {
-    "user_id": "user_d4ffbef0",
+    "account_id": "d4ffbef0-8bcc-445e-9ea3-7bc854e2ad76",
     "category_id": "9b870dba-7323-4dfe-9da5-54dfef366f52",
-    "category_name": "Giải trí",
+    "category_name": "Entertainment",
     "category_type": "expense",
     "monthly_data": [
       {
@@ -1845,7 +1845,7 @@ db.spending_trends.insertMany([
     }
   },
   {
-    "user_id": "user_a934f72c",
+    "account_id": "a934f72c-cac3-4387-8ec6-358438385955",
     "category_id": "bc0f56d8-1a77-4024-93d8-ae709d297cc7",
     "category_name": "Game & Ứng dụng",
     "category_type": "expense",
@@ -1935,7 +1935,7 @@ db.spending_trends.insertMany([
     }
   },
   {
-    "user_id": "user_a934f72c",
+    "account_id": "a934f72c-cac3-4387-8ec6-358438385955",
     "category_id": "1117481a-dd27-4615-9201-9a1cfec45c0e",
     "category_name": "Hóa đơn & Tiện ích",
     "category_type": "expense",
