@@ -76,9 +76,9 @@ const {
 router.get('/', getAllUserAnalytics);
  
 router.get('/user_analytics/:accountId',    getUserAnalytics);
-router.post('/user_analytics/:accountId',   createUserAnalytics);
-router.put('/user_analytics/:accountId',    updateUserAnalytics);
-router.delete('/user_analytics/:accountId', deleteUserAnalytics);
+// router.post('/user_analytics/:accountId',   createUserAnalytics);
+// router.put('/user_analytics/:accountId',    updateUserAnalytics);
+// router.delete('/user_analytics/:accountId', deleteUserAnalytics);
  
 // ================================================================
 // ANOMALY LOGS
@@ -98,15 +98,15 @@ router.get('/anomaly_logs/:accountId/unread',       getUnreadAnomalyLogs);
 router.get('/anomaly_logs/:accountId/unread/count', countUnreadAnomalyLogs);
 router.get('/anomaly_logs/detail/:logId',           getAnomalyLogById);
  
-router.post('/anomaly_logs/:accountId', createAnomalyLog);
+// router.post('/anomaly_logs/:accountId', createAnomalyLog);
  
-router.put('/anomaly_logs/detail/:logId', updateAnomalyLog);
+// router.put('/anomaly_logs/detail/:logId', updateAnomalyLog);
  
-router.patch('/anomaly_logs/:accountId/read_all',    markAllAnomalyLogsRead);
-router.patch('/anomaly_logs/detail/:logId/dismiss',  dismissAnomalyLog);
+// router.patch('/anomaly_logs/:accountId/read_all',    markAllAnomalyLogsRead);
+// router.patch('/anomaly_logs/detail/:logId/dismiss',  dismissAnomalyLog);
  
-router.delete('/anomaly_logs/detail/:logId', deleteAnomalyLog);
-router.delete('/anomaly_logs/:accountId',    deleteAllAnomalyLogs);
+// router.delete('/anomaly_logs/detail/:logId', deleteAnomalyLog);
+// router.delete('/anomaly_logs/:accountId',    deleteAllAnomalyLogs);
  
 // ================================================================
 // CATEGORY SUMMARY
@@ -125,13 +125,13 @@ router.get('/category_summary/:accountId/by_month',    getCategorySummaryByMonth
 router.get('/category_summary/:accountId/over_budget', getOverBudgetCategories);
 router.get('/category_summary/detail/:id',             getCategorySummaryById);
  
-router.post('/category_summary/:accountId', createCategorySummary);
+// router.post('/category_summary/:accountId', createCategorySummary);
  
-router.put('/category_summary/:accountId/upsert', upsertCategorySummary);
-router.put('/category_summary/detail/:id',        updateCategorySummary);
+// router.put('/category_summary/:accountId/upsert', upsertCategorySummary);
+// router.put('/category_summary/detail/:id',        updateCategorySummary);
  
-router.delete('/category_summary/detail/:id', deleteCategorySummary);
-router.delete('/category_summary/:accountId', deleteAllCategorySummary);
+// router.delete('/category_summary/detail/:id', deleteCategorySummary);
+// router.delete('/category_summary/:accountId', deleteAllCategorySummary);
  
 // ================================================================
 // DASHBOARD CACHE
@@ -140,8 +140,8 @@ router.delete('/category_summary/:accountId', deleteAllCategorySummary);
 // DELETE /dashboard_cache/:accountId → invalidate cache
 // ================================================================
 router.get('/dashboard_cache/:accountId',    getDashboardCache);
-router.put('/dashboard_cache/:accountId',    upsertDashboardCache);
-router.delete('/dashboard_cache/:accountId', invalidateDashboardCache);
+// router.put('/dashboard_cache/:accountId',    upsertDashboardCache);
+// router.delete('/dashboard_cache/:accountId', invalidateDashboardCache);
  
 // ================================================================
 // MONTHLY REPORT
@@ -160,13 +160,13 @@ router.get('/monthly_reports/:accountId/by_month', getMonthlyReportByMonth);
 router.get('/monthly_reports/:accountId/recent',   getRecentMonthlyReports);
 router.get('/monthly_reports/detail/:id',          getMonthlyReportById);
  
-router.post('/monthly_reports/:accountId', createMonthlyReport);
+// router.post('/monthly_reports/:accountId', createMonthlyReport);
  
-router.put('/monthly_reports/:accountId/upsert', upsertMonthlyReport);
-router.put('/monthly_reports/detail/:id',        updateMonthlyReport);
+// router.put('/monthly_reports/:accountId/upsert', upsertMonthlyReport);
+// router.put('/monthly_reports/detail/:id',        updateMonthlyReport);
  
-router.delete('/monthly_reports/detail/:id', deleteMonthlyReport);
-router.delete('/monthly_reports/:accountId', deleteAllMonthlyReports);
+// router.delete('/monthly_reports/detail/:id', deleteMonthlyReport);
+// router.delete('/monthly_reports/:accountId', deleteAllMonthlyReports);
  
 // ================================================================
 // SPENDING TREND
@@ -183,13 +183,13 @@ router.get('/spending_trends/:accountId',                       getSpendingTrend
 router.get('/spending_trends/:accountId/category/:categoryId',  getSpendingTrendByCategory);
 router.get('/spending_trends/detail/:id',                       getSpendingTrendById);
  
-router.post('/spending_trends/:accountId', createSpendingTrend);
+// router.post('/spending_trends/:accountId', createSpendingTrend);
  
-router.put('/spending_trends/:accountId/upsert', upsertSpendingTrend);
-router.put('/spending_trends/detail/:id',        updateSpendingTrend);
+// router.put('/spending_trends/:accountId/upsert', upsertSpendingTrend);
+// router.put('/spending_trends/detail/:id',        updateSpendingTrend);
  
-router.delete('/spending_trends/detail/:id', deleteSpendingTrend);
-router.delete('/spending_trends/:accountId', deleteAllSpendingTrends);
+// router.delete('/spending_trends/detail/:id', deleteSpendingTrend);
+// router.delete('/spending_trends/:accountId', deleteAllSpendingTrends);
  
 // ================================================================
 // TRANSACTIONS
@@ -206,11 +206,11 @@ router.get('/transactions/:accountId/date_range',           getTransactionsByDat
 router.get('/transactions/:accountId/category/:categoryId', getTransactionsByCategory);
 router.get('/transactions/detail/:transId',                 getTransactionByTransId);
  
-router.post('/transactions/:accountId', createTransaction);
+// router.post('/transactions/:accountId', createTransaction);
  
-router.put('/transactions/detail/:transId', updateTransaction);
+// router.put('/transactions/detail/:transId', updateTransaction);
  
-router.delete('/transactions/detail/:transId', deleteTransaction);
+// router.delete('/transactions/detail/:transId', deleteTransaction);
  
 module.exports = router;
 
