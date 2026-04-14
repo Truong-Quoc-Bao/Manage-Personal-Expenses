@@ -1,6 +1,6 @@
 db.anomaly_logs.insertMany([
   {
-    "user_id": "user_7dc770af",
+    "account_id": "7dc770af-615f-48a7-9c24-8baa3caf5571",
     "type": "category_spike",
     "severity": "medium",
     "description": "Chi tiêu danh mục 'Di chuyển' tháng 9/2025 tăng 126.1% so với tháng trước (884,000đ vs 391,000đ). Có thể do mua sắm bất thường hoặc phát sinh ngoài kế hoạch.",
@@ -18,7 +18,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_e5217da4",
+    "account_id": "e5217da4-46b7-434f-ba84-69aab89f0dd2",
     "type": "category_spike",
     "severity": "medium",
     "description": "Chi tiêu danh mục 'Mua sắm' tháng 11/2025 tăng 147.7% so với tháng trước (5,276,000đ vs 2,130,000đ). Có thể do mua sắm bất thường hoặc phát sinh ngoài kế hoạch.",
@@ -36,7 +36,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_d722044d",
+    "account_id": "d722044d-7259-4a95-9a9f-930935073828",
     "type": "category_spike",
     "severity": "medium",
     "description": "Chi tiêu danh mục 'Di chuyển' tháng 2/2026 tăng 104.3% so với tháng trước (1,179,000đ vs 577,000đ). Có thể do mua sắm bất thường hoặc phát sinh ngoài kế hoạch.",
@@ -54,7 +54,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_e8217da4",
+    "account_id": "e8217da4-46b7-434f-ba84-69aab89f0dd0",
     "type": "category_spike",
     "severity": "medium",
     "description": "Chi tiêu danh mục 'Mua sắm' tháng 4/2025 tăng 119.2% so với tháng trước (5,574,000đ vs 2,543,000đ). Có thể do mua sắm bất thường hoặc phát sinh ngoài kế hoạch.",
@@ -72,7 +72,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_e8217da4",
+    "account_id": "e8217da4-46b7-434f-ba84-69aab89f0dd0",
     "type": "category_spike",
     "severity": "medium",
     "description": "Chi tiêu danh mục 'Mua sắm' tháng 8/2025 tăng 121.2% so với tháng trước (4,693,000đ vs 2,122,000đ). Có thể do mua sắm bất thường hoặc phát sinh ngoài kế hoạch.",
@@ -90,7 +90,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_92408ebb",
+    "account_id": "92408ebb-8c11-4bdf-a008-8ad2fcbc3686",
     "type": "category_spike",
     "severity": "medium",
     "description": "Chi tiêu danh mục 'Du lịch' tháng 2/2025 tăng 138.9% so với tháng trước (1,414,000đ vs 592,000đ). Có thể do mua sắm bất thường hoặc phát sinh ngoài kế hoạch.",
@@ -108,7 +108,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_92408ebb",
+    "account_id": "92408ebb-8c11-4bdf-a008-8ad2fcbc3686",
     "type": "category_spike",
     "severity": "medium",
     "description": "Chi tiêu danh mục 'Du lịch' tháng 5/2025 tăng 101.9% so với tháng trước (3,566,000đ vs 1,766,000đ). Có thể do mua sắm bất thường hoặc phát sinh ngoài kế hoạch.",
@@ -126,7 +126,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_a834f72c",
+    "account_id": "a834f72c-cac3-4387-8ec6-358438385954",
     "type": "category_spike",
     "severity": "medium",
     "description": "Chi tiêu danh mục 'Game & Ứng dụng' tháng 3/2025 tăng 163.8% so với tháng trước (2,248,000đ vs 852,000đ). Có thể do mua sắm bất thường hoặc phát sinh ngoài kế hoạch.",
@@ -144,7 +144,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_a834f72c",
+    "account_id": "a834f72c-cac3-4387-8ec6-358438385954",
     "type": "category_spike",
     "severity": "high",
     "description": "Chi tiêu danh mục 'Hóa đơn & Tiện ích' tháng 2/2026 tăng 230.9% so với tháng trước (460,000đ vs 139,000đ). Có thể do mua sắm bất thường hoặc phát sinh ngoài kế hoạch.",
@@ -162,7 +162,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_93408ebb",
+    "account_id": "93408ebb-8c11-4bdf-a008-8ad2fcbc3687",
     "type": "category_spike",
     "severity": "medium",
     "description": "Chi tiêu danh mục 'Du lịch' tháng 3/2025 tăng 103.4% so với tháng trước (1,273,000đ vs 626,000đ). Có thể do mua sắm bất thường hoặc phát sinh ngoài kế hoạch.",
@@ -180,7 +180,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_93408ebb",
+    "account_id": "93408ebb-8c11-4bdf-a008-8ad2fcbc3687",
     "type": "category_spike",
     "severity": "medium",
     "description": "Chi tiêu danh mục 'Du lịch' tháng 5/2025 tăng 186.4% so với tháng trước (3,646,000đ vs 1,273,000đ). Có thể do mua sắm bất thường hoặc phát sinh ngoài kế hoạch.",
@@ -198,7 +198,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_93408ebb",
+    "account_id": "93408ebb-8c11-4bdf-a008-8ad2fcbc3687",
     "type": "category_spike",
     "severity": "high",
     "description": "Chi tiêu danh mục 'Du lịch' tháng 2/2026 tăng 920.0% so với tháng trước (2,397,000đ vs 235,000đ). Có thể do mua sắm bất thường hoặc phát sinh ngoài kế hoạch.",
@@ -216,7 +216,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_d4ffbef0",
+    "account_id": "d4ffbef0-8bcc-445e-9ea3-7bc854e2ad76",
     "type": "category_spike",
     "severity": "medium",
     "description": "Chi tiêu danh mục 'Giải trí' tháng 8/2025 tăng 196.1% so với tháng trước (1,996,000đ vs 674,000đ). Có thể do mua sắm bất thường hoặc phát sinh ngoài kế hoạch.",
@@ -234,7 +234,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_d4ffbef0",
+    "account_id": "d4ffbef0-8bcc-445e-9ea3-7bc854e2ad76",
     "type": "category_spike",
     "severity": "medium",
     "description": "Chi tiêu danh mục 'Giải trí' tháng 3/2026 tăng 127.3% so với tháng trước (2,412,000đ vs 1,061,000đ). Có thể do mua sắm bất thường hoặc phát sinh ngoài kế hoạch.",
@@ -252,7 +252,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_a934f72c",
+    "account_id": "a934f72c-cac3-4387-8ec6-358438385955",
     "type": "category_spike",
     "severity": "medium",
     "description": "Chi tiêu danh mục 'Game & Ứng dụng' tháng 9/2025 tăng 133.6% so với tháng trước (1,740,000đ vs 745,000đ). Có thể do mua sắm bất thường hoặc phát sinh ngoài kế hoạch.",
@@ -270,7 +270,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_a934f72c",
+    "account_id": "a934f72c-cac3-4387-8ec6-358438385955",
     "type": "category_spike",
     "severity": "high",
     "description": "Chi tiêu danh mục 'Game & Ứng dụng' tháng 11/2025 tăng 242.4% so với tháng trước (3,092,000đ vs 903,000đ). Có thể do mua sắm bất thường hoặc phát sinh ngoài kế hoạch.",
@@ -288,7 +288,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_a834f72c",
+    "account_id": "a834f72c-cac3-4387-8ec6-358438385954",
     "type": "income_drop",
     "severity": "high",
     "description": "Thu nhập tháng 2/2025 giảm 62.2% so với tháng trước (3,634,000đ vs 9,602,000đ). Cần kiểm tra nguồn thu nhập định kỳ.",
@@ -306,7 +306,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_a834f72c",
+    "account_id": "a834f72c-cac3-4387-8ec6-358438385954",
     "type": "income_drop",
     "severity": "high",
     "description": "Thu nhập tháng 11/2025 giảm 68.7% so với tháng trước (1,960,000đ vs 6,259,000đ). Cần kiểm tra nguồn thu nhập định kỳ.",
@@ -324,7 +324,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_a834f72c",
+    "account_id": "a834f72c-cac3-4387-8ec6-358438385954",
     "type": "income_drop",
     "severity": "high",
     "description": "Thu nhập tháng 2/2026 giảm 51.8% so với tháng trước (4,959,000đ vs 10,298,000đ). Cần kiểm tra nguồn thu nhập định kỳ.",
@@ -342,7 +342,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_d922044d",
+    "account_id": "d922044d-7259-4a95-9a9f-930935073821",
     "type": "recurring_missed",
     "severity": "medium",
     "description": "Danh mục thu nhập định kỳ 'Lương' không có giao dịch trong tháng 7/2025, trong khi các tháng xung quanh đều có. Có thể bị bỏ sót hoặc nguồn thu đã thay đổi.",
@@ -360,7 +360,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_d922044d",
+    "account_id": "d922044d-7259-4a95-9a9f-930935073821",
     "type": "recurring_missed",
     "severity": "medium",
     "description": "Danh mục thu nhập định kỳ 'Lương' không có giao dịch trong tháng 10/2025, trong khi các tháng xung quanh đều có. Có thể bị bỏ sót hoặc nguồn thu đã thay đổi.",
@@ -378,7 +378,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_d4ffbef0",
+    "account_id": "d4ffbef0-8bcc-445e-9ea3-7bc854e2ad76",
     "type": "recurring_missed",
     "severity": "medium",
     "description": "Danh mục thu nhập định kỳ 'Lương' không có giao dịch trong tháng 4/2025, trong khi các tháng xung quanh đều có. Có thể bị bỏ sót hoặc nguồn thu đã thay đổi.",
@@ -396,7 +396,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_d4ffbef0",
+    "account_id": "d4ffbef0-8bcc-445e-9ea3-7bc854e2ad76",
     "type": "recurring_missed",
     "severity": "medium",
     "description": "Danh mục thu nhập định kỳ 'Lương' không có giao dịch trong tháng 5/2025, trong khi các tháng xung quanh đều có. Có thể bị bỏ sót hoặc nguồn thu đã thay đổi.",
@@ -414,7 +414,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_d4ffbef0",
+    "account_id": "d4ffbef0-8bcc-445e-9ea3-7bc854e2ad76",
     "type": "recurring_missed",
     "severity": "medium",
     "description": "Danh mục thu nhập định kỳ 'Lương' không có giao dịch trong tháng 6/2025, trong khi các tháng xung quanh đều có. Có thể bị bỏ sót hoặc nguồn thu đã thay đổi.",
@@ -432,7 +432,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_d4ffbef0",
+    "account_id": "d4ffbef0-8bcc-445e-9ea3-7bc854e2ad76",
     "type": "recurring_missed",
     "severity": "medium",
     "description": "Danh mục thu nhập định kỳ 'Lương' không có giao dịch trong tháng 8/2025, trong khi các tháng xung quanh đều có. Có thể bị bỏ sót hoặc nguồn thu đã thay đổi.",
@@ -450,7 +450,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_d4ffbef0",
+    "account_id": "d4ffbef0-8bcc-445e-9ea3-7bc854e2ad76",
     "type": "recurring_missed",
     "severity": "medium",
     "description": "Danh mục thu nhập định kỳ 'Lương' không có giao dịch trong tháng 9/2025, trong khi các tháng xung quanh đều có. Có thể bị bỏ sót hoặc nguồn thu đã thay đổi.",
@@ -468,7 +468,7 @@ db.anomaly_logs.insertMany([
     }
   },
   {
-    "user_id": "user_d4ffbef0",
+    "account_id": "d4ffbef0-8bcc-445e-9ea3-7bc854e2ad76",
     "type": "recurring_missed",
     "severity": "medium",
     "description": "Danh mục thu nhập định kỳ 'Lương' không có giao dịch trong tháng 11/2025, trong khi các tháng xung quanh đều có. Có thể bị bỏ sót hoặc nguồn thu đã thay đổi.",
