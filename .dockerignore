@@ -6,7 +6,6 @@
 
 **/out
 **/publish
-**/appsettings.Development.json
 
 **/dist
 **/.npm
