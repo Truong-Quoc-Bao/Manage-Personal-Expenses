@@ -1,21 +1,51 @@
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
+async function markAsRead(id) {
+  try {
+    const res = await fetch(`/api/notifications/read/${id}`, { method: 'POST' });
+    if (res.ok) {
+      const header = document.getElementById(`noti-header-${id}`);
+      const statusSpan = header.querySelector('span');
+      const parentDiv = header.parentElement;
 
-  if (!authHeader || authHeader === 'Bearer null') {
-    console.log('⚠️ Không có token hợp lệ → dùng user_id = 1');
-    req.user = { user_id: 1 };
-    return next();
-  }
+      // Đổi nền về trắng, chữ giữ font-bold nhưng đổi sang màu xám (text-gray-400)
+      parentDiv.classList.replace('bg-blue-50', 'bg-white');
+      statusSpan.className = 'text-xs font-bold text-gray-400';
+      statusSpan.innerText = 'Thông báo cũ';
 
-  const token = authHeader.split(' ')[1];
+      // Cập nhật số đếm trên chuông và nút
+      let count = parseInt(notiCount.innerText) || 0;
+      if (count > 0) {
+        const newCount = count - 1;
+        notiCount.innerText = newCount;
+        if (newCount === 0) notiCount.classList.add('hidden');
 
-  jwt.verify(token, process.env.JWT_SECRET || 'secret_key', (err, user) => {
-    if (err) {
-      console.log('❌ Token sai!');
-      req.user = { user_id: 1 }; // fallback
-      return next();
+        const markAllBtn = document.querySelector('button[onclick="markAllAsRead()"]');
+        if (markAllBtn) {
+          if (newCount > 0) {
+            markAllBtn.innerText = `Đánh dấu tất cả (${newCount})`;
+          } else {
+            markAllBtn.outerHTML = '<span class="text-gray-400 font-bold">Không có tin mới</span>';
+          }
+        }
+      }
     }
-    req.user = user;
-    next();
-  });
-};
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function toggleNoti(id) {
+  const header = document.getElementById(`noti-header-${id}`);
+  const content = document.getElementById(`noti-content-${id}`);
+
+  if (content.classList.contains('hidden')) {
+    content.classList.remove('hidden');
+
+    // Nếu chữ vẫn là màu đen (text-gray-900) thì mới là chưa đọc -> Gọi markAsRead
+    const isUnread = header.querySelector('span').classList.contains('text-gray-900');
+    if (isUnread) {
+      await markAsRead(id);
+    }
+  } else {
+    content.classList.add('hidden');
+  }
+}

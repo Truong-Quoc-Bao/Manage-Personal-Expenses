@@ -1,167 +1,150 @@
-// 1. Khai báo các biến DOM
+// ==========================================
+// 1. KHAI BÁO CÁC BIẾN DOM
+// ==========================================
 const chatMessages = document.getElementById('chat-messages');
 const chatForm = document.getElementById('chat-form');
 const userInput = document.getElementById('user-input');
 const fileInput = document.getElementById('file-input');
 const uploadBtn = document.getElementById('upload-btn');
-
-// --- CÁC BIẾN MỚI CHO VÙNG PREVIEW ---
 const imagePreviewContainer = document.getElementById('image-preview-container');
 const imagePreviewImg = document.getElementById('image-preview-img');
 const removeImgBtn = document.getElementById('remove-img-btn');
+const notiBtn = document.getElementById('noti-btn');
+const notiDropdown = document.getElementById('noti-dropdown');
+const notiList = document.getElementById('noti-list');
+const notiCount = document.getElementById('noti-count');
 
-let isSending = false; // Biến chặn gửi tin nhắn liên tục
+let isSending = false;
+let myChart = null;
+let dashboardData = null;
+let currentView = 'expense';
 
-// // Đoạn code này nên nằm ở phần xử lý sau khi người dùng đã đăng nhập thành công
-// function updateTelegramLink(userId) {
-//   const telegramBtn = document.getElementById('telegram-link');
-//   if (telegramBtn && userId) {
-//     // Gắn ID động vào link
-//     telegramBtn.href = `https://t.me/truongquocbao_bot?start=${userId}`;
-//   }
-// }
+// ==========================================
+// 2. HÀM HỖ TRỢ
+// ==========================================
 
-// // Ví dụ: Nếu bạn lấy ID từ localStorage sau khi đăng nhập
-// const loggedInUserId = localStorage.getItem('userId'); // Hoặc lấy từ dữ liệu User của bạn
-// updateTelegramLink(loggedInUserId);
-
-// // 1. Thử lấy ID từ bộ nhớ trình duyệt
-// const userId = localStorage.getItem('userId'); // Hoặc 'user_id' tùy bạn đặt tên
-
-// // 2. Console.log để kiểm tra
-// console.log('--- KIỂM TRA KẾT NỐI TELEGRAM ---');
-// console.log('ID người dùng hiện tại:', userId);
-
-// // 3. Cập nhật link nếu có ID
-// const telegramBtn = document.getElementById('telegram-link');
-
-// if (userId) {
-//   telegramBtn.href = `https://t.me/truongquocbao_bot?start=${userId}`;
-//   console.log('Link Telegram mới:', telegramBtn.href);
-// } else {
-//   console.warn('CẢNH BÁO: Không tìm thấy ID người dùng! Link sẽ bị lỗi.');
-// }
-
-// fetch('/login', {
-//   method: 'POST',
-//   body: JSON.stringify(data),
-// })
-//   .then((res) => res.json())
-//   .then((userData) => {
-//     // Console log toàn bộ dữ liệu server trả về
-//     console.log('Dữ liệu Server trả về:', userData);
-
-//     const idToLink = userData.user.id; // Giả sử server trả về { user: { id: 123 } }
-//     console.log('ID dùng để gắn vào Telegram:', idToLink);
-
-//     // Cập nhật link
-//     document.getElementById(
-//       'telegram-link',
-//     ).href = `https://t.me/truongquocbao_bot?start=${idToLink}`;
-//   });
-
-// Thông báo
-// === HÀM ĐĂNG KÝ PUSH ĐÃ SỬA ===
-
-let myChart = null; // Biến lưu trữ đối tượng biểu đồ
-let dashboardData = null; // Thêm dòng này để lưu dữ liệu từ server
-let currentView = 'expense'; // Thêm dòng này để biết đang xem 'chi' hay 'thu'
-
-// Hàm định dạng tiền tệ Việt Nam
+// Định dạng tiền tệ
 function formatMoney(amount) {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND',
+  }).format(amount);
 }
 
-// // Hàm lấy dữ liệu và cập nhật Dashboard
-// async function updateDashboard() {
-//   try {
-//     const res = await fetch('/api/stats');
-//     const data = await res.json();
+// Định dạng ngày giờ
+// Định dạng ngày giờ (Đã Fix lỗi lệch 7 tiếng UTC của Database)
+function formatDateTime(dateString) {
+  // Thay thế dấu cách bằng 'T' để JS hiểu đây là định dạng ISO
+  const date = new Date(dateString.replace(' ', 'T'));
+  const now = new Date();
 
-//     document.querySelector(
-//       '.dashboard-header h1',
-//     ).innerText = `📊 Thống kê Tháng ${data.month}/${data.year}`;
+  // Tính khoảng cách thời gian
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
 
-//     // 1. Cập nhật các con số Header
-//     document.getElementById('total-income').innerText = formatMoney(data.income);
-//     document.getElementById('total-expense').innerText = formatMoney(data.expense);
-//     document.getElementById('total-balance').innerText = formatMoney(data.income - data.expense);
-//     document.getElementById('current-date').innerText =
-//       'Cập nhật lúc: ' + new Date().toLocaleTimeString('vi-VN');
+  // Nếu là thời gian tương lai hoặc vừa mới tạo (do sai lệch milisecond)
+  if (diffMins < 1 || isNaN(diffMins)) return 'Vừa xong';
+  if (diffMins < 60) return `${diffMins} phút trước`;
+  if (diffHours < 24) return `${diffHours} giờ trước`;
+  if (diffDays < 7) return `${diffDays} ngày trước`;
 
-//     // 2. Vẽ biểu đồ tròn (Pie Chart)
-//     const ctx = document.getElementById('expenseChart').getContext('2d');
+  return date.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+}
+// Animation cho số tiền
+function animateValue(element, start, end, duration) {
+  const range = end - start;
+  const increment = range / (duration / 16);
+  let current = start;
 
-//     // Nếu đã có biểu đồ trước đó thì xóa đi để vẽ lại (tránh bị lỗi đè dữ liệu)
-//     if (myChart) {
-//       myChart.destroy();
-//     }
+  const timer = setInterval(() => {
+    current += increment;
+    if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
+      element.textContent = formatMoney(end);
+      clearInterval(timer);
+    } else {
+      element.textContent = formatMoney(Math.floor(current));
+    }
+  }, 16);
+}
 
-//     myChart = new Chart(ctx, {
-//       type: 'doughnut', // Kiểu hình tròn khuyết (nhìn hiện đại hơn)
-//       data: {
-//         labels: data.categories.map((c) => c.category_name),
-//         datasets: [
-//           {
-//             data: data.categories.map((c) => c.amount),
-//             backgroundColor: [
-//               '#0084ff',
-//               '#28a745',
-//               '#dc3545',
-//               '#ffc107',
-//               '#17a2b8',
-//               '#6610f2',
-//               '#e83e8c',
-//             ],
-//             borderWidth: 1,
-//           },
-//         ],
-//       },
-//       options: {
-//         responsive: true,
-//         maintainAspectRatio: false,
-//         plugins: {
-//           legend: { position: 'bottom' },
-//         },
-//       },
-//     });
-//   } catch (err) {
-//     console.error('Lỗi fetch stats:', err);
-//   }
-// }
+// ==========================================
+// 3. CẬP NHẬT DASHBOARD
+// ==========================================
 
-// --- ĐOẠN CODE ĐÃ ĐƯỢC TINH GỌN VÀ CHUẨN HÓA ---
-
-// Hàm lấy dữ liệu và cập nhật Dashboard
 async function updateDashboard() {
   try {
     const res = await fetch('/api/stats');
-    const data = await res.json();
+    if (!res.ok) throw new Error('Không thể tải dữ liệu');
 
-    // Lưu dữ liệu vào biến toàn cục để hàm renderChart có thể dùng lại
+    const data = await res.json();
     dashboardData = data;
 
-    // Cập nhật tiêu đề tháng
+    // Cập nhật tiêu đề
     const headerTitle = document.querySelector('.dashboard-header h1');
-    if (headerTitle) headerTitle.innerText = `📊 Thống kê Tháng ${data.month}/${data.year}`;
+    if (headerTitle) {
+      headerTitle.innerText = `📊 Thống kê Tháng ${data.month}/${data.year}`;
+    }
 
-    // 1. Cập nhật các con số Header
-    document.getElementById('total-income').innerText = formatMoney(data.income);
-    document.getElementById('total-expense').innerText = formatMoney(data.expense);
-    document.getElementById('total-balance').innerText = formatMoney(data.income - data.expense);
+    // Cập nhật thời gian
     document.getElementById('current-date').innerText =
-      'Cập nhật lúc: ' + new Date().toLocaleTimeString('vi-VN');
+      'Cập nhật: ' +
+      new Date().toLocaleTimeString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
 
-    // 2. Gọi hàm vẽ biểu đồ (Dùng view hiện tại: chi hoặc thu)
+    // Animate số liệu với hiệu ứng mượt
+    const incomeEl = document.getElementById('total-income');
+    const expenseEl = document.getElementById('total-expense');
+    const balanceEl = document.getElementById('total-balance');
+
+    // Lấy giá trị cũ hoặc 0
+    const oldIncome = parseFloat(incomeEl.dataset.value || 0);
+    const oldExpense = parseFloat(expenseEl.dataset.value || 0);
+
+    // Lưu giá trị mới
+    incomeEl.dataset.value = data.income;
+    expenseEl.dataset.value = data.expense;
+
+    // Animate
+    if (oldIncome !== data.income) {
+      animateValue(incomeEl, oldIncome, data.income, 800);
+    } else {
+      incomeEl.textContent = formatMoney(data.income);
+    }
+
+    if (oldExpense !== data.expense) {
+      animateValue(expenseEl, oldExpense, data.expense, 800);
+    } else {
+      expenseEl.textContent = formatMoney(data.expense);
+    }
+
+    animateValue(balanceEl, oldIncome - oldExpense, data.income - data.expense, 800);
+
+    // Vẽ lại biểu đồ
     renderChart(currentView);
+
+    // Cập nhật giao dịch gần đây
+    await loadRecentTransactions();
   } catch (err) {
-    console.error('Lỗi fetch stats:', err);
+    console.error('❌ Lỗi fetch stats:', err);
+    showToast('Không thể tải dữ liệu dashboard', 'error');
   }
 }
 
-// Hàm hỗ trợ vẽ biểu đồ (Chỉ giữ một hàm duy nhất này để vẽ)
+// ==========================================
+// 4. VẼ BIỂU ĐỒ
+// ==========================================
+
 function renderChart(type) {
   if (!dashboardData) return;
+
   const canvas = document.getElementById('expenseChart');
   const noDataMsg = document.getElementById('no-data-msg');
   const ctx = canvas.getContext('2d');
@@ -171,28 +154,26 @@ function renderChart(type) {
   const dataToRender =
     type === 'income' ? dashboardData.incomeCategories : dashboardData.expenseCategories;
 
-  // KIỂM TRA DỮ LIỆU
+  // Kiểm tra dữ liệu
   if (!dataToRender || dataToRender.length === 0) {
-    // 1. Hiện thông báo đẹp, ẩn canvas
     canvas.style.display = 'none';
     noDataMsg.style.display = 'flex';
 
-    // Cập nhật tiêu đề báo cáo
     const titleText = type === 'income' ? 'Chưa có thu nhập ☘️' : 'Chưa có chi tiêu ✨';
     document.querySelector('.chart-section h3').innerText = titleText;
-    return; // Dừng lại không vẽ nữa
+    return;
   }
 
-  // NẾU CÓ DỮ LIỆU:
-  canvas.style.display = 'block'; // Hiện lại canvas
-  noDataMsg.style.display = 'none'; // Ẩn thông báo trống
+  // Hiện canvas
+  canvas.style.display = 'block';
+  noDataMsg.style.display = 'none';
 
   const colors =
     type === 'income'
-      ? ['#28a745', '#34ce57', '#218838', '#1e7e34', '#c3e6cb']
-      : ['#0084ff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6610f2', '#e83e8c'];
+      ? ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#d1fae5']
+      : ['#ec4899', '#f472b6', '#f59e0b', '#fbbf24', '#60a5fa', '#818cf8', '#a78bfa'];
 
-  const titleText = type === 'income' ? 'Phân tích thu nhập' : 'Phân tích chi tiêu';
+  const titleText = type === 'income' ? '💰 Phân tích thu nhập' : '💸 Phân tích chi tiêu';
   document.querySelector('.chart-section h3').innerText = titleText;
 
   myChart = new Chart(ctx, {
@@ -203,8 +184,8 @@ function renderChart(type) {
         {
           data: dataToRender.map((c) => c.amount),
           backgroundColor: colors,
-          hoverOffset: 15, // Hiệu ứng khi rê chuột vào nó to ra nhìn rất xịn
-          borderWidth: 2,
+          hoverOffset: 20,
+          borderWidth: 3,
           borderColor: '#ffffff',
         },
       ],
@@ -212,69 +193,231 @@ function renderChart(type) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      cutout: '70%', // Làm vòng tròn mỏng lại cho sang
+      cutout: '65%',
+      animation: {
+        animateRotate: true,
+        animateScale: true,
+        duration: 1000,
+        easing: 'easeInOutQuart',
+      },
       plugins: {
-        legend: { position: 'bottom' },
+        legend: {
+          position: 'bottom',
+          labels: {
+            padding: 12,
+            font: { size: 11 },
+            usePointStyle: true,
+          },
+        },
+        tooltip: {
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          padding: 12,
+          borderRadius: 8,
+          callbacks: {
+            label: function (context) {
+              const label = context.label || '';
+              const value = formatMoney(context.parsed);
+              const total = context.dataset.data.reduce((a, b) => a + b, 0);
+              const percentage = ((context.parsed / total) * 100).toFixed(1);
+              return `${label}: ${value} (${percentage}%)`;
+            },
+          },
+        },
       },
     },
   });
 }
 
-// Ngân hàng
-async function startLinking() {
-  const btn = document.getElementById('btn-link');
-  btn.innerHTML = '⏳ Đang chuyển hướng...';
+// ==========================================
+// 5. TẢI GIAO DỊCH GẦN ĐÂY
+// ==========================================
 
-  const token = localStorage.getItem('token');
+async function loadRecentTransactions() {
+  const container = document.getElementById('recent-transactions');
 
-  const headers = {};
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
+  try {
+    const res = await fetch('/api/recent-transactions');
+    if (!res.ok) throw new Error('Không thể tải giao dịch');
 
-  const res = await fetch('/api/get-magic-link', { headers });
-  const data = await res.json();
+    const transactions = await res.json();
 
-  if (data.url) {
-    window.location.href = data.url;
-  } else {
-    alert('❌ Không lấy được link ngân hàng');
+    if (!transactions || transactions.length === 0) {
+      container.innerHTML = `
+        <div class="flex flex-col items-center justify-center h-32 text-gray-400">
+          <i class="fa-solid fa-inbox text-3xl mb-2"></i>
+          <p class="text-xs italic">Chưa có giao dịch nào</p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = transactions
+      .slice(0, 20)
+      .map((t) => {
+        const isIncome = t.type === 'income';
+        const iconColor = isIncome ? 'text-green-500 bg-green-50' : 'text-red-500 bg-red-50';
+        const icon = isIncome ? 'fa-arrow-down' : 'fa-arrow-up';
+        const amountColor = isIncome ? 'text-green-600' : 'text-red-600';
+
+        return `
+          <div class="transaction-item flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 transition border-b border-gray-50 last:border-0">
+            <div class="flex items-center space-x-3">
+              <div class="w-9 h-9 rounded-full ${iconColor} flex items-center justify-center shadow-sm shrink-0">
+                <i class="fa-solid ${icon} text-sm"></i>
+              </div>
+              <div class="overflow-hidden">
+                <!-- 👉 In ra tên món đồ Bảo nhập (VD: Ăn cơm gà 100k) -->
+                <p class="text-sm font-medium text-gray-800 truncate" style="max-width: 180px;" title="${
+                  t.description || t.category_name
+                }">
+                  ${t.description || t.category_name || 'Khác'}
+                </p>
+                <!-- 👉 In Tag Danh mục và Thời gian ở ngay bên dưới -->
+                <div class="flex items-center text-[10px] text-gray-500 mt-1">
+                  <span class="bg-gray-100 px-1.5 py-0.5 rounded text-gray-600 mr-2 border border-gray-200">
+                    ${t.category_name || 'Khác'}
+                  </span>
+                  <span>${formatDateTime(t.created_at)}</span>
+                </div>
+              </div>
+            </div>
+            <div class="text-right shrink-0">
+              <p class="text-sm font-bold ${amountColor}">
+                ${isIncome ? '+' : '-'}${formatMoney(Math.abs(t.amount))}
+              </p>
+            </div>
+          </div>
+        `;
+      })
+      .join('');
+  } catch (err) {
+    console.error('❌ Lỗi tải giao dịch:', err);
+    container.innerHTML = `
+      <div class="flex items-center justify-center h-32 text-red-500 text-xs">
+        <i class="fa-solid fa-exclamation-triangle mr-2"></i>
+        Không thể tải dữ liệu
+      </div>
+    `;
   }
 }
 
-// --- QUAN TRỌNG: GỌI HÀM NÀY KHI TRANG LOAD XONG ---
-window.addEventListener('load', () => {
-  updateDashboard();
+// Ngân sách
+
+async function loadBudgets() {
+  const container = document.getElementById('budget-container');
+  try {
+    // Gọi API (chưa có API này ở server thì làm bước 2)
+    const res = await fetch('/api/budgets');
+    const budgets = await res.json();
+
+    if (budgets.length === 0) {
+      container.innerHTML = '<p class="text-xs text-gray-400 italic p-2">Chưa có ngân sách nào</p>';
+      return;
+    }
+
+    container.innerHTML = budgets
+      .map((b) => {
+        const limit = b.amount_limit || 0;
+        const spent = parseFloat(b.spent || 0);
+        const percent = limit > 0 ? Math.min(Math.round((spent / limit) * 100), 100) : 0;
+        const color =
+          percent >= 90 ? 'bg-red-500' : percent >= 70 ? 'bg-yellow-500' : 'bg-green-500';
+
+        return `
+        <div class="flex flex-col">
+            <div class="flex justify-between items-center mb-1">
+                <div class="flex items-center text-xs">
+                    <span class="mr-2">${b.icon || '📁'}</span>
+                    <span class="font-medium text-gray-600">${b.category_name}</span>
+                </div>
+                <div class="text-[10px] text-gray-500 font-medium">
+                    ${formatMoney(spent).replace('₫', '')} / ${
+          limit > 0 ? formatMoney(limit).replace('₫', '') : 'Chưa đặt'
+        }
+                </div>
+            </div>
+            <div class="w-full bg-gray-100 rounded-full h-1.5">
+                <div class="${color} h-1.5 rounded-full transition-all" style="width: ${percent}%"></div>
+            </div>
+        </div>
+      `;
+      })
+      .join('');
+  } catch (err) {
+    console.error('Lỗi load ngân sách:', err);
+    container.innerHTML = '<p class="text-xs text-red-400 p-2">Lỗi tải ngân sách</p>';
+  }
+}
+
+// ==========================================
+// 6. LIÊN KẾT NGÂN HÀNG
+// ==========================================
+
+document.addEventListener('DOMContentLoaded', function () {
+  const btnLinkBank = document.getElementById('btn-link-bank');
+  const loadingState = document.getElementById('loading-state');
+  const errorState = document.getElementById('error-state');
+  const errorMessage = document.getElementById('error-message');
+
+  if (btnLinkBank) {
+    btnLinkBank.addEventListener('click', async function () {
+      try {
+        btnLinkBank.style.display = 'none';
+        loadingState.style.display = 'block';
+        errorState.style.display = 'none';
+
+        console.log('🔗 Đang tạo link liên kết ngân hàng...');
+
+        const response = await fetch('/api/create-bank', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token') || 'demo'}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Không thể tạo link');
+        }
+
+        const data = await response.json();
+        console.log('✅ Nhận được magic link:', data.url);
+
+        window.location.href = data.url;
+      } catch (error) {
+        console.error('❌ Lỗi:', error);
+        loadingState.style.display = 'none';
+        errorState.style.display = 'block';
+        errorMessage.textContent = error.message;
+        btnLinkBank.style.display = 'block';
+      }
+    });
+  }
 });
 
-// --- CẬP NHẬT BIỂU ĐỒ MỖI KHI CHAT XONG ---
-// Trong file script.js của Bảo, chỗ fetch('/chat') thành công, hãy gọi thêm hàm này:
-// ... sau khi addMessage(cleanReply, false);
-// updateDashboard();
+// ==========================================
+// 7. PUSH NOTIFICATION
+// ==========================================
 
 async function registerPush() {
   try {
     console.log('⏳ Đang khởi tạo Service Worker...');
 
-    // 1. Đăng ký Service Worker
     const register = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
     console.log('✅ Service Worker đã đăng ký!');
 
-    // 2. Đợi Service Worker sẵn sàng
     const ready = await navigator.serviceWorker.ready;
     console.log('✅ Service Worker sẵn sàng!');
 
-    // 3. Lấy Public VAPID Key từ Server
     const keyRes = await fetch('/vapid-public-key');
     if (!keyRes.ok) throw new Error('Không lấy được VAPID key');
 
     const { publicVapidKey } = await keyRes.json();
     console.log('✅ Đã lấy Public VAPID Key');
 
-    // 4. Kiểm tra subscription cũ
     let subscription = await ready.pushManager.getSubscription();
 
-    // 5. Nếu chưa có thì subscribe mới
     if (!subscription) {
       console.log('🔔 Đang tạo subscription mới...');
       subscription = await ready.pushManager.subscribe({
@@ -286,7 +429,6 @@ async function registerPush() {
       console.log('🟡 Đã có subscription cũ');
     }
 
-    // 6. Gửi subscription lên server
     await fetch('/subscribe', {
       method: 'POST',
       body: JSON.stringify(subscription),
@@ -299,7 +441,6 @@ async function registerPush() {
   }
 }
 
-// Hàm bổ trợ để chuyển Public Key (Bảo nhớ copy hàm này dán vào script.js luôn)
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
@@ -311,23 +452,15 @@ function urlBase64ToUint8Array(base64String) {
   return outputArray;
 }
 
-// Gọi đăng ký Push khi trang load xong
-window.addEventListener('load', () => {
-  if ('serviceWorker' in navigator && 'PushManager' in window) {
-    // Đợi người dùng tương tác một chút để tăng tỷ lệ thành công
-    setTimeout(registerPush, 2000);
-  } else {
-    console.warn('❌ Trình duyệt không hỗ trợ Push Notification');
-  }
-});
+// ==========================================
+// 8. SOCKET.IO - NHẬN TIN TỪ NGÂN HÀNG
+// ==========================================
 
-// --- 2. CẤU HÌNH SOCKET.IO (NHẬN TIN TỪ NGÂN HÀNG) ---
 const socket = io();
 
 let notificationAudio = null;
 let userHasInteracted = false;
 
-// Khởi tạo âm thanh một lần
 function initNotificationAudio() {
   if (!notificationAudio) {
     notificationAudio = new Audio(
@@ -337,18 +470,16 @@ function initNotificationAudio() {
   }
 }
 
-// Phát âm thanh an toàn (chỉ phát khi đã có tương tác)
 async function playNotificationSound() {
   if (!notificationAudio || !userHasInteracted) return;
 
   try {
     await notificationAudio.play();
   } catch (err) {
-    console.log('🔇 Không phát được âm thanh thông báo (browser chặn)');
+    console.log('🔇 Không phát được âm thanh (browser chặn)');
   }
 }
 
-// Kích hoạt âm thanh sau khi người dùng click/tap vào trang
 function enableAudioAfterInteraction() {
   if (userHasInteracted) return;
 
@@ -357,59 +488,264 @@ function enableAudioAfterInteraction() {
   const handler = () => {
     userHasInteracted = true;
     initNotificationAudio();
-    console.log('✅ Người dùng đã tương tác → Âm thanh thông báo đã được kích hoạt');
-
-    // Xóa listener sau khi kích hoạt
+    console.log('✅ Âm thanh đã được kích hoạt');
     events.forEach((event) => document.removeEventListener(event, handler));
   };
 
   events.forEach((event) => document.addEventListener(event, handler, { once: true }));
 }
 
-// Lắng nghe thông báo từ ngân hàng
 socket.on('bank_notification', (data) => {
-  console.log('🏦 Nhận dữ liệu bank:', data);
-
-  // Hiển thị tin nhắn vào chat
+  console.log('🏦 Nhận thông báo ngân hàng:', data);
   addMessage(data.message, false);
-
-  // Phát âm thanh (an toàn)
   playNotificationSound();
-
-  // Cập nhật lại biểu đồ ngay lập tức khi tiền vừa về!
   updateDashboard();
+  showToast('💰 Có giao dịch mới từ ngân hàng!', 'success');
 });
 
 socket.on('connect', () => {
-  console.log('✅ Đã kết nối Socket thành công!');
+  console.log('✅ Socket.IO đã kết nối!');
 });
 
-// Khi bấm nút camera thì kích hoạt chọn file
+socket.on('disconnect', () => {
+  console.log('⚠️ Socket.IO đã ngắt kết nối');
+});
+
+// Bấm vào chuông thì chỉ hiện/ẩn list thông báo
+notiBtn.addEventListener('click', () => {
+  // Chỉ đổi trạng thái hiện/ẩn của dropdown
+  notiDropdown.classList.toggle('hidden');
+
+  // Nếu dropdown vừa mở ra, thì load dữ liệu mới nhất từ DB
+  if (!notiDropdown.classList.contains('hidden')) {
+    loadNotifications();
+  }
+});
+
+// Nhận thông báo từ socket
+socket.on('new_notification', (data) => {
+  // Cập nhật số trên chuông
+  let count = parseInt(notiCount.innerText) || 0;
+  notiCount.innerText = count + 1;
+  notiCount.classList.remove('hidden');
+
+  // Thêm vào list
+  const div = document.createElement('div');
+  div.className = 'p-2 border-b hover:bg-gray-50';
+  div.innerText = data.message;
+  notiList.prepend(div);
+});
+
+// Hàm đánh dấu đã đọc từngg tin
+async function markAsRead(id) {
+  try {
+    const res = await fetch(`/api/notifications/read/${id}`, { method: 'POST' });
+    if (res.ok) {
+      const header = document.getElementById(`noti-header-${id}`);
+      const statusSpan = header.querySelector('span');
+      const parentDiv = header.parentElement;
+
+      // Đổi nền về trắng, chữ giữ font-bold nhưng đổi sang màu xám (text-gray-400)
+      parentDiv.classList.replace('bg-blue-50', 'bg-white');
+      statusSpan.className = 'text-xs font-bold text-gray-400';
+      statusSpan.innerText = 'Thông báo cũ';
+
+      // Cập nhật số đếm trên chuông và nút
+      let count = parseInt(notiCount.innerText) || 0;
+      if (count > 0) {
+        const newCount = count - 1;
+        notiCount.innerText = newCount;
+        if (newCount === 0) notiCount.classList.add('hidden');
+
+        const markAllBtn = document.querySelector('button[onclick="markAllAsRead()"]');
+        if (markAllBtn) {
+          if (newCount > 0) {
+            markAllBtn.innerText = `Đánh dấu tất cả (${newCount})`;
+          } else {
+            markAllBtn.outerHTML = '<span class="text-gray-400 font-bold">Không có tin mới</span>';
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+// Hàm đánh dấu đã đọc tất cả tin
+async function markAllAsRead() {
+  await fetch('/api/notifications/read-all', { method: 'POST' });
+  loadNotifications();
+}
+
+// Xóa từng tin
+async function deleteNoti(id) {
+  if (!confirm('Bạn có chắc muốn xóa thông báo này?')) return;
+  await fetch(`/api/notifications/delete/${id}`, { method: 'DELETE' });
+  loadNotifications();
+}
+
+// Xóa tất cả
+async function deleteAllNotifications() {
+  if (!confirm('Xóa sạch tất cả thông báo?')) return;
+  await fetch('/api/notifications/delete-all', { method: 'DELETE' });
+  loadNotifications();
+}
+
+// Load data
+async function loadNotifications() {
+  try {
+    const res = await fetch('/api/notifications');
+    const data = await res.json();
+
+    // Tính số lượng tin chưa đọc
+    const unreadNotifications = data.filter((n) => !n.is_read);
+    const unreadCount = unreadNotifications.length;
+
+    const totalCount = data.length;
+
+    // 1. HEADER CHỨA NÚT CHỨC NĂNG (Chỉ hiện nếu có tin)
+    let htmlContent = '';
+    if (data.length > 0) {
+      htmlContent = `
+          <div class="p-3 border-b border-gray-100 bg-white sticky top-0 z-10 flex justify-between items-center text-[11px]">
+             ${
+               unreadCount > 0
+                 ? `
+                   <button onclick="markAllAsRead()" class="text-blue-600 font-bold hover:underline">
+                       Đánh dấu tất cả (${unreadCount})
+                   </button>
+               `
+                 : '<span class="text-gray-400 font-bold">Không có tin mới</span>'
+             }
+               
+               <button onclick="deleteAllNotifications()" class="text-red-500 font-bold hover:underline">
+                   <i class="fa-solid fa-trash mr-1"></i> Xóa tất cả (${totalCount})
+               </button>
+           </div>
+         `;
+    } else {
+      htmlContent = '<p class="text-xs text-gray-400 p-4 text-center">Chưa có thông báo nào</p>';
+    }
+    // 2. Render danh sách thông báo
+    htmlContent += data
+      .map((n) => {
+        const titleColor = n.is_read ? 'text-gray-400' : 'text-gray-900 font-bold';
+        const statusText = n.is_read ? 'Thông báo cũ' : 'Thông báo mới';
+        const bgColor = n.is_read ? 'bg-white' : 'bg-blue-50';
+
+        // ... trong hàm map của loadNotifications ...
+        return `
+                <div class="border-b transition border-gray-100 ${bgColor}">
+                    <!-- TIÊU ĐỀ: Dùng flex để dàn hàng ngang -->
+                    <div id="noti-header-${n.id}" onclick="toggleNoti(${n.id}, ${n.is_read})" 
+                        class="p-3 cursor-pointer flex justify-between items-center w-full">
+                        
+                        <div class="flex flex-col gap-0.5 overflow-hidden">
+                           <span class="text-xs font-bold ${
+                             n.is_read ? 'text-gray-400' : 'text-gray-900'
+                           }">
+                              ${statusText}
+                            </span>
+                      
+                            <span class="text-[10px] text-gray-400">${formatDateTime(
+                              n.created_at,
+                            )}</span>
+                        </div>
+
+                        <!-- NHÓM NÚT BÊN PHẢI -->
+                        <div class="flex items-center gap-3 text-gray-400">
+                            <!-- Nút Xóa -->
+                            <button onclick="event.stopPropagation(); deleteNoti(${
+                              n.id
+                            })" class="hover:text-red-500 transition text-sm">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                            <!-- Nút Mũi tên -->
+                            <i class="fa-solid fa-chevron-down text-[10px]"></i>
+                        </div>
+                    </div>
+                    
+                    <!-- NỘI DUNG CHI TIẾT -->
+                    <div id="noti-content-${n.id}" class="hidden p-3 pt-0 text-xs text-gray-700">
+                        <div class="bg-white p-3 rounded border border-gray-100 shadow-sm">
+                            <p class="mb-3">${n.message.replace(/\*\*/g, '')}</p>
+                            <div class="flex justify-end gap-3">
+                                <button onclick="toggleNoti(${
+                                  n.id
+                                })" class="text-gray-400 font-bold text-[10px]">« Thu gọn</button>
+                                <!-- NÚT ĐÁNH DẤU ĐÃ XÓA Ở ĐÂY -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                `;
+      })
+      .join('');
+
+    notiList.innerHTML = htmlContent;
+
+    if (unreadCount > 0) {
+      notiCount.innerText = unreadCount;
+      notiCount.classList.remove('hidden');
+    } else {
+      notiCount.classList.add('hidden');
+    }
+  } catch (err) {
+    console.error('Lỗi loadNotifications:', err);
+  }
+}
+
+// Hàm này mở/đóng chi tiết thông báo
+async function toggleNoti(id, isRead) {
+  const header = document.getElementById(`noti-header-${id}`);
+  const content = document.getElementById(`noti-content-${id}`);
+
+  // Nếu đang đóng (hidden) -> mở ra
+  if (content.classList.contains('hidden')) {
+    content.classList.remove('hidden');
+    header.classList.add('hidden');
+
+    // Nếu tin chưa đọc, đánh dấu là đã đọc ngay khi mở
+    const isUnread = header.querySelector('span').classList.contains('font-bold');
+    if (isUnread) {
+      await markAsRead(id);
+    }
+  } else {
+    // Nếu đang mở -> đóng lại
+    content.classList.add('hidden');
+    header.classList.remove('hidden');
+  }
+}
+
+// ==========================================
+// 9. CHAT - XỬ LÝ UPLOAD ẢNH
+// ==========================================
+
 if (uploadBtn) {
   uploadBtn.addEventListener('click', () => fileInput.click());
 }
 
-// 1. Khi chọn ảnh xong -> Hiện ảnh xem trước ngay lập tức
 fileInput.addEventListener('change', () => {
   const file = fileInput.files[0];
   if (file) {
     const url = URL.createObjectURL(file);
     imagePreviewImg.src = url;
-    imagePreviewContainer.style.display = 'flex'; // Hiện vùng preview
+    imagePreviewContainer.style.display = 'flex';
   }
 });
 
-// 2. Nút X để xóa ảnh đã chọn nếu không muốn gửi nữa
 if (removeImgBtn) {
   removeImgBtn.addEventListener('click', () => {
-    fileInput.value = ''; // Xóa file trong input
-    imagePreviewContainer.style.display = 'none'; // Ẩn vùng preview
+    fileInput.value = '';
+    imagePreviewContainer.style.display = 'none';
   });
 }
 
-/**
- * Hàm hiển thị tin nhắn lên màn hình
- */
+// ==========================================
+// 10. CHAT - HIỂN THỊ TIN NHẮN
+// ==========================================
+
 function addMessage(text, isUser = false) {
   const safeText = text || '';
 
@@ -421,26 +757,36 @@ function addMessage(text, isUser = false) {
     if (typeof marked !== 'undefined' && safeText.trim() !== '') {
       div.innerHTML = marked.parse(safeText);
     } else {
-      div.textContent = safeText || 'Guard không có phản hồi, thử lại nhé Bảo!';
+      div.textContent = safeText || 'Không có phản hồi';
     }
   } else {
     div.textContent = safeText;
   }
 
   chatMessages.appendChild(div);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  // Smooth scroll to bottom
+  setTimeout(() => {
+    chatMessages.scrollTo({
+      top: chatMessages.scrollHeight,
+      behavior: 'smooth',
+    });
+  }, 100);
 }
 
-/**
- * Hiệu ứng đang soạn tin
- */
 function showTypingIndicator() {
   const div = document.createElement('div');
   div.id = 'typing-indicator';
   div.className = 'typing';
   div.innerHTML = `<div class="dot"></div><div class="dot"></div><div class="dot"></div>`;
   chatMessages.appendChild(div);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  setTimeout(() => {
+    chatMessages.scrollTo({
+      top: chatMessages.scrollHeight,
+      behavior: 'smooth',
+    });
+  }, 100);
 }
 
 function removeTypingIndicator() {
@@ -448,9 +794,10 @@ function removeTypingIndicator() {
   if (indicator) indicator.remove();
 }
 
-/**
- * Xử lý sự kiện gửi Form
- */
+// ==========================================
+// 11. CHAT - GỬI TIN NHẮN
+// ==========================================
+
 chatForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   if (isSending) return;
@@ -458,177 +805,172 @@ chatForm.addEventListener('submit', async (e) => {
   const message = userInput.value.trim();
   const file = fileInput.files[0];
 
-  // Nếu không có cả chữ lẫn ảnh thì không làm gì cả
   if (!message && !file) return;
 
-  // --- [LOG 1]: Kiểm tra những gì Bảo vừa nhập ---
-  console.log('>>> [1. INPUT OBJECT]:', { text: message, file: file ? file.name : 'No image' });
+  console.log('📤 Gửi:', { text: message, file: file ? file.name : 'No image' });
 
   isSending = true;
 
-  // HIỂN THỊ TIN NHẮN USER
-  // Nếu Bảo chỉ gửi ảnh mà không gõ chữ, mình tự hiện câu thông báo
-  const displayMessage = message || (file ? 'Phân tích hình ảnh này giúp Bảo...' : '');
+  const displayMessage = message || (file ? '🖼️ Phân tích hình ảnh này giúp Bảo...' : '');
   addMessage(displayMessage, true);
 
   if (file) {
     const imageUrl = URL.createObjectURL(file);
     const lastMsg = chatMessages.lastElementChild;
-    lastMsg.innerHTML += `<br><img src="${imageUrl}" style="max-width:200px; border-radius:10px; margin-top:5px; display:block;" />`;
+    lastMsg.innerHTML += `<br><img src="${imageUrl}" style="max-width:200px; border-radius:12px; margin-top:8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />`;
   }
 
-  // DỌN DẸP GIAO DIỆN SAU KHI NHẤN GỬI
   userInput.value = '';
-  imagePreviewContainer.style.display = 'none'; // Ẩn vùng xem trước ảnh
+  imagePreviewContainer.style.display = 'none';
   userInput.disabled = true;
   showTypingIndicator();
 
   try {
     const formData = new FormData();
-    formData.append('message', message); // Gửi message (có thể trống)
+    formData.append('message', message);
     if (file) {
       formData.append('image', file);
     }
 
-    // --- [LOG 2]: Kiểm tra gói hàng gửi sang Server/n8n ---
-    console.log('>>> [2. SENDING FORMDATA]:');
-    for (let pair of formData.entries()) {
-      console.log(`   - ${pair[0]}:`, pair[1]);
-    }
-
-    // const res = await fetch('http://localhost:4005/chat', {
     const res = await fetch('/chat', {
       method: 'POST',
-      body: formData, // FormData chuẩn cho multer
+      body: formData,
     });
 
     if (!res.ok) {
       const errorData = await res.json();
-      console.error('>>> [ERR]: Server trả lỗi:', errorData);
-      throw new Error(errorData.error || 'Lỗi từ Server Money Guard');
+      throw new Error(errorData.error || 'Lỗi từ Server');
     }
 
     const data = await res.json();
     const replyText = data.reply;
 
-    // --- PHẦN XỬ LÝ TRÍCH XUẤT DỮ LIỆU ---
-
-    // 1. Nhặt lệnh tạo danh mục (Category)
-    const createCatMatch = replyText.match(/<create_category>(.*?)<\/create_category>/s);
-    if (createCatMatch && createCatMatch[1]) {
-      try {
-        const catObj = JSON.parse(createCatMatch[1].trim());
-        console.log('✨ [YÊU CẦU TẠO DANH MỤC]:', catObj);
-      } catch (e) {
-        console.error('🚨 Lỗi parse JSON create_category:', e);
-      }
-    }
-
-    // 2. Nhặt giao dịch (Transaction)
-    const transactionMatch = replyText.match(/<transaction>(.*?)<\/transaction>/s);
-    if (transactionMatch && transactionMatch[1]) {
-      try {
-        const transactionObj = JSON.parse(transactionMatch[1].trim());
-        console.log('🎯 [GIAO DỊCH TÌM THẤY]:');
-        console.table(transactionObj); // In ra bảng cho Bảo xem
-      } catch (e) {
-        console.error('🚨 Lỗi khi parse dữ liệu giao dịch:', e);
-      }
-    }
-
-    // 3. Nhặt TẤT CẢ giao dịch (Sử dụng matchAll để in ra 1 bảng nhiều dòng duy nhất)
+    // Phân tích dữ liệu
     const allMatches = [...replyText.matchAll(/<transaction>(.*?)<\/transaction>/gs)];
 
     if (allMatches.length > 0) {
       try {
         const transactions = allMatches.map((m) => JSON.parse(m[1].trim()));
-        console.log(`🎯 [PHÁT HIỆN ${transactions.length} GIAO DỊCH]:`);
-        console.table(transactions); // IN BẢNG XỊN XÒ TẠI ĐÂY
+        console.log(`🎯 [${transactions.length} GIAO DỊCH]:`);
+        console.table(transactions);
       } catch (e) {
-        console.error('🚨 Lỗi parse danh sách giao dịch');
-      }
-    } else {
-      // Fallback: Nếu AI quên bọc thẻ <transaction> nhưng vẫn in JSON khơi khơi
-      const looseJson = replyText.match(/\{[\s\S]*?("category_name"|"account_id")[\s\S]*?\}/g);
-      if (looseJson) {
-        console.log('⚠️ AI quên thẻ nhưng Money Guard nhặt được JSON rác:');
-        looseJson.forEach((j) => {
-          try {
-            console.log(JSON.parse(j));
-          } catch (e) {}
-        });
+        console.error('🚨 Lỗi parse giao dịch');
       }
     }
 
-    // Nếu AI "quên" thẻ mà in JSON thẳng, mình dùng cái này để bắt
-    const fallbackJsonMatch =
-      replyText.match(/\{[\s\S]*?"category_name"[\s\S]*?\}/) ||
-      replyText.match(/\{[\s\S]*?"account_id"[\s\S]*?\}/);
-
-    if (transactionMatch) {
-      console.log('🎯 Giao dịch:', JSON.parse(transactionMatch[1]));
-    } else if (createCatMatch) {
-      console.log('✨ Danh mục mới:', JSON.parse(createCatMatch[1]));
-    } else if (fallbackJsonMatch) {
-      console.log('⚠️ AI quên thẻ nhưng vẫn nhặt được JSON:', JSON.parse(fallbackJsonMatch[0]));
-    }
-
-    // 2. Làm sạch văn bản trước khi hiện lên màn hình chat
-    let cleanReply = replyText
-      .replace(/<.*?>[\s\S]*?<\/.*?>/gs, '') // Xóa sạch mọi thứ nằm trong cặp thẻ <tag>...</tag>
-      .replace(/<.*?>[\s\S]*?<\/.*?>/gs, '') // Xóa sạch mọi thứ nằm trong cặp ngoặc nhọn {...} (kể cả xuống dòng)
-      .trim();
+    // Làm sạch reply
+    let cleanReply = replyText.replace(/<.*?>[\s\S]*?<\/.*?>/gs, '').trim();
 
     removeTypingIndicator();
     addMessage(cleanReply, false);
 
+    // Cập nhật dashboard sau khi ghi sổ thành công
     updateDashboard();
   } catch (err) {
     removeTypingIndicator();
     addMessage('🚨 Lỗi: ' + err.message, false);
+    showToast('Không thể gửi tin nhắn', 'error');
   } finally {
     isSending = false;
     userInput.disabled = false;
-    fileInput.value = ''; // Reset input file
+    fileInput.value = '';
     userInput.focus();
   }
 });
 
-// === KÍCH HOẠT ÂM THANH & PUSH SAU KHI LOAD ===
-window.addEventListener('load', () => {
-  enableAudioAfterInteraction(); // ← Quan trọng cho âm thanh ting
+// ==========================================
+// 12. TOAST NOTIFICATION
+// ==========================================
 
-  if ('serviceWorker' in navigator && 'PushManager' in window) {
-    setTimeout(registerPush, 1500);
-  }
-});
+function showToast(message, type = 'info') {
+  const toast = document.createElement('div');
+  const bgColor =
+    type === 'success'
+      ? 'from-green-500 to-emerald-500'
+      : type === 'error'
+      ? 'from-red-500 to-pink-500'
+      : 'from-blue-500 to-indigo-500';
 
-// Lấy đoạn chat
+  toast.className = `fixed top-20 right-6 bg-gradient-to-r ${bgColor} text-white px-6 py-3 rounded-lg shadow-2xl z-50 transform transition-all duration-300 translate-x-full`;
+  toast.innerHTML = `
+    <div class="flex items-center space-x-2">
+      <i class="fa-solid ${
+        type === 'success'
+          ? 'fa-check-circle'
+          : type === 'error'
+          ? 'fa-exclamation-circle'
+          : 'fa-info-circle'
+      }"></i>
+      <span class="font-medium">${message}</span>
+    </div>
+  `;
+
+  document.body.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.transform = 'translateX(0)';
+  }, 100);
+
+  setTimeout(() => {
+    toast.style.transform = 'translateX(150%)';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+// ==========================================
+// 13. LOAD LỊCH SỬ CHAT
+// ==========================================
+
 window.addEventListener('DOMContentLoaded', async () => {
   try {
     const res = await fetch('/chat-history');
     const history = await res.json();
 
-    // Duyệt qua từng tin nhắn cũ và hiện lên màn hình
     history.forEach((msg) => {
       const isUser = msg.role === 'user';
       addMessage(msg.message, isUser);
     });
   } catch (err) {
-    console.error('Không lấy được lịch sử chat:', err);
+    console.error('⚠️ Không lấy được lịch sử chat:', err);
   }
 });
 
-// Lắng nghe click vào các Card để đổi biểu đồ
+// ==========================================
+// 14. CLICK VÀO CARD ĐỂ ĐỔI BIỂU ĐỒ
+// ==========================================
+
 document.addEventListener('click', (e) => {
-  // Nếu nhấn vào ô Thu nhập
   if (e.target.closest('.card.income')) {
     currentView = 'income';
     renderChart('income');
-  }
-  // Nếu nhấn vào ô Chi tiêu
-  else if (e.target.closest('.card.expense')) {
+  } else if (e.target.closest('.card.expense')) {
     currentView = 'expense';
     renderChart('expense');
   }
+});
+
+// ==========================================
+// 15. KHỞI TẠO KHI TRANG LOAD
+// ==========================================
+
+window.addEventListener('load', () => {
+  // Cập nhật dashboard
+  updateDashboard();
+  loadBudgets();
+  // Hiện số lượng thông báo
+  loadNotifications();
+  // Kích hoạt âm thanh
+  enableAudioAfterInteraction();
+
+  // Đăng ký Push
+  if ('serviceWorker' in navigator && 'PushManager' in window) {
+    setTimeout(registerPush, 2000);
+  }
+
+  // Thêm animation vào các cards
+  document.querySelectorAll('.card').forEach((card, index) => {
+    card.style.animationDelay = `${index * 0.1}s`;
+  });
+
+  console.log('🎉 Money Guard Dashboard đã sẵn sàng!');
 });

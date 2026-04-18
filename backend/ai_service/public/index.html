@@ -3,120 +3,626 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Money Guard Dashboard - AI của Bảo</title>
-    <link rel="stylesheet" href="style.css" />
-    <!-- Thư viện vẽ biểu đồ -->
+    <title>Money Guard Dashboard</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Thư viện render markdown -->
+    <!-- Marked.js -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Font Awesome -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+
+    <style>
+      body {
+        background-color: #f3f4f6;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      }
+      .card {
+        background-color: white;
+        border-radius: 1rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        padding: 1.25rem;
+      }
+
+      /* Heatmap Styles */
+      .heatmap-cell {
+        width: 12px;
+        height: 12px;
+        border-radius: 2px;
+        background-color: #ffe4e6;
+        margin: 2px;
+      }
+      .heatmap-cell.level-1 {
+        background-color: #fecdd3;
+      }
+      .heatmap-cell.level-2 {
+        background-color: #fb7185;
+      }
+      .heatmap-cell.level-3 {
+        background-color: #e11d48;
+      }
+
+      /* Floating Chat Widget Styles */
+      .chat-widget-container {
+        position: fixed;
+        bottom: 80px;
+        right: 20px;
+        width: 380px;
+        height: 600px;
+        max-height: 80vh;
+        background: white;
+        border-radius: 1.5rem;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        transform: translateY(120%);
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 50;
+        border: 1px solid #f3f4f6;
+      }
+      .chat-widget-container.open {
+        transform: translateY(0);
+        opacity: 1;
+      }
+
+      /* Chat Messages Custom Scrollbar */
+      .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1rem;
+        background-color: #f9fafb;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .chat-messages::-webkit-scrollbar {
+        width: 6px;
+      }
+      .chat-messages::-webkit-scrollbar-thumb {
+        background-color: #cbd5e1;
+        border-radius: 10px;
+      }
+
+      /* Chat Bubbles */
+      .message {
+        max-width: 85%;
+        padding: 10px 14px;
+        border-radius: 15px;
+        font-size: 14px;
+        line-height: 1.5;
+        word-wrap: break-word;
+      }
+
+      /* Tin nhắn của Bot (AI) - Nền trắng, chữ đen đậm */
+      .message.bot {
+        background-color: white;
+        color: #1f2937;
+        border-bottom-left-radius: 4px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        border: 1px solid #f3f4f6;
+        align-self: flex-start;
+      }
+
+      /* Tin nhắn của Người dùng (Bảo) - Nền xanh dương, chữ trắng */
+      .message.user {
+        background-color: #0084ff; /* Màu xanh dương đậm chuẩn Messenger */
+        color: white; /* Chữ màu trắng */
+        border-bottom-right-radius: 4px;
+        align-self: flex-end;
+        box-shadow: 0 1px 2px rgba(0, 132, 255, 0.2); /* Tạo bóng mờ màu xanh cho đẹp */
+      }
+
+      .message.bot p {
+        margin-bottom: 0.5em;
+      }
+      .message.bot p:last-child {
+        margin-bottom: 0;
+      }
+      .message.bot ul {
+        padding-left: 1.5em;
+        list-style-type: disc;
+        margin-bottom: 0.5em;
+      }
+
+      /* Typing indicator */
+      .typing {
+        align-self: flex-start;
+        background-color: white;
+        padding: 10px 14px;
+        border-radius: 15px;
+        border-bottom-left-radius: 4px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        display: flex;
+        gap: 4px;
+        border: 1px solid #f3f4f6;
+      }
+      .typing .dot {
+        width: 6px;
+        height: 6px;
+        background-color: #9ca3af;
+        border-radius: 50%;
+        animation: typing 1.4s infinite ease-in-out both;
+      }
+      .typing .dot:nth-child(1) {
+        animation-delay: -0.32s;
+      }
+      .typing .dot:nth-child(2) {
+        animation-delay: -0.16s;
+      }
+      @keyframes typing {
+        0%,
+        80%,
+        100% {
+          transform: scale(0);
+        }
+        40% {
+          transform: scale(1);
+        }
+      }
+    </style>
   </head>
-  <body>
-    <div class="app-wrapper">
-      <!-- PHẦN 1: DASHBOARD BÊN TRÁI -->
-      <div class="dashboard-container">
-        <div class="dashboard-header">
-          <h1>📊 Tổng quan tài chính</h1>
-          <p id="current-date"></p>
-        </div>
-
-        <div class="balance-cards">
-          <div class="card balance">
-            <span>💰 Số dư hiện tại</span>
-            <h2 id="total-balance">0đ</h2>
-          </div>
-          <div class="income-expense">
-            <div class="card income">
-              <span>📈 Thu nhập tháng này</span>
-              <h3 id="total-income">0đ</h3>
-            </div>
-            <div class="card expense">
-              <span>📉 Chi tiêu tháng này</span>
-              <h3 id="total-expense">0đ</h3>
-            </div>
-          </div>
-        </div>
-
-        <div
-          class="bank-link-card"
-          style="
-            padding: 20px;
-            background: #fff;
-            border-radius: 15px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-            text-align: center;
-          "
-        >
-          <h3 style="margin-bottom: 10px; font-size: 16px">🏦 Kết nối ngân hàng</h3>
-          <p style="font-size: 13px; color: #666; margin-bottom: 15px">
-            Liên kết để Moni tự động ghi sổ mỗi khi bạn quẹt thẻ.
-          </p>
-
-          <!-- NÚT CHÍNH CỦA BẢO -->
+  <body class="text-gray-800 p-4 h-screen flex flex-col overflow-hidden">
+    <!-- Navbar -->
+    <nav class="flex items-center justify-between mb-6 px-2">
+      <div class="flex items-center space-x-6">
+        <div class="font-bold text-xl text-pink-500 mr-4">Money Guard</div>
+        <div class="flex space-x-2 bg-white rounded-full p-1 shadow-sm">
           <button
-            id="btn-link"
-            onclick="startLinking()"
-            class="btn-primary"
-            style="width: 100%; cursor: pointer"
+            class="px-4 py-2 rounded-full text-sm font-medium text-gray-500 hover:bg-gray-100 transition"
           >
-            🔗 Liên kết Ngân hàng ngay
+            Trang chủ
+          </button>
+          <button
+            class="px-4 py-2 rounded-full text-sm font-medium text-gray-500 hover:bg-gray-100 transition"
+          >
+            Giao dịch
+          </button>
+          <button
+            class="px-4 py-2 rounded-full text-sm font-medium text-pink-600 bg-pink-50 transition"
+          >
+            Báo cáo
+          </button>
+          <button
+            class="px-4 py-2 rounded-full text-sm font-medium text-gray-500 hover:bg-gray-100 transition"
+          >
+            Ngân sách
+          </button>
+          <button
+            class="px-4 py-2 rounded-full text-sm font-medium text-gray-500 hover:bg-gray-100 transition"
+          >
+            Chat Box AI
           </button>
         </div>
-        <div class="chart-section">
-          <h3>Phân tích chi tiêu</h3>
-          <div class="chart-container-wrapper">
-            <!-- Biểu đồ -->
-            <canvas id="expenseChart"></canvas>
+      </div>
+      <div class="flex items-center space-x-4 dashboard-header">
+        <h1 class="hidden">📊 Thống kê</h1>
+        <!-- Giữ lại ID cho script JS -->
+        <p id="current-date" class="text-xs text-gray-400 font-medium"></p>
 
-            <div id="no-data-msg">
-              <span style="font-size: 50px">🍃</span>
-              <p style="color: #888; font-style: italic">Chưa có dữ liệu tháng này Bảo ơi...</p>
-            </div>
+        <!-- Nút chuông -->
+        <button id="noti-btn" class="text-gray-400 relative">
+          <i class="fa-regular fa-bell text-xl"></i>
+          <span
+            id="noti-count"
+            class="absolute -top-1 -right-1 bg-pink-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center hidden"
+            >0</span
+          >
+        </button>
+
+        <div
+          id="noti-dropdown"
+          class="hidden absolute right-20 top-14 w-64 bg-white shadow-xl rounded-lg p-2 z-50 border"
+        >
+          <!-- Nút đóng -->
+          <button
+            onclick="document.getElementById('noti-dropdown').classList.add('hidden')"
+            class="absolute top-1 right-2 text-gray-400 hover:text-black"
+          >
+            &times;
+          </button>
+
+          <div class="text-sm font-bold p-2 border-b">Thông báo</div>
+
+          <div id="noti-list" class="max-h-80 overflow-y-auto"></div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+          <div
+            class="w-8 h-8 rounded-full bg-pink-400 flex items-center justify-center text-white font-bold text-sm"
+          >
+            M
           </div>
+          <span class="text-sm font-medium">Quốc Bảo</span>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Top Stats Row (Gắn ID từ backend) -->
+    <div class="grid grid-cols-4 gap-4 mb-4">
+      <div class="card relative income cursor-pointer hover:shadow-md transition">
+        <div class="text-xs text-gray-500 mb-1">
+          Tổng thu nhập <i class="fa-solid fa-circle-info ml-1 text-gray-300"></i>
+        </div>
+        <div class="text-2xl font-bold mb-2 text-green-600" id="total-income">0 đ</div>
+        <div class="text-xs text-gray-400">
+          <span class="text-green-500"><i class="fa-solid fa-arrow-down mr-1"></i>0%</span> so với
+          kỳ trước
+        </div>
+        <div
+          class="absolute top-4 right-4 w-8 h-8 rounded-lg bg-green-50 text-green-500 flex items-center justify-center"
+        >
+          <i class="fa-solid fa-arrow-down"></i>
         </div>
       </div>
 
-      <!-- PHẦN 2: CHATBOT BÊN PHẢI (Giữ nguyên logic của bạn) -->
-      <div class="chat-container">
-        <div class="chat-header">
-          <h2>🤖 Trợ lý Money Guard</h2>
-          <a
-            href="https://t.me/truongquocbao_bot?start=1"
-            target="_blank"
-            class="tele-btn"
-            id="telegram-link"
-          >
-            <img
-              src="data:image/png;base64,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"
-              alt="Telegram Icon"
-            />
-            Kết nối Telegram
-          </a>
+      <div class="card relative expense cursor-pointer hover:shadow-md transition">
+        <div class="text-xs text-gray-500 mb-1">
+          Tổng chi tiêu <i class="fa-solid fa-circle-info ml-1 text-gray-300"></i>
         </div>
-
-        <div id="chat-messages" class="chat-messages"></div>
-
-        <!-- Preview Ảnh -->
-        <div id="image-preview-container" style="display: none">
-          <img id="image-preview-img" src="" />
-          <button type="button" id="remove-img-btn">×</button>
+        <div class="text-2xl font-bold mb-2 text-red-500" id="total-expense">0 đ</div>
+        <div class="text-xs text-gray-400">
+          <span class="text-red-500"><i class="fa-solid fa-arrow-up mr-1"></i>0%</span> so với kỳ
+          trước
         </div>
+        <div
+          class="absolute top-4 right-4 w-8 h-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center"
+        >
+          <i class="fa-solid fa-arrow-up"></i>
+        </div>
+      </div>
 
-        <form id="chat-form" class="chat-input">
-          <input type="file" id="file-input" accept="image/*" style="display: none" />
-          <button type="button" id="upload-btn">📷</button>
-          <input
-            type="text"
-            id="user-input"
-            placeholder="Hỏi Money Guard: 'Tháng này tiêu bao nhiêu?'"
-            autocomplete="off"
-          />
-          <button type="submit">Gửi</button>
-        </form>
+      <div class="card relative balance">
+        <div class="text-xs text-gray-500 mb-1">
+          Tiết kiệm ròng <i class="fa-solid fa-circle-info ml-1 text-gray-300"></i>
+        </div>
+        <div class="text-2xl font-bold mb-2 text-indigo-600" id="total-balance">0 đ</div>
+        <div class="text-xs text-gray-400">
+          <span class="text-green-500"><i class="fa-solid fa-arrow-up mr-1"></i>0%</span> so với kỳ
+          trước
+        </div>
+        <div
+          class="absolute top-4 right-4 w-8 h-8 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center"
+        >
+          <i class="fa-solid fa-wallet"></i>
+        </div>
+      </div>
+
+      <div class="card relative">
+        <div class="flex justify-between items-start mb-1">
+          <div class="text-xs text-gray-500">
+            Tỷ lệ tiết kiệm <i class="fa-solid fa-circle-info ml-1 text-gray-300"></i>
+          </div>
+          <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center">
+            <i class="fa-solid fa-calendar"></i>
+          </div>
+        </div>
+        <div class="text-2xl font-bold mb-2">98%</div>
+        <div class="w-full bg-gray-100 rounded-full h-1.5 mt-3">
+          <div class="bg-green-500 h-1.5 rounded-full" style="width: 98%"></div>
+        </div>
       </div>
     </div>
 
-    <!-- Script kết nối -->
+    <!-- Charts Row -->
+    <div class="grid grid-cols-12 gap-4 mb-4 flex-1">
+      <!-- Xu hướng dòng tiền -->
+      <div class="card col-span-5 flex flex-col">
+        <div class="flex justify-between items-center mb-4">
+          <div class="font-bold text-sm">Xu hướng dòng tiền</div>
+          <div class="flex space-x-2 text-xs">
+            <button class="px-3 py-1 rounded-full bg-gray-100 text-gray-500">Month</button>
+          </div>
+        </div>
+        <div class="relative flex-1 w-full h-[200px]"><canvas id="lineChart"></canvas></div>
+      </div>
+
+      <!-- Thu/Chi theo tháng -->
+      <div class="card col-span-4 flex flex-col">
+        <div class="flex justify-between items-center mb-4">
+          <div class="font-bold text-sm">Thu/Chi 6 tháng</div>
+        </div>
+        <div class="relative flex-1 w-full h-[200px]"><canvas id="barChart"></canvas></div>
+      </div>
+
+      <!-- CƠ CẤU CHI TIÊU (BIỂU ĐỒ ĐỘNG TỪ DB) -->
+      <div class="card col-span-3 flex flex-col items-center chart-section relative">
+        <div class="w-full flex justify-between items-center mb-2">
+          <h3 class="font-bold text-sm text-gray-800">Phân tích chi tiêu</h3>
+        </div>
+
+        <div
+          class="chart-container-wrapper relative w-full h-[180px] flex items-center justify-center mt-2"
+        >
+          <canvas id="expenseChart"></canvas>
+          <div
+            id="no-data-msg"
+            class="absolute inset-0 flex flex-col items-center justify-center bg-white z-10"
+            style="display: none"
+          >
+            <span class="text-4xl mb-2">🍃</span>
+            <p class="text-xs text-gray-400 italic">Chưa có dữ liệu...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Row -->
+    <div class="grid grid-cols-12 gap-4 pb-4">
+      <!-- Ngân sách -->
+      <div class="card col-span-4 overflow-y-auto max-h-[220px]">
+        <div class="flex justify-between items-center mb-4 sticky top-0 bg-white z-10 pb-2">
+          <div class="font-bold text-sm">Ngân sách theo danh mục</div>
+          <div class="text-xs text-pink-500 font-medium">
+            Cập nhật <i class="fa-solid fa-chevron-right ml-1 text-[10px]"></i>
+          </div>
+        </div>
+        <div class="space-y-4" id="budget-container"></div>
+      </div>
+
+      <!-- Link Bank Card (Được tích hợp vào thay vì Heatmap để tận dụng không gian) -->
+      <div
+        class="card col-span-4 flex flex-col justify-center items-center text-center bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100"
+      >
+        <div
+          class="w-12 h-12 bg-blue-500 text-white rounded-full flex items-center justify-center text-xl mb-3 shadow-md"
+        >
+          <i class="fa-solid fa-building-columns"></i>
+        </div>
+        <h3 class="font-bold text-gray-800 text-base mb-1">Kết nối ngân hàng</h3>
+        <p class="text-xs text-gray-500 mb-4 px-4">
+          Liên kết để Money Guard tự động ghi sổ mỗi khi bạn quẹt thẻ.
+        </p>
+
+        <button
+          id="btn-link-bank"
+          class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-6 rounded-lg transition shadow-sm w-3/4"
+        >
+          🔗 Bắt đầu liên kết
+        </button>
+        <div id="loading-state" class="mt-3 hidden">
+          <p class="text-blue-500 text-xs animate-pulse">
+            <i class="fa-solid fa-spinner fa-spin mr-1"></i> Đang tạo link...
+          </p>
+        </div>
+        <div id="error-state" class="mt-3 hidden">
+          <p class="text-red-500 text-xs" id="error-message"></p>
+        </div>
+      </div>
+
+      <!-- Giao dịch gần đây -->
+      <div class="card col-span-4 flex flex-col overflow-y-auto max-h-[220px]">
+        <div class="flex justify-between items-center mb-4 sticky top-0 bg-white z-10 pb-2">
+          <div class="font-bold text-sm">Giao dịch gần nhất</div>
+          <div class="text-xs text-gray-400 cursor-pointer hover:text-pink-500">Xem tất cả</div>
+        </div>
+        <div class="space-y-4" id="recent-transactions">
+          <div class="flex justify-center items-center h-full text-xs text-gray-400 italic">
+            Đang tải dữ liệu...
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- FLOATING CHAT WIDGET (BOT)                 -->
+    <!-- ========================================== -->
+
+    <!-- Floating Button -->
+    <button
+      id="chat-toggle-btn"
+      class="fixed bottom-6 right-6 w-14 h-14 bg-[#0084ff] rounded-full shadow-xl flex items-center justify-center text-white hover:bg-blue-600 transition-all transform hover:scale-105 z-40"
+    >
+      <i class="fa-solid fa-message text-xl"></i>
+    </button>
+
+    <!-- Chat Box -->
+    <div id="chat-widget" class="chat-widget-container">
+      <!-- Chat Header (Thanh tiêu đề màu xanh) -->
+      <div class="bg-[#0084ff] p-4 flex justify-between items-center text-white shrink-0">
+        <div class="flex items-center">
+          <div
+            class="w-8 h-8 bg-white rounded-full flex items-center justify-center text-[#0084ff] mr-2 text-lg"
+          >
+            🤖
+          </div>
+          <h2 class="font-bold text-sm">Money Guard AI</h2>
+        </div>
+        <div class="flex items-center gap-3">
+          <a
+            href="https://t.me/truongquocbao_bot?start=1"
+            target="_blank"
+            id="telegram-link"
+            title="Mở Telegram"
+            class="text-white hover:text-blue-200 transition"
+          >
+            <i class="fa-brands fa-telegram text-xl"></i>
+          </a>
+          <button
+            id="close-chat-btn"
+            class="text-white hover:text-blue-200 transition text-lg w-6 h-6 flex items-center justify-center"
+          >
+            &times;
+          </button>
+        </div>
+      </div>
+
+      <!-- Messages Area -->
+      <div id="chat-messages" class="chat-messages">
+        <div class="message bot">
+          <p>Chào Bảo! Money Guard đây, hôm nay Bảo muốn ghi sổ món gì nào?</p>
+        </div>
+      </div>
+
+      <!-- Image Preview -->
+      <div
+        id="image-preview-container"
+        class="px-4 pt-2 pb-0 bg-white shrink-0 relative"
+        style="display: none"
+      >
+        <div class="relative inline-block border border-gray-200 rounded-lg p-1">
+          <img id="image-preview-img" src="" class="h-16 rounded object-cover" />
+          <button
+            type="button"
+            id="remove-img-btn"
+            class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs shadow hover:bg-red-600"
+          >
+            &times;
+          </button>
+        </div>
+      </div>
+
+      <!-- Chat Input Form (Nút gửi và viền màu xanh) -->
+      <form id="chat-form" class="flex items-center p-3 bg-white border-t border-gray-100 shrink-0">
+        <input type="file" id="file-input" accept="image/*" class="hidden" />
+        <button
+          type="button"
+          id="upload-btn"
+          class="text-gray-400 hover:text-[#0084ff] transition px-2 text-lg"
+        >
+          <i class="fa-solid fa-camera"></i>
+        </button>
+        <input
+          type="text"
+          id="user-input"
+          placeholder="Nhập '100k ăn phở'..."
+          autocomplete="off"
+          class="flex-1 bg-gray-100 border-none rounded-full px-4 py-2 mx-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+        />
+        <button
+          type="submit"
+          class="bg-[#0084ff] text-white w-9 h-9 rounded-full flex items-center justify-center hover:bg-blue-600 transition shadow-sm"
+        >
+          <i class="fa-solid fa-paper-plane text-xs relative -left-[1px]"></i>
+        </button>
+      </form>
+    </div>
+
+    <!-- Scripts -->
     <script src="/socket.io/socket.io.js"></script>
     <script src="script.js"></script>
+
+    <!-- Script xử lý mở khung Chat và biểu đồ phụ -->
+    <script>
+      // =====================================
+      // 1. XỬ LÝ MỞ / ĐÓNG CHAT WIDGET
+      // =====================================
+      const chatWidget = document.getElementById('chat-widget');
+      const chatToggleBtn = document.getElementById('chat-toggle-btn');
+      const closeChatBtn = document.getElementById('close-chat-btn');
+
+      if (chatToggleBtn) {
+        chatToggleBtn.addEventListener('click', () => {
+          chatWidget.classList.add('open');
+          chatToggleBtn.style.transform = 'scale(0)';
+
+          // Trỏ chuột vào ô chat sau khi mở
+          const inputField = document.getElementById('user-input');
+          if (inputField) setTimeout(() => inputField.focus(), 300);
+        });
+      }
+
+      if (closeChatBtn) {
+        closeChatBtn.addEventListener('click', () => {
+          chatWidget.classList.remove('open');
+          chatToggleBtn.style.transform = 'scale(1)';
+        });
+      }
+
+      // =====================================
+      // 2. VẼ DATA GIẢ CHO BIỂU ĐỒ NGOÀI
+      // =====================================
+      Chart.defaults.font.family = "'Segoe UI', sans-serif";
+      Chart.defaults.color = '#9ca3af';
+
+      // A. Biểu đồ Đường (Xu hướng dòng tiền)
+      const ctxLine = document.getElementById('lineChart');
+      if (ctxLine) {
+        const lineContext = ctxLine.getContext('2d');
+        let gradGreen = lineContext.createLinearGradient(0, 0, 0, 200);
+        gradGreen.addColorStop(0, 'rgba(74, 222, 128, 0.2)');
+        gradGreen.addColorStop(1, 'rgba(74, 222, 128, 0)');
+
+        let gradOrange = lineContext.createLinearGradient(0, 0, 0, 200);
+        gradOrange.addColorStop(0, 'rgba(251, 146, 60, 0.2)');
+        gradOrange.addColorStop(1, 'rgba(251, 146, 60, 0)');
+
+        new Chart(lineContext, {
+          type: 'line',
+          data: {
+            labels: ['Tuần 1', 'Tuần 2', 'Tuần 3', 'Tuần 4'],
+            datasets: [
+              {
+                label: 'Thu',
+                data: [15, 20, 18, 40],
+                borderColor: '#4ade80',
+                backgroundColor: gradGreen,
+                fill: true,
+                tension: 0.4,
+                borderWidth: 2,
+                pointRadius: 0,
+              },
+              {
+                label: 'Chi',
+                data: [5, 12, 8, 15],
+                borderColor: '#fb923c',
+                backgroundColor: gradOrange,
+                fill: true,
+                tension: 0.4,
+                borderWidth: 2,
+                pointRadius: 0,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { grid: { display: false } },
+              y: { grid: { borderDash: [4, 4] }, min: 0 },
+            },
+          },
+        });
+      }
+
+      // B. Biểu đồ Cột (Thu chi 6 tháng)
+      const ctxBar = document.getElementById('barChart');
+      if (ctxBar) {
+        new Chart(ctxBar.getContext('2d'), {
+          type: 'bar',
+          data: {
+            labels: ['T11', 'T12', 'T1', 'T2', 'T3', 'T4'],
+            datasets: [
+              {
+                label: 'Thu',
+                data: [30, 35, 45, 30, 38, 40],
+                backgroundColor: '#22c55e',
+                borderRadius: 4,
+                barPercentage: 0.6,
+              },
+              {
+                label: 'Chi',
+                data: [10, 25, 20, 15, 18, 12],
+                backgroundColor: '#f97316',
+                borderRadius: 4,
+                barPercentage: 0.6,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { x: { grid: { display: false } }, y: { grid: { borderDash: [4, 4] } } },
+          },
+        });
+      }
+    </script>
   </body>
 </html>

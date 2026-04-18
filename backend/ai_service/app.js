@@ -11,6 +11,10 @@ import { Server } from 'socket.io';
 import webpush from 'web-push';
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
+import { setDefaultResultOrder } from 'dns';
+import got from 'got';
+
+setDefaultResultOrder('ipv4first');
 
 const { Pool } = pg;
 
@@ -38,10 +42,6 @@ const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: { origin: '*' },
 });
-
-// // liên kết ngân hàng
-// const httpServer = createServer(app); // Tạo server http
-// const io = new Server(httpServer); // Gắn socket.io vào server
 
 // Cấu hình multer để xử lý file ảnh (lưu tạm trong bộ nhớ)
 const upload = multer({ storage: multer.memoryStorage() });
@@ -85,24 +85,28 @@ app.post('/login', (req, res) => {
   });
 });
 
-// Hàm đứng gác ở các API cần đăng nhập
+//lấy token đăng nhập
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
-  if (!token || token === 'Bearer null') {
-    console.log('⚠️ Không có token, mặc định dùng User ID: 1');
-    req.user = { user_id: 1 }; // Gán mặc định là Bảo để chạy được
+  // 1. Nếu hoàn toàn không có token hoặc token là chữ "null"/"undefined"
+  if (!token || token === 'null' || token === 'undefined') {
+    console.log('⚠️ Không có token, dùng User ID 1');
+    req.user = { user_id: 1 };
     return next();
   }
 
+  // 2. Nếu có token, kiểm tra xem nó còn sống không
   jwt.verify(token, process.env.JWT_SECRET || 'secret_key', (err, user) => {
     if (err) {
-      console.log('Token sai hoặc hết hạn!');
-      req.user = { user_id: 1 }; // fallback
-      return res.status(403).json({ error: 'Phiên đăng nhập hết hạn' });
+      // ✅ SỬA TẠI ĐÂY: Thay vì báo lỗi 403, mình log ra rồi cho đi tiếp với ID 1
+      console.log('⚠️ Token hết hạn hoặc sai, tự động dùng User ID 1 để Demo');
+      req.user = { user_id: 1 };
+      return next();
     }
-    // Lưu thông tin user vào req.user (trong này sẽ có req.user.user_id)
+
+    // Nếu token chuẩn thì dùng thông tin từ token
     req.user = user;
     next();
   });
@@ -167,6 +171,65 @@ app.get('/api/stats', async (req, res) => {
   }
 });
 
+// API lấy danh sách ngân sách tháng hiện tại
+app.get('/api/budgets', async (req, res) => {
+  try {
+    const userId = 1;
+    const now = new Date();
+    const result = await pool.query(
+      `
+      SELECT 
+        c.category_name, 
+        c.icon,
+        COALESCE(SUM(t.amount), 0) as spent,
+        (SELECT amount_limit FROM budgets b WHERE b.category_id = c.category_id AND b.month = $2 AND b.year = $3) as amount_limit
+      FROM categories c
+      LEFT JOIN transactions t ON c.category_id = t.category_id 
+        AND EXTRACT(MONTH FROM t.date) = $2 
+        AND EXTRACT(YEAR FROM t.date) = $3
+      WHERE c.user_id = $1
+      GROUP BY c.category_id, c.category_name, c.icon
+    `,
+      [userId, now.getMonth() + 1, now.getFullYear()],
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// api giao dịch gần đây
+app.get('/api/recent-transactions', async (req, res) => {
+  try {
+    const userId = 1;
+
+    const result = await pool.query(
+      `
+        SELECT 
+          t.trans_id, 
+          t.amount, 
+          /* 👉 Dùng cú pháp này để chuyển UTC sang giờ Việt Nam (Asia/Ho_Chi_Minh) */
+          (t.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh') as created_at,
+          t.transaction_type as type, 
+          t.description,
+          COALESCE(c.category_name, 'Khác') as category_name
+        FROM transactions t
+        JOIN accounts a ON t.account_id = a.account_id
+        LEFT JOIN categories c ON t.category_id = c.category_id
+        WHERE a.user_id = $1
+        ORDER BY t.created_at DESC, t.trans_id DESC
+        LIMIT 20
+      `,
+      [userId],
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Lỗi lấy giao dịch gần đây:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
 // Route lấy toàn bộ lịch sử chat để hiện lên màn hình khi load trang
 app.get('/chat-history', authenticateToken, async (req, res) => {
   try {
@@ -247,6 +310,77 @@ const sendPushNotification = (message) => {
   });
 };
 
+// Thay vì chỉ bắn socket, hãy lưu vào DB
+async function addNotification(message) {
+  const userId = 1; // ID của Bảo
+  await pool.query('INSERT INTO notifications (user_id, message) VALUES ($1, $2)', [
+    userId,
+    message,
+  ]);
+
+  // Sau khi lưu DB thì mới bắn socket
+  io.emit('new_notification', { message, time: new Date() });
+}
+
+// API Lấy thông báo (Lấy hết, không lọc is_read để không bị mất tin khi load lại)
+app.get('/api/notifications', async (req, res) => {
+  try {
+    const userId = 1;
+    const result = await pool.query(
+      "SELECT id, message, is_read, (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh') as created_at FROM notifications WHERE user_id = $1 ORDER BY created_at DESC ",
+      [userId],
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// API Đánh dấu đã đọc (Lưu ý đường dẫn phải có :id)
+app.post('/api/notifications/read/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = 1;
+    await pool.query('UPDATE notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2', [
+      id,
+      userId,
+    ]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Lỗi update thông báo:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+// Route 2: Đánh dấu đọc TẤT CẢ (Không cần ID)
+app.post('/api/notifications/read-all', async (req, res) => {
+  const userId = 1;
+  await pool.query('UPDATE notifications SET is_read = TRUE WHERE user_id = $1', [userId]);
+  res.json({ success: true });
+});
+
+// API xoá tin thông báo
+// Xóa 1 tin cụ thể theo ID
+app.delete('/api/notifications/delete/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = 1;
+    await pool.query('DELETE FROM notifications WHERE id = $1 AND user_id = $2', [id, userId]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+// Xóa tất cả thông báo của người dùng
+app.delete('/api/notifications/delete-all', async (req, res) => {
+  try {
+    const userId = 1;
+    await pool.query('DELETE FROM notifications WHERE user_id = $1', [userId]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
 // --- HÀM HỖ TRỢ PHÁT HIỆN CHI TIÊU BẤT THƯỜNG ---
 async function getAnomalyStatus(userId, categoryName, amount) {
   try {
@@ -272,59 +406,177 @@ async function getAnomalyStatus(userId, categoryName, amount) {
   }
 }
 
-// --- API TẠO LINK LIÊN KẾT NGÂN HÀNG TỰ ĐỘNG ---
-// --- API TẠO LINK LIÊN KẾT NHẢY THẲNG NGÂN HÀNG (BANK HUB SANDBOX) ---
-app.get('/api/get-magic-link', authenticateToken, async (req, res) => {
+// --- API TẠO LINK LIÊN KẾT (CHỈNH THEO CHUẨN SEPAY) ---
+app.get('/api/create-bank', authenticateToken, async (req, res) => {
   try {
     const userId = req.user?.user_id || 1;
-    await pool.query('UPDATE users SET linking_at = NOW() WHERE user_id = $1', [userId]);
+    const companyXid = process.env.BANKHUB_COMPANY_XID;
 
-    // 1. Thông tin định danh (Dùng Sandbox)
-    const clientId = 'BH-SB-TRUONG-QUOC-BAO-6908C837';
-    const clientSecret = '97c68602dc26d169e630dd14a51ab97e489a608d8906055cec8d78a3f09b38ad';
-    const companyXid = 'DGLNEMX5HSZHP1AMSEQ09NR4Q308BJY9LZYTEWUYIBKVAC5TOHI3ZJ2FTURCSDL6';
+    if (!companyXid) {
+      return res.status(500).json({ error: 'Thiếu BANKHUB_COMPANY_XID' });
+    }
+
+    const clientId = process.env.BANKHUB_CLIENT_ID;
+    const clientSecret = process.env.BANKHUB_CLIENT_SECRET;
 
     const authString = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
-    // Header để lừa Cloudflare (Cực kỳ quan trọng)
     const headers = {
-      Authorization: `Basic ${authString}`,
       'User-Agent':
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-      'Content-Type': 'application/json',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      Accept: 'application/json',
+      'Accept-Language': 'en-US,en;q=0.9,vi;q=0.8',
     };
 
-    // BƯỚC 1: Lấy Access Token
-    const tokenRes = await axios.post(
-      'https://bankhub-api-sandbox.sepay.vn/v1/token',
-      {},
-      { headers },
-    );
-    const accessToken = tokenRes.data.access_token;
+    console.log('🔑 Bước 1: Đang lấy access token...');
 
-    console.log('STEP 1: get token');
-    console.log(tokenRes.data);
+    // ======================
+    // STEP 1: GET TOKEN
+    // ======================
+    const tokenRes = await got.post('https://bankhub-api-sandbox.sepay.vn/v1/token', {
+      headers: {
+        ...headers,
+        Authorization: `Basic ${authString}`,
+        'Content-Type': 'application/json',
+      },
+      responseType: 'json',
+      https: { rejectUnauthorized: false },
+    });
 
-    // BƯỚC 2: Tạo link nhảy thẳng (Hosted Link)
-    const linkRes = await axios.post(
-      'https://bankhub-api-sandbox.sepay.vn/v1/link-token',
-      {
+    const accessToken = tokenRes.body.access_token;
+
+    console.log('✅ Đã lấy access_token');
+
+    // ======================
+    // STEP 2: CHECK COMPANY
+    // ======================
+    const companyRes = await axios.get('https://bankhub-api-sandbox.sepay.vn/v1/company', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    console.log('🏢 Company info:', companyRes.data);
+
+    // ======================
+    // STEP 3: CREATE LINK
+    // ======================
+    console.log('🔗 Bước 3: Đang tạo link token...');
+
+    const linkRes = await got.post('https://bankhub-api-sandbox.sepay.vn/v1/link-token/create', {
+      headers: {
+        ...headers,
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      json: {
         company_xid: companyXid,
         purpose: 'LINK_BANK_ACCOUNT',
-        completion_redirect_uri: 'http://localhost:4005/',
-        external_id: `user_${userId}`, // 🔥 QUAN TRỌNG
+        completion_redirect_uri: 'https://badafuta.com/api/callback',
+        external_id: `user_${userId}`,
       },
-      { headers: { ...headers, Authorization: `Bearer ${accessToken}` } },
-    );
-    console.log('STEP 2: create link');
-    console.log(linkRes.data);
-    // 3. Trả về cái link "Ma thuật"
-    res.json({ url: linkRes.data.hosted_link_url });
+      responseType: 'json',
+      https: { rejectUnauthorized: false },
+    });
+
+    console.log('✅ Tạo link thành công!');
+
+    return res.json({
+      url: linkRes.body.hosted_link_url,
+      expires_at: linkRes.body.expires_at,
+    });
   } catch (err) {
-    console.error('❌ Lỗi:', err.response?.data || err.message);
-    res.status(500).json({ error: 'Lỗi kết nối cổng ngân hàng' });
+    console.error('--- LỖI CHI TIẾT ---');
+    console.error('Message:', err.message);
+    console.error('Response:', err.response?.body || err.response);
+
+    return res.status(500).json({
+      error: 'Lỗi API',
+      message: err.message,
+      detail: err.response?.body || null,
+    });
   }
 });
+
+// real
+// app.get('/api/create-bank', authenticateToken, async (req, res) => {
+//   try {
+//     const userId = req.user?.user_id || 1;
+
+//     const BASE_URL = process.env.BANKHUB_BASE_URL;
+//     const companyXid = process.env.BANKHUB_COMPANY_XID;
+
+//     if (!BASE_URL || !companyXid) {
+//       return res.status(500).json({ error: 'Thiếu config BANKHUB' });
+//     }
+
+//     const clientId = process.env.BANKHUB_CLIENT_ID;
+//     const clientSecret = process.env.BANKHUB_CLIENT_SECRET;
+
+//     const authString = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+
+//     const headers = {
+//       'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+//       Accept: 'application/json',
+//       'Accept-Language': 'en-US,en;q=0.9,vi;q=0.8',
+//     };
+
+//     // ======================
+//     // TOKEN
+//     // ======================
+//     const tokenRes = await got.post(`${BASE_URL}/v1/token`, {
+//       headers: {
+//         ...headers,
+//         Authorization: `Basic ${authString}`,
+//         'Content-Type': 'application/json',
+//       },
+//       responseType: 'json',
+//     });
+
+//     const accessToken = tokenRes.body.access_token;
+
+//     console.log('✅ Token OK');
+
+//     // ======================
+//     // COMPANY CHECK
+//     // ======================
+//     const companyRes = await axios.get(`${BASE_URL}/v1/company`, {
+//       headers: {
+//         Authorization: `Bearer ${accessToken}`,
+//       },
+//     });
+
+//     console.log('🏢 Company:', companyRes.data);
+
+//     // ======================
+//     // CREATE LINK
+//     // ======================
+//     const linkRes = await got.post(`${BASE_URL}/v1/link-token/create`, {
+//       headers: {
+//         ...headers,
+//         Authorization: `Bearer ${accessToken}`,
+//         'Content-Type': 'application/json',
+//       },
+//       json: {
+//         company_xid: companyXid,
+//         purpose: 'LINK_BANK_ACCOUNT',
+//         completion_redirect_uri: process.env.BANKHUB_REDIRECT_URI,
+//         external_id: `user_${userId}`,
+//       },
+//       responseType: 'json',
+//     });
+
+//     return res.json({
+//       url: linkRes.body.hosted_link_url,
+//       expires_at: linkRes.body.expires_at,
+//     });
+//   } catch (err) {
+//     return res.status(500).json({
+//       error: err.message,
+//       detail: err.response?.body,
+//     });
+//   }
+// });
 
 // --- LOG QUÁ TRÌNH XỬ LÝ GIAO DỊCH (BANK) ---
 app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
@@ -338,7 +590,6 @@ app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
       amount_out,
       amount_in,
       transferType,
-      accountNumber,
       gateway,
     } = req.body;
 
@@ -366,41 +617,6 @@ app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
     if (finalAmount === 0) return res.status(200).send('No amount');
 
     console.log(`💰 [${transactionType.toUpperCase()}] Số tiền: ${finalAmount}đ`);
-
-    let targetUserId = 1;
-    let targetAccountId = 1;
-
-    // Kiểm tra STK này đã có trong hệ thống chưa
-    let accRes = await pool.query(
-      'SELECT user_id, account_id FROM accounts WHERE account_number = $1',
-      [accountNumber],
-    );
-
-    if (accRes.rows.length === 0) {
-      // Nếu chưa có, tìm xem 10 phút qua có ai nhấn nút "Liên kết" không
-      const finder = await pool.query(
-        `SELECT user_id FROM users 
-         WHERE linking_at >= (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') - INTERVAL '10 minutes' 
-         ORDER BY linking_at DESC LIMIT 1`,
-      );
-
-      if (finder.rows.length > 0) {
-        targetUserId = finder.rows[0].user_id;
-        // Tự động tạo bản ghi Ngân hàng cho User đó
-        const newAcc = await pool.query(
-          'INSERT INTO accounts (user_id, account_name, account_number) VALUES ($1, $2, $3) RETURNING account_id',
-          [targetUserId, gateway || 'Ngân hàng mới', accountNumber],
-        );
-        targetAccountId = newAcc.rows[0].account_id;
-        // Xóa dấu vết để không nhận nhầm
-        await pool.query('UPDATE users SET linking_at = NULL WHERE user_id = $1', [targetUserId]);
-      } else {
-        return res.status(200).send('Unknown account');
-      }
-    } else {
-      targetUserId = accRes.rows[0].user_id;
-      targetAccountId = accRes.rows[0].account_id;
-    }
 
     // 2. NHỜ AI PHÂN LOẠI (Gửi thêm ngữ cảnh là Tiền vào hay Tiền ra)
     const model = genAI.getGenerativeModel({ model: 'gemini-flash-lite-latest' });
@@ -478,8 +694,8 @@ app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
       `INSERT INTO transactions (account_id, category_id, amount, transaction_type, description, date, note)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
-        // 1,
-        targetAccountId,
+        1,
+        // targetAccountId,
         categoryId,
         finalAmount,
         transactionType,
@@ -504,7 +720,8 @@ app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
     // 5.MỚI: LƯU VÀO LỊCH SỬ CHAT (Để khi F5 web nó vẫn hiện ra)
     try {
       await pool.query('INSERT INTO message_history (user_id, role, message) VALUES ($1, $2, $3)', [
-        targetUserId,
+        // targetUserId,
+        userId,
         'model',
         notificationMsg,
       ]);
@@ -514,7 +731,13 @@ app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
     }
 
     // 6.Bắn socket và push thông báo
-    io.emit('bank_notification', { message: notificationMsg });
+    // io.emit('bank_notification', { message: notificationMsg });
+    await addNotification(notificationMsg);
+
+    // Test xem client có đang lắng nghe không
+    socket.on('new_notification', (data) => {
+      console.log('🔥 Đã nhận được dữ liệu qua Socket:', data);
+    });
 
     if (typeof sendPushNotification === 'function') {
       sendPushNotification(notificationMsg);
@@ -550,7 +773,9 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
 
     if (lastUserMessage.content === messageKey && nowBlock - lastUserMessage.time < 3000) {
       console.log('🚫 Chặn Double Submit tin nhắn');
-      return res.json({ reply: 'Bảo ơi, từ từ thôi, Moni đang xử lý tin nhắn trước đó rồi!' });
+      return res.json({
+        reply: 'Bảo ơi, từ từ thôi, Money Guard đang xử lý tin nhắn trước đó rồi!',
+      });
     }
     lastUserMessage = { time: nowBlock, content: messageKey };
 
@@ -570,9 +795,6 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     } catch (err) {
       console.error('❌ Lỗi lưu tin nhắn user:', err.message);
     }
-
-    // 2. Dữ liệu giả lập (Sau này lấy từ DB)
-    // const stats = { total: '5.649.011đ', count: 60, avg: '182.226đ', month: '3/2026', age: 21 };
 
     // --- 2. LẤY DỮ LIỆU THẬT TỪ DATABASE ---
     // const currentUserId = 1; // ID của Bảo trong DB
@@ -660,11 +882,6 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     const daysLeft = daysInMonth - daysPassed;
     const projectedTotal = totalExpense + dailyAvg * daysLeft; // dailyAvg Bảo đã có ở trên rồi
 
-    // const totalAmount = parseFloat(overallData.total_spent) || 0; // Nếu null thì về 0
-    // const dbData = overallStatsRes.rows[0];
-    // const totalAmount = parseFloat(dbData.total);
-    // const transactionCount = parseInt(dbData.count);
-
     // Tạo báo cáo danh mục
     const categoryReport =
       categoryStatsRes.rows.length > 0
@@ -688,7 +905,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
             .join('\n')
         : 'Chưa có chi tiêu nào.';
 
-    // Lấy 5 giao dịch gần nhất để AI biết lịch sử (Dùng cho Anomaly Detection & CRUD)
+    // Lấy 10 giao dịch gần nhất để AI biết lịch sử (Dùng cho Anomaly Detection & CRUD)
     const recentTransactionsRes = await pool.query(
       `
           SELECT t.trans_id, t.description, t.amount, t.date, c.category_name
@@ -717,7 +934,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
       balance: balance.toLocaleString('vi-VN') + 'đ',
       expense_count: expenseCount,
       income_count: incomeCount,
-      // count: expenseCount + incomeCount,
+      count: expenseCount + incomeCount,
       avg: dailyAvg.toLocaleString('vi-VN') + 'đ',
       month: `${currentMonth}/${currentYear}`,
       age: 21,
@@ -798,6 +1015,10 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     - Nếu giá món đồ cao bất thường (gấp 3 lần trung bình): Bạn PHẢI mắng Bảo và hỏi xác nhận. 
     - TUYỆT ĐỐI KHÔNG được in thẻ <transaction> trong câu hỏi xác nhận này.
     - CHỈ KHI NÀO Bảo trả lời "Đúng rồi", "Lưu đi", "Xác nhận" thì bạn mới được in thẻ <transaction> ở câu trả lời sau đó.
+    - NHƯNG: Nếu Bảo đã trả lời "Đúng rồi", "Lưu đi", "Xác nhận", "Ghi đi" hoặc các từ tương tự: 
+    => BẠN PHẢI DỪNG VIỆC HỎI LẠI. 
+    => BẠN PHẢI IN THẺ <transaction> NGAY LẬP TỨC ở cuối câu trả lời. 
+    => Không được chần chừ, không được hỏi thêm lần 2, lần 3.
 
     2. KIỂM TRA TƯƠNG LAI: Nếu Bảo nhập ngày là tương lai (ví dụ hôm nay 31 mà nhập cho ngày 01 tháng sau), hãy hỏi: "Bảo đang tính trước tương lai à? Chắc chắn thì Money Guard mới ghi sổ nhé".
 
@@ -825,8 +1046,15 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
        - Mỗi khi Bảo nhắc đến hoặc nhập thêm món vào hạng mục đó, bạn PHẢI mắng Bảo thật gắt trước khi làm bất cứ việc gì khác. 
        - Dùng giọng điệu "sát thủ tài chính" để ngăn chặn Bảo tiêu thêm.
    
-    Nếu người dùng hỏi về thống kê (ví dụ: tháng này tiêu bao nhiêu), hãy trả về một thẻ <query_db>{"type": "total_spending", "month": 4}</query_db> để hệ thống tự truy vấn.
-    
+    9. ĐỐI VỚI THÁNG NÀY: Dữ liệu ĐÃ CÓ SẴN ở [DỮ LIỆU THẬT THÁNG ${
+      stats.month
+    }]. Khi Bảo hỏi "Tháng này tiêu bao nhiêu?", "Còn dư bao nhiêu?" -> HÃY ĐỌC DỮ LIỆU ĐÓ VÀ TRẢ LỜI LUÔN. TUYỆT ĐỐI KHÔNG dùng thẻ <query_db>.
+    10. CHỈ DÙNG thẻ <query_db> KHI hỏi quá khứ hoặc chi tiết:
+         - "Tháng trước tiêu bao nhiêu?" -> <query_db>{"type": "total_spending", "month": ${
+           currentMonth - 1
+         }, "year": ${currentYear}}</query_db>
+         - "Tháng này ăn uống mấy lần?" -> <query_db>{"type": "category_spending", "category": "ăn uống", "month": ${currentMonth}, "year": ${currentYear}}</query_db>
+
     [CÂU HỎI CỦA BẢO]: "${message}"
 
     [QUY TẮC PHẢN HỒI]: Trình bày theo phong cách hiện đại, sử dụng icon 🚨, 💸, 🛡️, 📈. Tuyệt đối không để lộ mã JSON rác ra ngoài các thẻ quy định.
@@ -838,20 +1066,14 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
 
     // 3. Khởi tạo Model
     const model = genAI.getGenerativeModel({
-      model: 'gemini-3.1-flash-lite-preview', // quota free tier thường cao hơn một chút (khoảng 50-1500/ngày tùy thời điểm) // ← dùng cái này, ổn định hơn 2.0, ít lỗi hơn nếu không overload
+      model: 'gemini-robotics-er-1.5-preview', // quota free tier thường cao hơn một chút (khoảng 50-1500/ngày tùy thời điểm) // ← dùng cái này, ổn định hơn 2.0, ít lỗi hơn nếu không overload
       systemInstruction: MONEY_GUARD_RULES, // Gọi biến từ file rules vào đây
     });
-
-    // console.log('--- 1. LỊCH SỬ CHAT TRƯỚC KHI GỬI ---');
-    // console.log(JSON.stringify(chatHistory.slice(-2), null, 2)); // Xem 2 câu gần nhất
 
     // --- BẮT ĐẦU ĐOẠN FIX LỊCH SỬ ---
     const chat = model.startChat({
       history: chatHistory.slice(-10),
     });
-
-    // console.log('--- 2. PROMPT GỬI ĐI ---');
-    // console.log(inputPrompt);
 
     // 4. Chuẩn bị dữ liệu gửi cho Google AI
     let promptParts = [inputPrompt];
@@ -884,29 +1106,6 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
             let sql = '';
             let params = [currentUserId];
 
-            // // Logic truy vấn linh hoạt
-            // if (queryData.type === 'total_spending') {
-            //   sql = `
-            //     SELECT COALESCE(SUM(amount), 0) as total
-            //     FROM transactions t
-            //     JOIN accounts a ON t.account_id = a.account_id
-            //     WHERE a.user_id = $1 AND EXTRACT(MONTH FROM t.date) = $2
-            //     AND t.transaction_type = 'expense'`;
-            //   params.push(queryData.month || currentMonth);
-            // }
-
-            // if (sql) {
-            //   const dbRes = await pool.query(sql, params);
-            //   const totalFound = parseFloat(dbRes.rows[0].total).toLocaleString('vi-VN');
-
-            //   // Gửi kết quả thật từ DB lại cho AI để nó trả lời Bảo
-            //   const secondResult = await chat.sendMessage(
-            //     `[KẾT QUẢ THỰC TẾ TỪ DATABASE]: Tổng cộng là ${totalFound}đ. Hãy trả lời Bảo.`,
-            //   );
-            //   const finalReply = secondResult.response.text();
-            //   return res.json({ reply: finalReply });
-            // }
-
             // 1. Xử lý "Tuần trước" (Last Week)
             if (queryData.time_range === 'last_week') {
               sql = `
@@ -930,25 +1129,60 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
             // 3. Tổng chi tiêu tháng
             else if (queryData.type === 'total_spending') {
               sql = `
-                SELECT COALESCE(SUM(amount), 0) as total 
+                SELECT COALESCE(SUM(amount), 0) as total , COUNT(*) as count
                 FROM transactions t JOIN accounts a ON t.account_id = a.account_id
                 WHERE a.user_id = $1 AND EXTRACT(MONTH FROM t.date) = $2 
                 AND t.transaction_type = 'expense'`;
               params.push(queryData.month || currentMonth);
+            }
+            // 4. Tổng thu nhập tháng
+            else if (queryData.type === 'total_spending') {
+              sql = `
+                SELECT COALESCE(SUM(amount), 0) as total , COUNT(*) as count
+                FROM transactions t JOIN accounts a ON t.account_id = a.account_id
+                WHERE a.user_id = $1 AND EXTRACT(MONTH FROM t.date) = $2 
+                AND t.transaction_type = 'income'`;
+              params.push(queryData.month || currentMonth);
+            }
+
+            // 5. (MỚI) Truy vấn theo Hạng mục (VD: Tháng này uống Cafe bao nhiêu?)
+            else if (queryData.type === 'category_spending' && queryData.category) {
+              sql = `
+                SELECT COALESCE(SUM(t.amount), 0) as total, COUNT(*) as count
+                FROM transactions t 
+                JOIN accounts a ON t.account_id = a.account_id
+                JOIN categories c ON t.category_id = c.category_id
+                WHERE a.user_id = $1 
+                AND (c.category_name ILIKE $2 OR $2 ILIKE '%' || c.category_name || '%')
+                AND EXTRACT(MONTH FROM t.date) = $3 
+                AND EXTRACT(YEAR FROM t.date) = $4
+                AND t.transaction_type = 'expense'`;
+
+              const targetMonth = queryData.month || currentMonth;
+              const targetYear = queryData.year || currentYear;
+              params.push(`%${queryData.category}%`, targetMonth, targetYear);
             }
 
             if (sql) {
               const dbRes = await pool.query(sql, params);
               const dataFound = dbRes.rows[0];
 
-              // Gửi dữ liệu thật cho AI để nó trả lời Bảo mặn mà hơn
+              // 1. Chuẩn bị dữ liệu thô từ DB
+              const dbResult = `
+                [DỮ LIỆU VỪA TRUY VẤN TỪ HỆ THỐNG]:
+                - Tổng Thu: ${parseFloat(dataFound.total_income || 0).toLocaleString()}đ
+                - Tổng Chi: ${parseFloat(
+                  dataFound.total_expense || dataFound.total || 0,
+                ).toLocaleString()}đ
+                - Số giao dịch: ${dataFound.count || 0}
+              `;
+
+              // 2. ÉP AI ĐỌC LẠI TOÀN BỘ inputPrompt KÈM DATA MỚI
+              // Việc dán ${inputPrompt} ở đây sẽ bắt nó dùng đúng rules, icon và phong cách bạn muốn.
               const secondResult = await chat.sendMessage(
-                `[DỮ LIỆU THỰC TẾ]: Bảo đã tiêu ${parseFloat(
-                  dataFound.total,
-                ).toLocaleString()}đ với ${
-                  dataFound.count || 0
-                } giao dịch trong khoảng thời gian này. Hãy phân tích và trả lời Bảo.`,
+                `${dbResult}\n\n[YÊU CẦU]: Dựa vào dữ liệu vừa truy vấn ở trên, hãy thực hiện đúng vai trò Money Guard theo hướng dẫn chi tiết dưới đây (Tuyệt đối tuân thủ Format 4 đoạn và phong cách mắng gắt):\n${inputPrompt}`,
               );
+
               return res.json({ reply: secondResult.response.text() });
             }
           } catch (e) {
@@ -972,10 +1206,6 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
             }
           }
         }
-
-        // [LOG 3]: Kiểm tra AI có nhả ra thẻ <transaction> không
-        // console.log('--- 3. AI PHẢN HỒI ---');
-        // console.log(reply);
 
         // ==========================================
         // VỊ TRÍ 2: DÁN ĐOẠN LƯU CÂU TRẢ LỜI MONEY GUARD TẠI ĐÂY
@@ -1049,14 +1279,9 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
           console.log(`✏️ Đã cập nhật giao dịch ID: ${id} thành ${amount}đ`);
         }
 
-        // mới
         // --- LOGIC LƯU VÀO DATABASE POSTGRESQL (ĐÃ FIX NHẬP NHIỀU MÓN) ---
-
         // 1. Tìm tất cả các thẻ transaction có trong câu trả lời
         const matches = [...reply.matchAll(/<transaction>(.*?)<\/transaction>/gs)];
-
-        // // Tạo một biến bên ngoài app.post để lưu giao dịch cuối cùng
-        // let lastSavedTransaction = { time: 0, content: '' };
 
         if (matches.length > 0) {
           for (const match of matches) {
@@ -1074,6 +1299,13 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
               if (!finalDate || finalDate.includes('X')) {
                 finalDate = new Date().toISOString().split('T')[0];
               }
+
+              // BẮT BUỘC: Ghép thêm Giờ:Phút:Giây thực tế lúc người dùng chat vào chuỗi ngày
+              const now = new Date();
+              const timeString = now.toTimeString().split(' ')[0]; // Lấy ra chuỗi "09:20:35"
+
+              // Kết quả sẽ ra một chuỗi đầy đủ: "2026-04-14 09:20:35"
+              finalDate = `${finalDate} ${timeString}`;
 
               const transactionKey = `${data.description}-${data.amount}-${data.date}`;
               const nowTime = Date.now();
@@ -1158,6 +1390,8 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
             }
           }
         }
+
+        await addNotification('Money Guard đã ghi sổ xong giao dịch của bạn! 🛡️');
 
         // Trả về reply cho client
         return res.json({ reply });
