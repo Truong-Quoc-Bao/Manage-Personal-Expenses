@@ -73,6 +73,34 @@ function animateValue(element, start, end, duration) {
   }, 16);
 }
 
+// --- 2.1 CẬP NHẬT SỨC KHỎE NÃO BỘ AI ---
+async function updateAIHealth() {
+  try {
+    const res = await fetch('/api/ai-health');
+    const models = await res.json();
+    const selector = document.getElementById('model-selector');
+    const currentVal = selector.value;
+
+    // Giữ lại option Auto
+    /* The above code is using JavaScript to select an HTML element with the id 'model-selector' using
+    the `getElementById` method. */
+    // selector.innerHTML = '<option value="auto"> </option>';
+
+    models.forEach((m) => {
+      const isOnline = m.status === 'online';
+      const option = document.createElement('option');
+      option.value = m.name;
+      option.disabled = !isOnline;
+      option.className = isOnline ? 'text-green-600' : 'text-red-400';
+      option.innerText = `${isOnline ? '●' : '○'} ${m.name.replace('gemini-', '')}`;
+      selector.appendChild(option);
+    });
+    selector.value = currentVal;
+  } catch (err) {
+    console.error('Lỗi nạp danh sách AI');
+  }
+}
+
 // ==========================================
 // 3. CẬP NHẬT DASHBOARD
 // ==========================================
@@ -745,10 +773,8 @@ if (removeImgBtn) {
 // ==========================================
 // 10. CHAT - HIỂN THỊ TIN NHẮN
 // ==========================================
-
 function addMessage(text, isUser = false) {
   const safeText = text || '';
-
   const div = document.createElement('div');
   div.classList.add('message');
   div.classList.add(isUser ? 'user' : 'bot');
@@ -826,11 +852,19 @@ chatForm.addEventListener('submit', async (e) => {
   showTypingIndicator();
 
   try {
+    // ✅ BƯỚC 1: KHỞI TẠO FORMDATA
     const formData = new FormData();
+
+    // ✅ BƯỚC 2: BỎ DỮ LIỆU VÀO TÚI
     formData.append('message', message);
     if (file) {
       formData.append('image', file);
     }
+
+    // ✅ BƯỚC 3: LẤY MODEL TỪ DROPDOWN VÀ BỎ VÀO LUÔN
+    const modelSelector = document.getElementById('model-selector');
+    const selectedModel = modelSelector ? modelSelector.value : 'auto';
+    formData.append('model', selectedModel);
 
     const res = await fetch('/chat', {
       method: 'POST',
@@ -862,7 +896,16 @@ chatForm.addEventListener('submit', async (e) => {
     let cleanReply = replyText.replace(/<.*?>[\s\S]*?<\/.*?>/gs, '').trim();
 
     removeTypingIndicator();
-    addMessage(cleanReply, false);
+    // addMessage(cleanReply, false);
+
+    addMessage(cleanReply, false, {
+      modelUsed: data.modelUsed,
+      tokens: data.usage?.totalTokenCount || 0,
+      cost: data.cost || 0,
+    });
+    if (data.reply.includes('🚨') || data.reply.includes('⚠️')) {
+      showToast('Moni vừa đưa ra cảnh báo tài chính!', 'error');
+    }
 
     // Cập nhật dashboard sau khi ghi sổ thành công
     updateDashboard();
@@ -961,6 +1004,9 @@ window.addEventListener('load', () => {
   loadNotifications();
   // Kích hoạt âm thanh
   enableAudioAfterInteraction();
+
+  updateAIHealth();
+  setInterval(updateAIHealth, 30000); // 30 giây quét sức khỏe AI một lần
 
   // Đăng ký Push
   if ('serviceWorker' in navigator && 'PushManager' in window) {

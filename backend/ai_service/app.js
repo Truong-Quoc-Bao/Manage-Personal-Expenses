@@ -14,6 +14,8 @@ import axios from 'axios';
 import { setDefaultResultOrder } from 'dns';
 import got from 'got';
 
+import { getBestModel, getStatusData } from './super_check.js';
+
 setDefaultResultOrder('ipv4first');
 
 const { Pool } = pg;
@@ -38,6 +40,7 @@ const app = express();
 
 // Khởi tạo httpServer và Socket.io ngay từ đầu
 const httpServer = createServer(app);
+
 // soket
 const io = new Server(httpServer, {
   cors: { origin: '*' },
@@ -233,6 +236,8 @@ app.get('/api/recent-transactions', async (req, res) => {
 // Route lấy toàn bộ lịch sử chat để hiện lên màn hình khi load trang
 app.get('/chat-history', authenticateToken, async (req, res) => {
   try {
+    const { message, model: requestedModel } = req.body;
+
     // const userId = req.user.user_id;
     const userId = 1; // Tạm thời fix là Bảo
     const result = await pool.query(
@@ -381,6 +386,7 @@ app.delete('/api/notifications/delete-all', async (req, res) => {
     res.status(500).json({ error: 'Lỗi server' });
   }
 });
+
 // --- HÀM HỖ TRỢ PHÁT HIỆN CHI TIÊU BẤT THƯỜNG ---
 async function getAnomalyStatus(userId, categoryName, amount) {
   try {
@@ -404,6 +410,39 @@ async function getAnomalyStatus(userId, categoryName, amount) {
   } catch (err) {
     return { isAnomaly: false };
   }
+}
+
+// --- HÀM TẠO NGỮ CẢNH SIÊU CHỦ ĐỘNG (Dán sau đoạn pool.connect) ---
+async function getProactiveContext(userId) {
+  const now = new Date();
+  const month = now.getMonth() + 1;
+
+  const stats = await pool.query(
+    `
+    SELECT 
+      COALESCE(SUM(CASE WHEN transaction_type = 'income' THEN amount ELSE 0 END), 0) as total_inc,
+      COALESCE(SUM(CASE WHEN transaction_type = 'expense' THEN amount ELSE 0 END), 0) as total_exp
+    FROM transactions t JOIN accounts a ON t.account_id = a.account_id
+    WHERE a.user_id = $1 AND EXTRACT(MONTH FROM t.date) = $2 AND EXTRACT(YEAR FROM t.date) = $3
+  `,
+    [userId, month, now.getFullYear()],
+  );
+
+  const { total_inc, total_exp } = stats.rows[0];
+  const balance = parseFloat(total_inc) - parseFloat(total_exp);
+
+  const daysInMonth = new Date(now.getFullYear(), month, 0).getDate();
+  const daysPassed = now.getDate() || 1; // Tránh chia cho 0
+  const dailyAvg = parseFloat(total_exp) / daysPassed;
+  const projectedExp = dailyAvg * daysInMonth;
+
+  return {
+    balance: balance,
+    dailyAvg: Math.round(dailyAvg),
+    status: projectedExp > total_inc ? '🔴 NGUY_HIỂM (Chi vượt Thu)' : '🟢 AN_TOÀN',
+    daysToEmpty: dailyAvg > 0 && balance > 0 ? Math.floor(balance / dailyAvg) : 0,
+    projectedTotal: Math.round(projectedExp),
+  };
 }
 
 // --- API TẠO LINK LIÊN KẾT (CHỈNH THEO CHUẨN SEPAY) ---
@@ -497,86 +536,6 @@ app.get('/api/create-bank', authenticateToken, async (req, res) => {
     });
   }
 });
-
-// real
-// app.get('/api/create-bank', authenticateToken, async (req, res) => {
-//   try {
-//     const userId = req.user?.user_id || 1;
-
-//     const BASE_URL = process.env.BANKHUB_BASE_URL;
-//     const companyXid = process.env.BANKHUB_COMPANY_XID;
-
-//     if (!BASE_URL || !companyXid) {
-//       return res.status(500).json({ error: 'Thiếu config BANKHUB' });
-//     }
-
-//     const clientId = process.env.BANKHUB_CLIENT_ID;
-//     const clientSecret = process.env.BANKHUB_CLIENT_SECRET;
-
-//     const authString = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-
-//     const headers = {
-//       'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-//       Accept: 'application/json',
-//       'Accept-Language': 'en-US,en;q=0.9,vi;q=0.8',
-//     };
-
-//     // ======================
-//     // TOKEN
-//     // ======================
-//     const tokenRes = await got.post(`${BASE_URL}/v1/token`, {
-//       headers: {
-//         ...headers,
-//         Authorization: `Basic ${authString}`,
-//         'Content-Type': 'application/json',
-//       },
-//       responseType: 'json',
-//     });
-
-//     const accessToken = tokenRes.body.access_token;
-
-//     console.log('✅ Token OK');
-
-//     // ======================
-//     // COMPANY CHECK
-//     // ======================
-//     const companyRes = await axios.get(`${BASE_URL}/v1/company`, {
-//       headers: {
-//         Authorization: `Bearer ${accessToken}`,
-//       },
-//     });
-
-//     console.log('🏢 Company:', companyRes.data);
-
-//     // ======================
-//     // CREATE LINK
-//     // ======================
-//     const linkRes = await got.post(`${BASE_URL}/v1/link-token/create`, {
-//       headers: {
-//         ...headers,
-//         Authorization: `Bearer ${accessToken}`,
-//         'Content-Type': 'application/json',
-//       },
-//       json: {
-//         company_xid: companyXid,
-//         purpose: 'LINK_BANK_ACCOUNT',
-//         completion_redirect_uri: process.env.BANKHUB_REDIRECT_URI,
-//         external_id: `user_${userId}`,
-//       },
-//       responseType: 'json',
-//     });
-
-//     return res.json({
-//       url: linkRes.body.hosted_link_url,
-//       expires_at: linkRes.body.expires_at,
-//     });
-//   } catch (err) {
-//     return res.status(500).json({
-//       error: err.message,
-//       detail: err.response?.body,
-//     });
-//   }
-// });
 
 // --- LOG QUÁ TRÌNH XỬ LÝ GIAO DỊCH (BANK) ---
 app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
@@ -717,13 +676,35 @@ app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
       }". Đã ghi vào sổ rồi nhé!`;
     }
 
+    // ============================================================
+    // 🔥 CHIẾN THUẬT SIÊU CHỦ ĐỘNG (PROACTIVE AI)
+    // ============================================================
+
+    // 1. Lấy sức khỏe tài chính thực tế từ Database
+    const health = await getProactiveContext(userId);
+
+    // 2. Moni tự động "soi" dữ liệu để đưa ra lời khuyên "đanh đá"
+    let proactiveMsg = '';
+    if (health.status.includes('🔴')) {
+      proactiveMsg = `\n\n🚨 **TỔNG BÁO ĐỘNG**: Bảo ơi, hiện tại Bảo đang TIÊU VƯỢT THU NHẬP rồi! Cất ngay cái thẻ đi trước khi cái ví "đăng xuất" khỏi trái đất! 😤`;
+    } else if (health.daysToEmpty <= 5 && health.balance > 0) {
+      proactiveMsg = `\n\n⚠️ **CẢNH BÁO ĐÓI KÉM**: Với đà này Bảo chỉ còn đủ tiền sống trong **${health.daysToEmpty} ngày** nữa thôi. Chuẩn bị tinh thần ăn mì tôm cả tháng nhé! 🍜`;
+    } else if (finalAmount > 1000000 && transactionType === 'expense') {
+      proactiveMsg = `\n\n💸 **XÀI SANG QUÁ**: Món này tận **${finalAmount.toLocaleString()}đ**, Bảo có thực sự cần nó không hay chỉ là nhất thời? Suy nghĩ kỹ đi nhé! 🤔`;
+    } else {
+      proactiveMsg = `\n\n✅ **TỐT LẮM**: Duy trì phong độ này nhé Bảo, hiện Bảo vẫn còn sống sót được thêm **${health.daysToEmpty} ngày** nữa. Tiết kiệm là quốc sách! 💎`;
+    }
+
+    // 3. Gộp nội dung thông báo gốc + Lời cảnh báo chủ động của AI
+    const finalMsg = notificationMsg + proactiveMsg;
+
     // 5.MỚI: LƯU VÀO LỊCH SỬ CHAT (Để khi F5 web nó vẫn hiện ra)
     try {
       await pool.query('INSERT INTO message_history (user_id, role, message) VALUES ($1, $2, $3)', [
         // targetUserId,
         userId,
         'model',
-        notificationMsg,
+        finalMsg,
       ]);
       console.log('💾 Đã lưu thông báo ngân hàng vào lịch sử chat');
     } catch (chatErr) {
@@ -732,7 +713,10 @@ app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
 
     // 6.Bắn socket và push thông báo
     // io.emit('bank_notification', { message: notificationMsg });
-    await addNotification(notificationMsg);
+    io.emit('bank_notification', { message: finalMsg });
+    console.log('📡 [PROACTIVE]: Đã bắn Socket cảnh báo về Web.');
+
+    await addNotification(finalMsg);
 
     // Test xem client có đang lắng nghe không
     socket.on('new_notification', (data) => {
@@ -753,7 +737,9 @@ app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
 
 app.post('/chat', authenticateToken, upload.single('image'), async (req, res) => {
   try {
-    const { message } = req.body;
+    const { message, model: requestedModel } = req.body;
+
+    // const { message } = req.body;
     const imageFile = req.file; // Lấy file ảnh nếu có
     const currentUserId = 1;
     // const currentUserId = req.user.user_id;
@@ -812,22 +798,6 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     ];
     const currentDayName = daysOfWeek[now.getDay()];
     const currentDate = now.toLocaleDateString('en-CA');
-
-    // Truy vấn tổng chi tiêu và số giao dịch của tháng hiện tại
-    // const statsRes = await pool.query(
-    //   `
-    // SELECT
-    //     COALESCE(SUM(amount), 0) as total,
-    //     COUNT(*) as count
-    // FROM transactions t
-    // JOIN accounts a ON t.account_id = a.account_id
-    // WHERE a.user_id = $1
-    //   AND EXTRACT(MONTH FROM t.date) = $2
-    //   AND EXTRACT(YEAR FROM t.date) = $3
-    //   AND t.transaction_type = 'expense'
-    // `,
-    //   [currentUserId, currentMonth, currentYear],
-    // );
 
     // QUERY 1: Lấy chi tiết hạng mục
     const categoryStatsRes = await pool.query(
@@ -961,6 +931,9 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
       contextData = `[DỮ LIỆU TÀI CHÍNH THẬT]: Tháng ${stats.month}, Tổng chi ${stats.total}, ${stats.count} giao dịch.`;
     }
 
+    // 🔥 GỌI NÃO BỘ CHỦ ĐỘNG TẠI ĐÂY
+    const health = await getProactiveContext(currentUserId);
+
     // 2. Tạo Prompt tổng hợp ngữ cảnh
     const inputPrompt = `
     [THÔNG TIN HỆ THỐNG - TỐI MẬT]:
@@ -968,8 +941,12 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     - Tổng cả thu và chi: ${stats.total}
     - Tổng Chi: ${stats.expense} (${stats.expense_count} lần chi)
     - Tổng Thu: ${stats.income} (${stats.income_count} lần nhận)
-    - Số dư: ${stats.balance}
+    - Số dư: ${health.balance}
     - Giao dịch: ${stats.count}
+    - Tình trạng: ${health.status}.
+    - Tốc độ đốt tiền: ${health.dailyAvg}đ/ngày.
+    - Dự báo: Bảo sẽ cạn sạch tiền sau ${health.daysToEmpty} ngày nữa.
+    
     ${adviceContext}
 
     [NGỮ CẢNH HỆ THỐNG]:
@@ -1009,6 +986,11 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     4. SMART BUDGET: Nếu chi tiêu hạng mục nào vượt quá Hạn mức, hãy "mắng" thật gắt và yêu cầu cắt giảm.
     5. Khi in ra số dư nếu âm thì phải có dấu - đằng trước balance
 
+    [DỮ LIỆU DỰ BÁO]:
+    - Tiêu xài tuần này tăng {{ n% }} so với tuần trước.
+    - Các món thuộc nhóm 'Wants' chiếm {{ m% }} tổng chi.
+    - Nếu không cắt giảm, Bảo sẽ nợ {{ X }} đồng vào cuối tháng.
+    - Hãy dùng mô hình dự báo để chỉ ra ngày chính xác Bảo sẽ hết tiền.
 
     [CÔNG VIỆC CỤ THỂ]:
     1. PHÁT HIỆN BẤT THƯỜNG: So sánh món đồ Bảo vừa nhập với "5 giao dịch gần nhất". Nếu giá cao gấp 3 lần trung bình, hãy dừng lại, mắng Bảo một trận và yêu cầu Bảo xác nhận: "Có thực sự muốn đốt tiền không?" mới được nhả thẻ <transaction>.
@@ -1055,6 +1037,12 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
          }, "year": ${currentYear}}</query_db>
          - "Tháng này ăn uống mấy lần?" -> <query_db>{"type": "category_spending", "category": "ăn uống", "month": ${currentMonth}, "year": ${currentYear}}</query_db>
 
+    Nếu Bảo vừa nhập một món đồ mà trong 7 ngày qua Bảo đã mua món đó hơn 3 lần (ví dụ Trà sữa), bạn PHẢI khịa Bảo về việc nghiện món này và tính tổng tiền Bảo đã 'cúng' cho món đó trong tuần.
+    
+    Dựa vào số dư ${
+      health.balance
+    }đ, Money Guard dự báo Bảo chỉ còn trụ được đến ngày X tháng này. Nếu muốn sống sót đến ngày 30, từ mai Bảo chỉ được tiêu tối đa Y đồng/ngày thôi!
+    
     [CÂU HỎI CỦA BẢO]: "${message}"
 
     [QUY TẮC PHẢN HỒI]: Trình bày theo phong cách hiện đại, sử dụng icon 🚨, 💸, 🛡️, 📈. Tuyệt đối không để lộ mã JSON rác ra ngoài các thẻ quy định.
@@ -1065,10 +1053,25 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     }
 
     // 3. Khởi tạo Model
+    let modelToUse;
+    if (requestedModel && requestedModel !== 'auto') {
+      modelToUse = requestedModel; // Dùng con khách chọn
+    } else {
+      modelToUse = getBestModel(); // Tự động chọn con khỏe nhất
+    }
+
+    console.log(`🧠 Client yêu cầu não: ${requestedModel} | Thực tế sử dụng: ${modelToUse}`);
+
+    // Chỗ gọi genAI.getGenerativeModel...
     const model = genAI.getGenerativeModel({
-      model: 'gemini-robotics-er-1.5-preview', // quota free tier thường cao hơn một chút (khoảng 50-1500/ngày tùy thời điểm) // ← dùng cái này, ổn định hơn 2.0, ít lỗi hơn nếu không overload
-      systemInstruction: MONEY_GUARD_RULES, // Gọi biến từ file rules vào đây
+      model: modelToUse,
+      systemInstruction: MONEY_GUARD_RULES,
     });
+
+    // const model = genAI.getGenerativeModel({
+    //   model: 'gemini-robotics-er-1.5-preview', // quota free tier thường cao hơn một chút (khoảng 50-1500/ngày tùy thời điểm) // ← dùng cái này, ổn định hơn 2.0, ít lỗi hơn nếu không overload
+    //   systemInstruction: MONEY_GUARD_RULES, // Gọi biến từ file rules vào đây
+    // });
 
     // --- BẮT ĐẦU ĐOẠN FIX LỊCH SỬ ---
     const chat = model.startChat({
@@ -1080,6 +1083,16 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
 
     if (imageFile) {
       promptParts.push({
+        text: `
+          ĐÂY LÀ ẢNH CHỤP HÓA ĐƠN (BILL). 
+          NHIỆM VỤ: 
+          1. Đọc tên cửa hàng, ngày tháng và DANH SÁCH CHI TIẾT TỪNG MÓN.
+          2. Với mỗi món trong bill, xuất một thẻ <transaction> riêng.
+          Ví dụ: Bill 100k gồm Phở 60k, Cafe 40k -> Xuất 2 thẻ <transaction>.
+          3. Nếu ảnh mờ, hãy báo Bảo chụp lại.
+        `,
+      });
+      promptParts.push({
         inlineData: {
           data: imageFile.buffer.toString('base64'),
           mimeType: imageFile.mimetype,
@@ -1090,11 +1103,32 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     // 5. Cơ chế Retry nếu lỗi 503
     const maxRetries = 3;
     let attempt = 0;
+    let finalReply = '';
 
     while (attempt < maxRetries) {
       try {
+        // --- 1. GỌI AI LẦN 1: PHÂN TÍCH Ý ĐỊNH ---
         const result = await chat.sendMessage(promptParts);
-        const reply = result.response.text();
+        const response = result.response;
+        const reply = response.text();
+
+        // --- 2. LOG CHI PHÍ AI (CHỈ LÀM 1 LẦN) ---
+        const usage = response.usageMetadata;
+        if (usage) {
+          const pTokens = usage.promptTokenCount;
+          const cTokens = usage.candidatesTokenCount;
+          const totalT = usage.totalTokenCount;
+          const cost = pTokens * 0.000000075 + cTokens * 0.0000003; // Giá 1.5 Flash
+
+          await pool
+            .query(
+              'INSERT INTO ai_usage_logs (user_id, prompt_tokens, completion_tokens, total_tokens, cost_usd, model_name) VALUES ($1, $2, $3, $4, $5, $6)',
+              [currentUserId, pTokens, cTokens, totalT, cost, 'gemini-1.5-flash'],
+            )
+            .catch((e) => console.error('Lỗi log cost:', e.message));
+
+          console.log(`📊 AI Usage: $${cost.toFixed(8)} | Tokens: ${totalT}`);
+        }
 
         // --- MỚI: XỬ LÝ TRUY VẤN DỮ LIỆU (NLP QUERY) ---
         const queryMatch = reply.match(/<query_db>(.*?)<\/query_db>/s);
@@ -1430,20 +1464,14 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
 });
 
 // Health check đơn giản
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'AI service đang chạy' });
-});
-
-// app.listen(PORT, () => {
-//   console.log(`🚀 Money Guard Server chạy tại cổng: ${PORT}`);
+// app.get('/health', (req, res) => {
+//   res.json({ status: 'ok', message: 'AI service đang chạy' });
 // });
+
+app.get('/api/ai-health', (req, res) => {
+  res.json(getStatusData());
+});
 
 httpServer.listen(PORT, () => {
   console.log(`🚀 Server và Socket đang chạy tại cổng: ${PORT}`);
 });
-// KHÔNG ĐƯỢC ghi: app.listen(PORT, 'localhost', ...) vì nó sẽ chặn điện thoại.
-
-// app.listen(PORT, () => {
-//   console.log(`🚀 Server chạy tại: http://localhost:${PORT}`);
-//   console.log(`→ POST /chat với body: { "message": "xin chào" }`);
-// });

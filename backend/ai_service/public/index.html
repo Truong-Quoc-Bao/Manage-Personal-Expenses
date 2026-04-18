@@ -3,6 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+
     <title>Money Guard Dashboard</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -15,6 +18,7 @@
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
     />
+    <link rel="manifest" href="/manifest.json" />
 
     <style>
       body {
@@ -26,6 +30,212 @@
         border-radius: 1rem;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
         padding: 1.25rem;
+      }
+
+      /* token*/
+
+      .ai-meta-container {
+        margin-top: 8px;
+        border-top: 1px solid #f1f5f9;
+        padding-top: 8px;
+        font-family: 'JetBrains Mono', monospace;
+      }
+
+      .tech-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 9px;
+        color: #64748b;
+        margin-bottom: 2px;
+      }
+
+      .tech-label {
+        font-weight: 500;
+      }
+      .tech-value {
+        font-weight: bold;
+        color: #0f172a;
+      }
+
+      .cost-highlight {
+        color: #e11d48 !important; /* Màu đỏ đô cho chi phí */
+        font-weight: 800;
+      }
+
+      .model-badge-mini {
+        background: #0084ff;
+        color: white;
+        padding: 1px 5px;
+        border-radius: 4px;
+        font-size: 8px;
+        text-transform: uppercase;
+      }
+      /* --- Style cho nội dung chữ bên trong bong bóng --- */
+      .chat-content {
+        word-break: break-word;
+      }
+      #model-selector option {
+        background-color: white !important;
+        color: #1f2937 !important; /* Màu xám đậm cho dễ đọc */
+        padding: 10px;
+      }
+
+      /* --- Hiệu ứng xuất hiện của tin nhắn --- */
+      .message {
+        animation: messageSlideIn 0.3s ease-out forwards;
+        position: relative;
+      }
+
+      @keyframes messageSlideIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      /* --- Nhãn thông số AI (Industrial Look) --- */
+      .ai-meta-info {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        margin-top: 10px;
+        padding-top: 8px;
+        border-top: 1px border-gray-100;
+        justify-content: flex-end;
+      }
+
+      .badge-tech {
+        font-family: 'JetBrains Mono', 'Consolas', monospace;
+        font-size: 9px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        text-transform: uppercase;
+        font-weight: 600;
+      }
+
+      .badge-model {
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+      }
+      .badge-token {
+        background: #ecfdf5;
+        color: #059669;
+      }
+      .badge-cost {
+        background: #fff7ed;
+        color: #ea580c;
+        font-weight: 800;
+        border: 1px solid #ffedd5;
+      }
+
+      /* Dấu sao hiển thị trong markdown */
+      .chat-content strong {
+        color: #1e293b;
+        font-weight: 700;
+      }
+      /* --- AI Model Selector - Thiết kế dạng Chip hiện đại --- */
+      .model-selector-wrapper {
+        display: flex;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(10px);
+        padding: 4px 10px;
+        border-radius: 99px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        transition: all 0.3s ease;
+      }
+
+      .model-selector-wrapper:hover {
+        background: rgba(255, 255, 255, 0.25);
+        border-color: rgba(255, 255, 255, 0.5);
+      }
+
+      #model-selector {
+        background: transparent;
+        color: white;
+        font-size: 11px;
+        font-weight: 700;
+        border: none;
+        outline: none;
+        cursor: pointer;
+        text-transform: uppercase;
+      }
+
+      #model-selector option {
+        background: white;
+        color: #1f2937;
+        font-weight: normal;
+      }
+
+      /* --- Nhãn Token & Cost - Nhìn như Log của Dev --- */
+      .ai-meta-info {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 8px;
+        justify-content: flex-end;
+        opacity: 0.8;
+      }
+
+      .badge-tech {
+        font-size: 9px;
+        font-family: 'JetBrains Mono', 'Consolas', monospace;
+        padding: 2px 6px;
+        border-radius: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .badge-model {
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+      }
+      .badge-token {
+        background: #ecfdf5;
+        color: #059669;
+      }
+      .badge-cost {
+        background: #fff7ed;
+        color: #ea580c;
+        font-weight: bold;
+      }
+
+      /* --- Cải tiến bong bóng chat --- */
+      .message {
+        position: relative;
+        transition: all 0.3s ease;
+        animation: slideUp 0.4s ease-out;
+      }
+
+      @keyframes slideUp {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .message.bot {
+        background: white;
+        border: 1px solid #f1f5f9;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+      }
+
+      .message.user {
+        background: linear-gradient(135deg, #0084ff, #0066cc);
+        box-shadow: 0 4px 12px rgba(0, 132, 255, 0.25);
       }
 
       /* Heatmap Styles */
@@ -425,15 +635,40 @@
     <div id="chat-widget" class="chat-widget-container">
       <!-- Chat Header (Thanh tiêu đề màu xanh) -->
       <div class="bg-[#0084ff] p-4 flex justify-between items-center text-white shrink-0">
-        <div class="flex items-center">
+        <div class="flex items-center space-x-3">
           <div
-            class="w-8 h-8 bg-white rounded-full flex items-center justify-center text-[#0084ff] mr-2 text-lg"
+            class="w-9 h-9 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-md border border-white/30"
           >
-            🤖
+            <i class="fa-solid fa-robot text-lg text-white"></i>
           </div>
-          <h2 class="font-bold text-sm">Money Guard AI</h2>
+          <div>
+            <h2 class="font-bold text-sm leading-tight">Money Guard AI</h2>
+            <div class="flex items-center space-x-1">
+              <span class="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
+              <span class="text-[10px] text-white/70 font-medium">AI Active</span>
+            </div>
+          </div>
         </div>
-        <div class="flex items-center gap-3">
+        <!-- Dropdown Chọn Não Bộ -->
+        <div
+          class="flex items-center bg-white/10 hover:bg-white/20 px-2 py-1 rounded-full border border-white/20 transition-all"
+        >
+          <i class="fa-solid fa-brain text-[9px] mr-1 opacity-70"></i>
+          <!-- Dropdown Chọn Não Bộ - Bản SIÊU GỌN -->
+          <div
+            class="flex items-center bg-white/10 hover:bg-white/20 px-2 py-1 rounded-full border border-white/20 transition-all w-24 sm:w-28"
+          >
+            <select
+              id="model-selector"
+              class="bg-transparent text-white text-[9px] font-black outline-none cursor-pointer uppercase appearance-none w-full text-center"
+            >
+              <option value="auto" class="text-gray-900">🤖 Auto</option>
+              <!-- Các model khác nạp vào cũng nên được cắt bớt tên ở JS -->
+            </select>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-3">
           <a
             href="https://t.me/truongquocbao_bot?start=1"
             target="_blank"
