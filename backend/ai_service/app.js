@@ -1,9 +1,8 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+import validator from 'validator';
 import express from 'express';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { MONEY_GUARD_RULES } from './systemRules.js';
 import multer from 'multer';
 import pg from 'pg';
 import { createServer } from 'http';
@@ -15,6 +14,8 @@ import { setDefaultResultOrder } from 'dns';
 import got from 'got';
 
 import { getBestModel, getStatusData } from './super_check.js';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { MONEY_GUARD_RULES } from './systemRules.js';
 
 setDefaultResultOrder('ipv4first');
 
@@ -748,9 +749,23 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     if (message.length > 30000) {
       return res.status(400).json({ error: 'Message quá dài (tối đa ~30k ký tự)' });
     }
+
     // Kiểm tra nếu cả chữ và ảnh đều trống thì báo lỗi
     if (!message && !imageFile) {
       return res.status(400).json({ error: 'Bảo ơi, hãy nhập tin nhắn hoặc gửi ảnh nhé!' });
+    }
+
+    // Sanitize XSS
+    if (message) {
+      req.body.message = validator.escape(message);
+    }
+
+    // Check file size
+    if (req.file && req.file.size > 5 * 1024 * 1024) {
+      // 5MB
+      return res.status(400).json({
+        error: 'Ảnh quá lớn! Tối đa 5MB.',
+      });
     }
 
     // 🕵️‍♂️ CHỐT CHẶN DOUBLE SUBMIT: Kiểm tra nguyên cái tin nhắn
@@ -834,6 +849,21 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
       [currentUserId, currentMonth, currentYear],
     );
 
+    // Lấy tổng ngân sách mà đã cài đặt cho tháng này
+    const budgetRes = await pool.query(
+      `
+        SELECT COALESCE(SUM(amount_limit), 0) as total_limit
+        FROM budgets
+        WHERE user_id = $1 AND month = $2 AND year = $3
+      `,
+      [currentUserId, currentMonth, currentYear],
+    );
+
+    const totalLimit = parseFloat(budgetRes.rows[0].total_limit);
+    const remainingBudget = totalLimit - totalExpense;
+    const dailyAllowance = daysLeft > 0 ? Math.round(remainingBudget / daysLeft) : 0;
+
+    //
     const row = overallStatsRes.rows[0];
     const totalExpense = parseFloat(row.total_expense);
     const totalIncome = parseFloat(row.total_income);
@@ -939,14 +969,20 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     [THÔNG TIN HỆ THỐNG - TỐI MẬT]:
     [DỮ LIỆU THẬT THÁNG ${stats.month}]:
     - Tổng cả thu và chi: ${stats.total}
-    - Tổng Chi: ${stats.expense} (${stats.expense_count} lần chi)
-    - Tổng Thu: ${stats.income} (${stats.income_count} lần nhận)
-    - Số dư: ${health.balance}
+    - Tổng Chi tháng này: ${stats.expense} (${stats.expense_count} lần chi)
+    - Tổng Thu tháng này: ${stats.income} (${stats.income_count} lần nhận)
+    - Số dư hiện tại: ${health.balance}
     - Giao dịch: ${stats.count}
     - Tình trạng: ${health.status}.
     - Tốc độ đốt tiền: ${health.dailyAvg}đ/ngày.
     - Dự báo: Bảo sẽ cạn sạch tiền sau ${health.daysToEmpty} ngày nữa.
     
+    - Tổng ngân sách Bảo tự đặt (Budget): ${totalLimit.toLocaleString()}đ.
+    - Người dùng đã tiêu hết: ${totalExpense.toLocaleString()}đ.
+    - Quỹ còn lại ĐƯỢC PHÉP TIÊU: ${remainingBudget.toLocaleString()}đ.
+    - Số ngày còn lại của tháng: ${daysLeft} ngày.
+    - Hạn mức chi tiêu mỗi ngày KHÔNG ĐƯỢC VƯỢT QUÁ: ${dailyAllowance.toLocaleString()}đ.
+
     ${adviceContext}
 
     [NGỮ CẢNH HỆ THỐNG]:
@@ -992,6 +1028,13 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     - Nếu không cắt giảm, Bảo sẽ nợ {{ X }} đồng vào cuối tháng.
     - Hãy dùng mô hình dự báo để chỉ ra ngày chính xác Bảo sẽ hết tiền.
 
+    [CHỈ THỊ CỰC GẮT CHO AI]:
+    1. Nếu "Quỹ còn lại" bị âm: Hãy mắng Bảo là 'Chiến thần phá gia chi tử' và yêu cầu dừng mọi khoản chi.
+    2. Khi Người dùng hỏi 'Mua gì tự thưởng', hãy nhìn vào 'Hạn mức chi tiêu mỗi ngày' (${dailyAllowance}đ). 
+    3. Tuyệt đối KHÔNG ĐƯỢC lấy số dư tài khoản (${
+      stats.balance
+    }) để khuyên Bảo tiêu xài. Phải giữ kỷ luật theo Ngân sách (Budget).
+    
     [CÔNG VIỆC CỤ THỂ]:
     1. PHÁT HIỆN BẤT THƯỜNG: So sánh món đồ Bảo vừa nhập với "5 giao dịch gần nhất". Nếu giá cao gấp 3 lần trung bình, hãy dừng lại, mắng Bảo một trận và yêu cầu Bảo xác nhận: "Có thực sự muốn đốt tiền không?" mới được nhả thẻ <transaction>.
     - Nếu giá món đồ cao bất thường (gấp 3 lần trung bình): Bạn PHẢI mắng Bảo và hỏi xác nhận. 
@@ -1160,6 +1203,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
                 AND t.transaction_type = 'expense'`;
               params.push(queryData.start_date, queryData.end_date);
             }
+
             // 3. Tổng chi tiêu tháng
             else if (queryData.type === 'total_spending') {
               sql = `
@@ -1197,19 +1241,88 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
               params.push(`%${queryData.category}%`, targetMonth, targetYear);
             }
 
+            // 6. (MỚI) Truy vấn ngày trong tuần tiêu nhiều nhất (Thứ mấy tiêu nhiều nhất?)
+            else if (queryData.type === 'top_spending_day') {
+              sql = `
+                  SELECT 
+                    CASE EXTRACT(DOW FROM t.date)
+                      WHEN 0 THEN 'Chủ Nhật' WHEN 1 THEN 'Thứ 2' WHEN 2 THEN 'Thứ 3'
+                      WHEN 3 THEN 'Thứ 4' WHEN 4 THEN 'Thứ 5' WHEN 5 THEN 'Thứ 6'
+                      WHEN 6 THEN 'Thứ 7'
+                    END as "day_name",
+                    SUM(t.amount) as "total_day",
+                    COUNT(*) as "count"
+                  FROM transactions t 
+                  JOIN accounts a ON t.account_id = a.account_id
+                  WHERE a.user_id = $1 
+                  AND EXTRACT(MONTH FROM t.date) = $2
+                  AND t.transaction_type = 'expense'
+                  GROUP BY "day_name"
+                  ORDER BY "total_day" DESC
+                  LIMIT 1`; // Chỉ lấy ngày đứng đầu
+
+              params.push(currentMonth);
+            }
+
+            // 7. (MỚI) So sánh chi tiêu tuần này với tuần trước
+            else if (queryData.type === 'compare_weeks') {
+              sql = `
+                  SELECT 
+                    SUM(CASE WHEN t.date >= date_trunc('week', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') THEN t.amount ELSE 0 END)::bigint as this_week,
+                    SUM(CASE WHEN t.date >= date_trunc('week', (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') - INTERVAL '1 week') 
+                            AND t.date < date_trunc('week', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') THEN t.amount ELSE 0 END)::bigint as last_week
+                  FROM transactions t
+                  JOIN accounts a ON t.account_id = a.account_id
+                  WHERE a.user_id = $1 AND t.transaction_type = 'expense'
+                `;
+            }
+
             if (sql) {
               const dbRes = await pool.query(sql, params);
               const dataFound = dbRes.rows[0];
 
               // 1. Chuẩn bị dữ liệu thô từ DB
-              const dbResult = `
-                [DỮ LIỆU VỪA TRUY VẤN TỪ HỆ THỐNG]:
-                - Tổng Thu: ${parseFloat(dataFound.total_income || 0).toLocaleString()}đ
-                - Tổng Chi: ${parseFloat(
-                  dataFound.total_expense || dataFound.total || 0,
-                ).toLocaleString()}đ
-                - Số giao dịch: ${dataFound.count || 0}
-              `;
+              let dbResult = '[DỮ LIỆU TRUY VẤN TỪ HỆ THỐNG]:\n';
+
+              if (dataFound) {
+                // TRƯỜNG HỢP 1: So sánh tuần (Nếu có biến this_week)
+                if (dataFound.hasOwnProperty('this_week')) {
+                  const thisW = parseFloat(dataFound.this_week || 0);
+                  const lastW = parseFloat(dataFound.last_week || 0);
+                  const diff = thisW - lastW;
+                  const status = diff > 0 ? 'TĂNG THÊM 📈' : 'GIẢM ĐƯỢC 📉';
+
+                  dbResult += `- Chi tiêu tuần này (đến hiện tại): ${thisW.toLocaleString()}đ\n`;
+                  dbResult += `- Chi tiêu cả tuần trước: ${lastW.toLocaleString()}đ\n`;
+                  dbResult += `- Chênh lệch: Tuần này Bảo đang tiêu ${status} ${Math.abs(
+                    diff,
+                  ).toLocaleString()}đ so với tuần trước.`;
+                }
+
+                // TRƯỜNG HỢP 2: Ngày tiêu nhiều nhất (Nếu có biến day_name)
+                else if (dataFound.day_name) {
+                  dbResult += `- Ngày tiêu nhiều nhất trong tháng: ${dataFound.day_name}\n`;
+                  dbResult += `- Số tiền đã đốt vào ngày đó: ${parseFloat(
+                    dataFound.total_day,
+                  ).toLocaleString()}đ\n`;
+                  dbResult += `- Số giao dịch: ${dataFound.count || 0}`;
+                }
+
+                // TRƯỜNG HỢP 3: Tổng Thu/Chi (Hôm nay, Tháng này, Hạng mục)
+                else {
+                  dbResult += `- Tổng Thu: ${parseFloat(
+                    dataFound.total_income || 0,
+                  ).toLocaleString()}đ\n`;
+                  dbResult += `- Tổng Chi: ${parseFloat(
+                    dataFound.total_expense || dataFound.total || 0,
+                  ).toLocaleString()}đ\n`;
+                  dbResult += `- Số giao dịch tìm thấy: ${dataFound.count || 0}`;
+                }
+              } else {
+                dbResult +=
+                  'Moni đã lục tung sổ sách nhưng không tìm thấy dữ liệu nào cho yêu cầu này của Bảo cả! 🕵️‍♂️';
+              }
+              // --- KẾT THÚC GOM CHUNG ---
 
               // 2. ÉP AI ĐỌC LẠI TOÀN BỘ inputPrompt KÈM DATA MỚI
               // Việc dán ${inputPrompt} ở đây sẽ bắt nó dùng đúng rules, icon và phong cách bạn muốn.
@@ -1463,10 +1576,97 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
   }
 });
 
+app.post('/chat-stream', authenticateToken, async (req, res) => {
+  const { message } = req.body;
+  const currentUserId = req.user?.user_id || 1;
+
+  // Set headers cho SSE
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  try {
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-robotics-er-1.5-preview',
+      systemInstruction: MONEY_GUARD_RULES,
+    });
+
+    const chat = model.startChat({
+      history: manageChatHistory(currentUserId, message, ''),
+    });
+
+    // Stream response
+    const result = await chat.sendMessageStream(message);
+
+    let fullResponse = '';
+
+    for await (const chunk of result.stream) {
+      const text = chunk.text();
+      fullResponse += text;
+
+      // Gửi từng chunk về client
+      res.write(`data: ${JSON.stringify({ text })}\n\n`);
+    }
+
+    // Kết thúc stream
+    res.write(`data: ${JSON.stringify({ done: true, fullText: fullResponse })}\n\n`);
+    res.end();
+
+    // Lưu vào DB sau khi hoàn thành
+    await pool.query('INSERT INTO message_history (user_id, role, message) VALUES ($1, $2, $3)', [
+      currentUserId,
+      'user',
+      message,
+    ]);
+
+    await pool.query('INSERT INTO message_history (user_id, role, message) VALUES ($1, $2, $3)', [
+      currentUserId,
+      'model',
+      fullResponse,
+    ]);
+  } catch (err) {
+    res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+    res.end();
+  }
+});
+
 // Health check đơn giản
 // app.get('/health', (req, res) => {
 //   res.json({ status: 'ok', message: 'AI service đang chạy' });
 // });
+
+// Middleware xử lý lỗi toàn cục
+app.use((err, req, res, next) => {
+  console.error('❌ Uncaught Error:', err);
+
+  // Gemini API errors
+  if (err.message?.includes('quota') || err.status === 429) {
+    return res.status(429).json({
+      error: 'AI đang quá tải, vui lòng thử lại sau 1 phút! 🙏',
+      retryAfter: 60,
+    });
+  }
+
+  if (err.status === 503) {
+    return res.status(503).json({
+      error: 'Gemini AI tạm thời không khả dụng. Đang thử model dự phòng...',
+    });
+  }
+
+  // Database errors
+  if (err.code === '23505') {
+    // Unique violation
+    return res.status(400).json({
+      error: 'Dữ liệu đã tồn tại!',
+    });
+  }
+
+  // Default
+  res.status(500).json({
+    error: 'Có lỗi xảy ra, vui lòng thử lại!',
+    ...(process.env.NODE_ENV === 'development' && { details: err.message }),
+  });
+});
 
 app.get('/api/ai-health', (req, res) => {
   res.json(getStatusData());

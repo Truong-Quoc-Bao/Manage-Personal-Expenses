@@ -136,6 +136,42 @@
         border: 1px solid #ffedd5;
       }
 
+      /* Ẩn thanh cuộn nhưng vẫn cho vuốt ngang */
+      .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+      }
+      .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+
+      /* Style cho từng viên thuốc (Chip) */
+      .suggestion-chip {
+        white-space: nowrap;
+        background: #f0f2f5;
+        border: 1px solid #e4e6eb;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 500;
+        color: #050505;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .suggestion-chip:hover {
+        background: #e4e6eb;
+        transform: translateY(-1px);
+      }
+
+      .suggestion-chip i {
+        color: #0084ff;
+        font-size: 10px;
+      }
+
       /* Dấu sao hiển thị trong markdown */
       .chat-content strong {
         color: #1e293b;
@@ -712,6 +748,14 @@
         </div>
       </div>
 
+      <!-- Smart Suggestions Bar -->
+      <div
+        id="suggestions-bar"
+        class="flex overflow-x-auto space-x-2 px-3 py-2 scrollbar-hide bg-white border-t border-gray-50"
+      >
+        <!-- Các nút gợi ý sẽ được nạp tự động bằng JS -->
+      </div>
+
       <!-- Chat Input Form (Nút gửi và viền màu xanh) -->
       <form id="chat-form" class="flex items-center p-3 bg-white border-t border-gray-100 shrink-0">
         <input type="file" id="file-input" accept="image/*" class="hidden" />
@@ -725,7 +769,7 @@
         <input
           type="text"
           id="user-input"
-          placeholder="Nhập '100k ăn phở'..."
+          placeholder="Bạn cần cái gì nè ..."
           autocomplete="off"
           class="flex-1 bg-gray-100 border-none rounded-full px-4 py-2 mx-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
         />

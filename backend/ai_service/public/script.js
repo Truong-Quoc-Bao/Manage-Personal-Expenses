@@ -32,7 +32,6 @@ function formatMoney(amount) {
 }
 
 // Định dạng ngày giờ
-// Định dạng ngày giờ (Đã Fix lỗi lệch 7 tiếng UTC của Database)
 function formatDateTime(dateString) {
   // Thay thế dấu cách bằng 'T' để JS hiểu đây là định dạng ISO
   const date = new Date(dateString.replace(' ', 'T'));
@@ -79,25 +78,33 @@ async function updateAIHealth() {
     const res = await fetch('/api/ai-health');
     const models = await res.json();
     const selector = document.getElementById('model-selector');
+    if (!selector) return;
+
     const currentVal = selector.value;
 
-    // Giữ lại option Auto
-    /* The above code is using JavaScript to select an HTML element with the id 'model-selector' using
-    the `getElementById` method. */
-    // selector.innerHTML = '<option value="auto"> </option>';
+    // ✅ BẮT BUỘC: Xóa sạch danh sách cũ trước khi nạp cái mới vào
+    selector.innerHTML = '<option value="auto">🤖 AUTO</option>';
 
     models.forEach((m) => {
       const isOnline = m.status === 'online';
       const option = document.createElement('option');
       option.value = m.name;
       option.disabled = !isOnline;
-      option.className = isOnline ? 'text-green-600' : 'text-red-400';
-      option.innerText = `${isOnline ? '●' : '○'} ${m.name.replace('gemini-', '')}`;
+      option.className = 'text-gray-900';
+
+      let shortName = m.name
+        .replace('gemini-', '')
+        .replace('-latest', '')
+        .replace('-preview', '')
+        .toUpperCase();
+      option.innerText = `${isOnline ? '●' : '○'} ${shortName}`;
+
       selector.appendChild(option);
     });
+
     selector.value = currentVal;
   } catch (err) {
-    console.error('Lỗi nạp danh sách AI');
+    console.log('Lỗi đồng bộ AI');
   }
 }
 
@@ -160,6 +167,7 @@ async function updateDashboard() {
 
     // Cập nhật giao dịch gần đây
     await loadRecentTransactions();
+    renderSuggestions(data);
   } catch (err) {
     console.error('❌ Lỗi fetch stats:', err);
     showToast('Không thể tải dữ liệu dashboard', 'error');
@@ -773,31 +781,91 @@ if (removeImgBtn) {
 // ==========================================
 // 10. CHAT - HIỂN THỊ TIN NHẮN
 // ==========================================
-function addMessage(text, isUser = false) {
+// function addMessage(text, isUser = false) {
+//   const safeText = text || '';
+//   const div = document.createElement('div');
+//   div.classList.add('message');
+//   div.classList.add(isUser ? 'user' : 'bot');
+
+//   if (!isUser) {
+//     if (typeof marked !== 'undefined' && safeText.trim() !== '') {
+//       div.innerHTML = marked.parse(safeText);
+//     } else {
+//       div.textContent = safeText || 'Không có phản hồi';
+//     }
+//   } else {
+//     div.textContent = safeText;
+//   }
+
+//   chatMessages.appendChild(div);
+
+//   // Smooth scroll to bottom
+//   setTimeout(() => {
+//     chatMessages.scrollTo({
+//       top: chatMessages.scrollHeight,
+//       behavior: 'smooth',
+//     });
+//   }, 100);
+// }
+
+// ==========================================
+// 10. CHAT - HIỂN THỊ TIN NHẮN (BẢN PRO)
+// ==========================================
+function addMessage(text, isUser = false, aiInfo = null) {
   const safeText = text || '';
   const div = document.createElement('div');
-  div.classList.add('message');
-  div.classList.add(isUser ? 'user' : 'bot');
+  div.classList.add('message', isUser ? 'user' : 'bot');
 
+  // 1. Phần nội dung chữ
+  const contentDiv = document.createElement('div');
+  contentDiv.className = 'chat-content';
   if (!isUser) {
-    if (typeof marked !== 'undefined' && safeText.trim() !== '') {
-      div.innerHTML = marked.parse(safeText);
-    } else {
-      div.textContent = safeText || 'Không có phản hồi';
-    }
+    contentDiv.innerHTML =
+      typeof marked !== 'undefined' && safeText.trim() !== ''
+        ? marked.parse(safeText)
+        : safeText || 'Moni không có phản hồi';
   } else {
-    div.textContent = safeText;
+    contentDiv.textContent = safeText;
+  }
+  div.appendChild(contentDiv);
+
+  // 2. PHẦN BẢNG TOKEN (Chỉ hiện cho Bot và khi có dữ liệu)
+  if (!isUser && aiInfo && aiInfo.modelUsed) {
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'ai-token-panel'; // Đảm bảo Bảo đã dán CSS bảng đen mình đưa lúc nãy
+
+    // Rút gọn tên model: gemini-1.5-flash -> FLASH
+    const shortModel = aiInfo.modelUsed.replace('gemini-', '').replace('-latest', '').toUpperCase();
+    const u = aiInfo.usage || {};
+
+    infoDiv.innerHTML = `
+      <div class="panel-header">
+          <span>TOKEN USAGE</span>
+          <span class="model-name-tag">${shortModel}</span>
+      </div>
+      <div class="panel-body">
+          <div class="panel-row"><span>Input tokens:</span> <span>${
+            u.inputTokens || aiInfo.tokens || 0
+          }</span></div>
+          <div class="panel-row"><span>Output tokens:</span> <span>${
+            u.outputTokens || 0
+          }</span></div>
+          <div class="panel-divider"></div>
+          <div class="panel-section-title">COST ESTIMATION *</div>
+          <div class="panel-row total-cost"><span>Total cost:</span> <span>$${Number(
+            aiInfo.cost || 0,
+          ).toFixed(6)}</span></div>
+      </div>
+    `;
+    div.appendChild(infoDiv);
   }
 
   chatMessages.appendChild(div);
 
-  // Smooth scroll to bottom
+  // Cuộn mượt mà xuống dưới
   setTimeout(() => {
-    chatMessages.scrollTo({
-      top: chatMessages.scrollHeight,
-      behavior: 'smooth',
-    });
-  }, 100);
+    chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
+  }, 50);
 }
 
 function showTypingIndicator() {
@@ -918,6 +986,7 @@ chatForm.addEventListener('submit', async (e) => {
     userInput.disabled = false;
     fileInput.value = '';
     userInput.focus();
+    document.getElementById('suggestions-bar').style.display = 'flex';
   }
 });
 
@@ -993,7 +1062,127 @@ document.addEventListener('click', (e) => {
 });
 
 // ==========================================
-// 15. KHỞI TẠO KHI TRANG LOAD
+// 15. HỆ THỐNG GỢI Ý SIÊU CẤP (30+ KỊCH BẢN LINH HOẠT)
+// ==========================================
+
+function getSmartSuggestions(data) {
+  const suggestions = [];
+  const income = data?.income || 0;
+  const expense = data?.expense || 0;
+  const balance = income - expense;
+  const categories = data?.categories || [];
+
+  const now = new Date();
+  const day = now.getDate();
+  const hour = now.getHours();
+  const month = now.getMonth() + 1;
+
+  // --- 1. NHÓM: NGƯỜI MỚI (CHƯA CÓ DỮ LIỆU) ---
+  if (income === 0 && expense === 0) {
+    return [
+      { icon: 'fa-rocket', text: 'Bắt đầu hành trình tiết kiệm' },
+      { icon: 'fa-link', text: 'Kết nối ngân hàng tự động' },
+      { icon: 'fa-camera', text: 'Chụp thử 1 hóa đơn cafe' },
+      { icon: 'fa-circle-question', text: 'Moni làm được những gì?' },
+      { icon: 'fa-user-shield', text: 'Dữ liệu của tôi có an toàn không?' },
+    ];
+  }
+
+  // --- 2. NHÓM: CẢNH BÁO TÀI CHÍNH (ÂM TIỀN/SẮP HẾT TIỀN) ---
+  if (balance < 0) {
+    suggestions.push({ icon: 'fa-skull-crossbones', text: 'Kế hoạch trả nợ khẩn cấp' });
+    suggestions.push({ icon: 'fa-hand-holding-dollar', text: 'Tìm nguồn thu nhập bổ sung' });
+    suggestions.push({ icon: 'fa-ban', text: 'Món nào tôi nên ngừng mua ngay?' });
+  } else if (income > 0 && expense / income > 0.9) {
+    suggestions.push({ icon: 'fa-triangle-exclamation', text: 'Cảnh báo: Sắp chạm đáy ví!' });
+  }
+
+  // --- 3. NHÓM: NGƯỜI GIÀU (DƯ NHIỀU TIỀN) ---
+  if (balance > 10000000) {
+    // Dư trên 10 triệu
+    suggestions.push({ icon: 'fa-coins', text: 'Gợi ý kênh đầu tư an toàn' });
+    suggestions.push({ icon: 'fa-gem', text: 'Tôi có thể mua gì tự thưởng cho mình?' });
+    suggestions.push({ icon: 'fa-arrow-up-right-dots', text: 'Làm sao để tiền đẻ ra tiền?' });
+  }
+
+  // --- 4. NHÓM: THEO THỜI GIAN TRONG NGÀY ---
+  if (hour < 10) {
+    suggestions.push({ icon: 'fa-mug-saucer', text: 'Kế hoạch chi tiêu hôm nay' });
+  } else if (hour > 21) {
+    suggestions.push({ icon: 'fa-moon', text: 'Tổng kết chi tiêu ngày hôm nay' });
+    suggestions.push({ icon: 'fa-bed', text: 'Ngày mai nên tiêu tối đa bao nhiêu?' });
+  }
+
+  // --- 5. NHÓM: THEO CHU KỲ THÁNG (ĐẦU/CUỐI THÁNG) ---
+  const daysInMonth = new Date(now.getFullYear(), month, 0).getDate();
+  if (day <= 5) {
+    suggestions.push({ icon: 'fa-flag', text: `Lập ngân sách cho tháng ${month}` });
+    suggestions.push({ icon: 'fa-money-bill-transfer', text: 'Tiền lương của tôi đâu rồi?' });
+  } else if (day >= daysInMonth - 5) {
+    suggestions.push({ icon: 'fa-hourglass-half', text: 'Sống sót qua những ngày cuối tháng' });
+    suggestions.push({ icon: 'fa-file-invoice-dollar', text: 'Dự báo số dư cuối tháng' });
+  }
+
+  // --- 6. NHÓM: THEO THÓI QUEN (DANH MỤC) ---
+  if (categories.length > 0) {
+    const topCat = [...categories].sort((a, b) => b.amount - a.amount)[0];
+    const name = topCat.category_name.toLowerCase();
+
+    if (name.includes('ăn') || name.includes('food')) {
+      suggestions.push({ icon: 'fa-utensils', text: 'Cắt giảm tiền ăn uống thế nào?' });
+    }
+    if (name.includes('cafe') || name.includes('nước') || name.includes('coffee')) {
+      suggestions.push({ icon: 'fa-cup-togo', text: 'Tôi đã đốt bao nhiêu tiền cho Cafe?' });
+    }
+    if (name.includes('mua sắm') || name.includes('shopping')) {
+      suggestions.push({ icon: 'fa-cart-shopping', text: 'Kiểm soát cơn nghiện mua sắm' });
+    }
+    if (name.includes('game') || name.includes('giải trí')) {
+      suggestions.push({ icon: 'fa-gamepad', text: 'Cân đối tiền nạp game' });
+    }
+  }
+
+  // --- 7. NHÓM: TRUY VẤN DỮ LIỆU THÔNG MINH ---
+  suggestions.push({ icon: 'fa-magnifying-glass-chart', text: 'So sánh với tuần trước' });
+  suggestions.push({ icon: 'fa-bolt', text: 'Khoản chi nào bất thường nhất?' });
+  suggestions.push({ icon: 'fa-calendar-days', text: 'Thứ mấy tôi tiêu nhiều nhất?' });
+
+  // --- 8. NHÓM: TRUYỀN CẢM HỨNG (MOTIVATION) ---
+  suggestions.push({ icon: 'fa-quote-left', text: 'Lời khuyên tài chính hôm nay' });
+  suggestions.push({ icon: 'fa-trophy', text: 'Thử thách 7 ngày không trà sữa' });
+
+  // XÁO TRỘN VÀ LẤY 6 CÁI (Tăng số lượng lên 6 cho đẹp giao diện mới)
+  return suggestions.sort(() => 0.5 - Math.random()).slice(0, 6);
+}
+
+function renderSuggestions(data) {
+  const container = document.getElementById('suggestions-bar');
+  if (!container) return;
+
+  const smartList = getSmartSuggestions(data);
+  container.innerHTML = '';
+
+  smartList.forEach((item) => {
+    const chip = document.createElement('div');
+    // CSS Class Tailwind mix với Custom style cho chuyên nghiệp
+    chip.className =
+      'suggestion-chip flex items-center bg-white hover:bg-blue-50 text-gray-700 text-[11px] font-semibold px-4 py-2 rounded-full cursor-pointer transition-all shrink-0 border border-gray-100 shadow-sm hover:border-blue-200 hover:text-blue-600';
+    chip.innerHTML = `<i class="fa-solid ${item.icon} mr-2 opacity-70"></i><span>${item.text}</span>`;
+
+    chip.onclick = () => {
+      userInput.value = item.text;
+      container.style.display = 'none';
+      chatForm.dispatchEvent(new Event('submit'));
+    };
+
+    container.appendChild(chip);
+  });
+
+  container.style.display = 'flex';
+}
+
+// ==========================================
+// 16. KHỞI TẠO KHI TRANG LOAD
 // ==========================================
 
 window.addEventListener('load', () => {
@@ -1005,6 +1194,7 @@ window.addEventListener('load', () => {
   // Kích hoạt âm thanh
   enableAudioAfterInteraction();
 
+  renderSuggestions();
   updateAIHealth();
   setInterval(updateAIHealth, 30000); // 30 giây quét sức khỏe AI một lần
 
