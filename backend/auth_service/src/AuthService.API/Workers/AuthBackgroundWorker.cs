@@ -22,10 +22,10 @@ namespace AuthService.API.Workers
             {
                 using (var scope = _serviceProvider.CreateScope())
                 {
+                    var _authService = scope.ServiceProvider.GetRequiredService<IAuthService>();
                     switch (message.Status)
                     {
                         case "Success":
-                            var _authService = scope.ServiceProvider.GetRequiredService<IAuthService>();
                             await _authService.UpdateStatusUserAsync(message);
                             break;
                         case "Fail":
@@ -35,9 +35,9 @@ namespace AuthService.API.Workers
                 }
             });
 
-            await _rabbitMQClient.ConsumeAsync<UserRegistrationFailedEvent>("user.user_create.queue", new[] { "user.user_create_fail" }, async (message) =>
+            await _rabbitMQClient.ConsumeAsync<UserRegistrationConsumeEvent>("user.user_create.queue", new[] { "user.user_create_fail" }, async (message) =>
             {
-                var userRejected = new UserRegistrationFailedEvent
+                var userRejected = new UserRegistrationConsumeEvent
                 {
                     UserId = message.UserId,
                 };

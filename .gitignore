@@ -96,6 +96,7 @@ out/
 
 # ASP.NET Core config
 appsettings.Development.json
+appsettings.json
 appsettings.*.local.json
 
 # EF Core

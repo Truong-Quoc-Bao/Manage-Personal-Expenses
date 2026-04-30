@@ -2,6 +2,10 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using TransactionService.Infrastructure.Extensions;
 using TransactionService.API.Workers;
+using TransactionService.Application.Mappings;
+using TransactionService.API.Middlewares;
+using TransactionService.API.Filters;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,14 +14,22 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower;
+    });
 
 builder.Services.AddTransactionInfrastructure(builder.Configuration);
 builder.Services.AddHostedService<TransactionBackgroundWorker>();
+builder.Services.AddAutoMapper(typeof(AutoMapperTransaction).Assembly);
+builder.Services.AddScoped<TransactionService.Core.Interfaces.ITransactionService, TransactionService.Application.Services.TransactionAppService>();
+builder.Services.AddScoped<ValidationFilter>();
 
 var app = builder.Build();
 
-app.UseAuthentication();
+app.UseMiddleware<ErrorHandlingMiddleware>();
+// app.UseAuthentication();
 // app.UseAuthorization();
 
 app.MapControllers();

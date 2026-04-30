@@ -3,6 +3,7 @@ const { createCategories } = require("../repositories/category.repository");
 const { updateCategory } = require("../repositories/category.repository");
 const { findOneCategory } = require("../repositories/category.repository");
 const { deleteCategory } = require("../repositories/category.repository");
+const categoryRepository = require("../repositories/category.repository");
 
 
 
@@ -72,7 +73,17 @@ const delCategoryService = async ({ categoryId }) => {
   return categories;
 };
 
+const checkValidCategory = async ({ categoryId, userId, transactionType }) => {
+  const isValid = await categoryRepository.findOneCategoryForTransactionCheck(categoryId, userId, transactionType.toLowerCase());
+
+  return isValid === null ? false : true;
+};
+
 
 module.exports = {
-  getCategories,creaCategories,updCategories,delCategoryService
+  getCategories,
+  creaCategories,
+  updCategories,
+  delCategoryService,
+  checkValidCategory
 };

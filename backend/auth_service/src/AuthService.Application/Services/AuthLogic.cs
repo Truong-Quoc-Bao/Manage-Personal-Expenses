@@ -2,7 +2,7 @@ using AuthService.Core.Interfaces;
 using AuthService.Core.DTOs;
 using AuthService.Core.Entities;
 using Microsoft.AspNetCore.Identity;
-
+using Microsoft.Extensions.Configuration;
 
 namespace AuthService.Application.Services 
 {
@@ -40,19 +40,15 @@ namespace AuthService.Application.Services
 
             if(result.Succeeded)
             {
-                result = await _authRepository.AddToRoleAsync(user, "User");
-                if(result.Succeeded)
+                var userCreatedEvent = new UserRegistrationPublishEvent
                 {
-                    var userCreatedEvent = new UserRegistrationPublishEvent
-                    {
-                        userId = user.Id,
-                        userName = registerRequest.user_name,
-                        email = user.Email,
-                        createdAt = DateTime.UtcNow
-                    };
-                    await _rabbitMQPublisher.PublishAsync(userCreatedEvent, "user.user_create");
-                }
+                    userId = user.Id,
+                    userName = registerRequest.user_name,
+                    email = user.Email,
+                    createdAt = DateTime.UtcNow
+                };
 
+                await _rabbitMQPublisher.PublishAsync(userCreatedEvent, "user.user_created");
             }
 
             return result;

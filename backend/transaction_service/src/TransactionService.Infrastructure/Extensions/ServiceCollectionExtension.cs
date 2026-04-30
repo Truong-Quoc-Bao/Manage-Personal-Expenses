@@ -1,12 +1,16 @@
-using TransactionService.Infrastructure.Data;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+
 using RabbitMQ.Client.Shared;
+using TransactionService.Infrastructure.Data;
 using TransactionService.Core.Interfaces;
 using TransactionService.Infrastructure.MessageBroker;
+using TransactionService.Infrastructure.Protos;
+using TransactionService.Infrastructure.Services;
+using TransactionService.Infrastructure.Repositories;
 
 namespace TransactionService.Infrastructure.Extensions
 {
@@ -21,6 +25,8 @@ namespace TransactionService.Infrastructure.Extensions
 
             services.AddScoped<IRabbitMQPublisher, RabbitMQPublisher>();
 
+            services.AddScoped<ITransactionRepository, TransactionRepository>();
+
             services.AddDbContext<TransactionDbContext>(options =>
             {
                 options.UseNpgsql(connectionString, npgsqlOptions =>
@@ -30,18 +36,20 @@ namespace TransactionService.Infrastructure.Extensions
                 });
             });
 
-            services.AddAuthentication("Bearer")
-                .AddJwtBearer("Bearer", options => options.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuer = true,
-                    ValidateAudience = true,
-                    ValidateLifetime = true,
-                    ValidateIssuerSigningKey = true,
-                    ValidIssuer = configuration["Jwt:Issuer"],
-                    ValidAudience = configuration["Jwt:Audience"],
-                    IssuerSigningKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(configuration["Jwt:SecretKey"])),                    
-                });
+            services.AddGrpcClient<CategoryProtoService.CategoryProtoServiceClient>(options =>
+            {
+                options.Address = new Uri(configuration["GrpcSettings:CategoryServiceUrl"]!);
+            });
+
+            services.AddGrpcClient<AccountProtoService.AccountProtoServiceClient>(options =>
+            {
+                options.Address = new Uri(configuration["GrpcSettings:AccountServiceUrl"]!);
+            });
                 
+            services.AddScoped<IAccountInternalService, AccountInternalService>();
+
+            services.AddScoped<ICategoryInternalService, CategoryInternalService>();
+
             return services;
         }
     }

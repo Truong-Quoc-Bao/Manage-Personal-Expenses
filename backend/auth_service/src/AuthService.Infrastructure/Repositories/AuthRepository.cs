@@ -8,6 +8,11 @@ namespace AuthService.Infrastructure.Repositories
     {
         private readonly UserManager<ApplicationUser> _userManager;
 
+        public AuthRepository(UserManager<ApplicationUser> userManager)
+        {
+            _userManager = userManager;
+        }
+
         public async Task<IdentityResult> RegisterUserAsync(ApplicationUser user, string password)
         {
             return await _userManager.CreateAsync(user, password);
@@ -34,7 +39,7 @@ namespace AuthService.Infrastructure.Repositories
         public async Task<IdentityResult> UpdateStatusUserAsync(ApplicationUser user)
         {
 
-            return await _userManager.UpdateAsync(existingUser);
+            return await _userManager.UpdateAsync(user);
         }
 
         public async Task<bool> CheckPasswordAsync(ApplicationUser user, string password)

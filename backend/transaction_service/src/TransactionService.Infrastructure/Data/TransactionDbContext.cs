@@ -29,6 +29,12 @@ namespace TransactionService.Infrastructure.Data
 
                 entity.Property(e => e.CreatedAt)
                     .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(e => e.TransactionType)
+                    .HasConversion(
+                        v => v.ToString().ToLower(), 
+                        v => (TransactionType)Enum.Parse(typeof(TransactionType), v, true)
+                    )
+                    .HasColumnType("varchar(50)");
             });
 
             base.OnModelCreating(modelBuilder);

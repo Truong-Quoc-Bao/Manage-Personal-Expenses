@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using AuthService.Infrastructure.Extensions;
 using AuthService.API.Workers;
 using AuthService.Application.Services;
-using AuthLogic = AuthService.Application.Services.AuthService;
 using AuthService.Core.Interfaces;
 using AuthService.Infrastructure.Repositories;
 using AuthService.API.Middlewares;
@@ -25,7 +24,7 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 
 var app = builder.Build();
 
-app.UseAuthentication();
+// app.UseAuthentication();
 // app.UseAuthorization();
 
 

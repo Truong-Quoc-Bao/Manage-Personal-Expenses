@@ -21,6 +21,7 @@
 const path = require("path");
 require("dotenv").config({ path: path.resolve(__dirname, ".env") });
 const rabbitMQClient = require("./src/events");
+const {startGrpcServer} = require("./src/grpc/category.grpc");
 
 const express = require("express");
 const app = express();
@@ -47,4 +48,5 @@ app.use("/", categoryRoutes);
 app.listen(PORT, async () => {
   await rabbitMQClient.startRabbitMQ();
   console.log(`Category service is running on port ${PORT}`);
+  startGrpcServer();
 });
