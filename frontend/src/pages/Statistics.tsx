@@ -1,5 +1,4 @@
-import React from "react";
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   PieChart,
   Pie,
@@ -44,47 +43,48 @@ export function Statistics() {
 
   const totalExpense = categoryData.reduce((sum, item) => sum + item.value, 0);
 
+  const tabButtonClass = (active: boolean) =>
+    `rounded-xl px-4 py-2 font-medium transition ${
+      active
+        ? "!bg-gradient-to-r !from-orange-400 !to-rose-400 text-white shadow-md"
+        : "!bg-gray-100 text-gray-700 hover:!bg-gray-200"
+    }`;
+
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="mx-auto max-w-7xl">
       <div className="mb-8">
-        <h1 className="text-3xl text-gray-800 mb-1">Thống kê</h1>
+        <h1 className="mb-1 text-4xl font-bold text-gray-900">Thống kê</h1>
         <p className="text-gray-600">Phân tích chi tiêu và thu nhập của bạn</p>
       </div>
 
-      <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 mb-6">
-        <div className="flex flex-col sm:flex-row gap-4">
+      <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-lg">
+        <div className="flex flex-col gap-4 sm:flex-row">
           <div className="flex-1">
-            <label className="block text-sm text-gray-700 mb-2">
+            <label className="mb-2 block text-sm font-medium text-gray-700">
               Khoảng thời gian
             </label>
-            <div className="flex gap-2">
+
+            <div className="flex flex-wrap gap-2">
               <button
+                type="button"
                 onClick={() => setPeriod("month")}
-                className={`px-4 py-2 rounded-xl transition-all ${
-                  period === "month"
-                    ? "bg-gradient-to-r from-orange-400 to-rose-400 text-white shadow-md"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
+                className={tabButtonClass(period === "month")}
               >
                 Tháng này
               </button>
+
               <button
+                type="button"
                 onClick={() => setPeriod("quarter")}
-                className={`px-4 py-2 rounded-xl transition-all ${
-                  period === "quarter"
-                    ? "bg-gradient-to-r from-orange-400 to-rose-400 text-white shadow-md"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
+                className={tabButtonClass(period === "quarter")}
               >
                 Quý này
               </button>
+
               <button
+                type="button"
                 onClick={() => setPeriod("year")}
-                className={`px-4 py-2 rounded-xl transition-all ${
-                  period === "year"
-                    ? "bg-gradient-to-r from-orange-400 to-rose-400 text-white shadow-md"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
+                className={tabButtonClass(period === "year")}
               >
                 Năm nay
               </button>
@@ -92,25 +92,23 @@ export function Statistics() {
           </div>
 
           <div className="flex-1">
-            <label className="block text-sm text-gray-700 mb-2">Xem theo</label>
-            <div className="flex gap-2">
+            <label className="mb-2 block text-sm font-medium text-gray-700">
+              Xem theo
+            </label>
+
+            <div className="flex flex-wrap gap-2">
               <button
+                type="button"
                 onClick={() => setView("category")}
-                className={`px-4 py-2 rounded-xl transition-all ${
-                  view === "category"
-                    ? "bg-gradient-to-r from-orange-400 to-rose-400 text-white shadow-md"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
+                className={tabButtonClass(view === "category")}
               >
                 Theo danh mục
               </button>
+
               <button
+                type="button"
                 onClick={() => setView("trend")}
-                className={`px-4 py-2 rounded-xl transition-all ${
-                  view === "trend"
-                    ? "bg-gradient-to-r from-orange-400 to-rose-400 text-white shadow-md"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
+                className={tabButtonClass(view === "trend")}
               >
                 Xu hướng
               </button>
@@ -120,9 +118,12 @@ export function Statistics() {
       </div>
 
       {view === "category" ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-            <h2 className="text-xl text-gray-800 mb-6">Phân bổ chi tiêu</h2>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-lg">
+            <h2 className="mb-6 text-xl font-semibold text-gray-900">
+              Phân bổ chi tiêu
+            </h2>
+
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
@@ -141,6 +142,7 @@ export function Statistics() {
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
+
                 <Tooltip
                   formatter={(value) => formatCurrency(Number(value ?? 0))}
                   contentStyle={{
@@ -153,29 +155,32 @@ export function Statistics() {
             </ResponsiveContainer>
           </div>
 
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-            <h2 className="text-xl text-gray-800 mb-6">
+          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-lg">
+            <h2 className="mb-6 text-xl font-semibold text-gray-900">
               Chi tiết theo danh mục
             </h2>
+
             <div className="space-y-4">
               {categoryData.map((category, index) => {
                 const percentage = (category.value / totalExpense) * 100;
+
                 return (
                   <div key={category.name}>
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="mb-2 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         {index < 3 && <span>{["🥇", "🥈", "🥉"][index]}</span>}
-                        <span className="text-sm text-gray-800">
+                        <span className="text-sm font-medium text-gray-800">
                           {category.name}
                         </span>
                       </div>
-                      <span className="text-sm text-gray-800">
+
+                      <span className="text-sm font-medium text-gray-800">
                         {formatCurrency(category.value)}
                       </span>
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
                         <div
                           className="h-full rounded-full transition-all"
                           style={{
@@ -184,7 +189,8 @@ export function Statistics() {
                           }}
                         />
                       </div>
-                      <span className="text-xs text-gray-600 w-12 text-right">
+
+                      <span className="w-12 text-right text-xs text-gray-600">
                         {percentage.toFixed(1)}%
                       </span>
                     </div>
@@ -193,10 +199,10 @@ export function Statistics() {
               })}
             </div>
 
-            <div className="mt-6 pt-6 border-t border-gray-200">
+            <div className="mt-6 border-t border-gray-200 pt-6">
               <div className="flex items-center justify-between">
-                <span className="text-gray-800">Tổng chi tiêu</span>
-                <span className="text-xl text-red-600">
+                <span className="font-medium text-gray-800">Tổng chi tiêu</span>
+                <span className="text-xl font-semibold text-red-600">
                   {formatCurrency(totalExpense)}
                 </span>
               </div>
@@ -204,8 +210,11 @@ export function Statistics() {
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-          <h2 className="text-xl text-gray-800 mb-6">Xu hướng thu chi</h2>
+        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-lg">
+          <h2 className="mb-6 text-xl font-semibold text-gray-900">
+            Xu hướng thu chi
+          </h2>
+
           <ResponsiveContainer width="100%" height={400}>
             <BarChart data={trendData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -223,12 +232,14 @@ export function Statistics() {
                 }}
               />
               <Legend />
+
               <Bar
                 dataKey="income"
                 name="Thu nhập"
                 fill="#10b981"
                 radius={[8, 8, 0, 0]}
               />
+
               <Bar
                 dataKey="expense"
                 name="Chi tiêu"
@@ -238,28 +249,36 @@ export function Statistics() {
             </BarChart>
           </ResponsiveContainer>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-            <div className="p-4 rounded-xl bg-green-50 border border-green-100">
-              <p className="text-sm text-green-700 mb-1">Thu nhập trung bình</p>
-              <p className="text-2xl text-green-600">
+          <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3">
+            <div className="rounded-xl border border-green-100 bg-green-50 p-4">
+              <p className="mb-1 text-sm font-medium text-green-700">
+                Thu nhập trung bình
+              </p>
+              <p className="text-2xl font-semibold text-green-600">
                 {formatCurrency(
                   trendData.reduce((sum, item) => sum + item.income, 0) /
                     trendData.length
                 )}
               </p>
             </div>
-            <div className="p-4 rounded-xl bg-red-50 border border-red-100">
-              <p className="text-sm text-red-700 mb-1">Chi tiêu trung bình</p>
-              <p className="text-2xl text-red-600">
+
+            <div className="rounded-xl border border-red-100 bg-red-50 p-4">
+              <p className="mb-1 text-sm font-medium text-red-700">
+                Chi tiêu trung bình
+              </p>
+              <p className="text-2xl font-semibold text-red-600">
                 {formatCurrency(
                   trendData.reduce((sum, item) => sum + item.expense, 0) /
                     trendData.length
                 )}
               </p>
             </div>
-            <div className="p-4 rounded-xl bg-blue-50 border border-blue-100">
-              <p className="text-sm text-blue-700 mb-1">Tiết kiệm trung bình</p>
-              <p className="text-2xl text-blue-600">
+
+            <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
+              <p className="mb-1 text-sm font-medium text-blue-700">
+                Tiết kiệm trung bình
+              </p>
+              <p className="text-2xl font-semibold text-blue-600">
                 {formatCurrency(
                   trendData.reduce(
                     (sum, item) => sum + (item.income - item.expense),

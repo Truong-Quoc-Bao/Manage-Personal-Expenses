@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import {
   Plus,
   Search,
-  Filter,
   TrendingUp,
   TrendingDown,
   Edit2,
@@ -37,6 +36,7 @@ export function Transactions() {
   useEffect(() => {
     const unsubscribeTransactions = transactionStore.subscribe(setTransactions);
     const unsubscribeAccounts = accountStore.subscribe(setAccounts);
+
     return () => {
       unsubscribeTransactions();
       unsubscribeAccounts();
@@ -55,86 +55,41 @@ export function Transactions() {
       note: transactionData.note,
     };
 
-    // Add transaction to store
     transactionStore.add(newTransaction);
 
-    // Update account balance
     const account = accounts.find(
       (acc) => acc.name === transactionData.account
     );
+
     if (account) {
       const balanceChange =
         transactionData.type === "income"
           ? newTransaction.amount
           : -newTransaction.amount;
+
       accountStore.update(account.id, {
         balance: account.balance + balanceChange,
       });
     }
 
     setShowAddTransaction(false);
-
-    const typeLabel =
-      transactionData.type === "income" ? "thu nhập" : "chi tiêu";
-    toast.success(`Đã thêm giao dịch ${typeLabel} thành công!`);
+    toast.success("Đã thêm giao dịch thành công!");
   };
 
   const handleEditTransaction = (transactionData: any) => {
-    if (editingTransaction) {
-      // Revert old transaction balance
-      const oldAccount = accounts.find(
-        (acc) => acc.name === editingTransaction.account
-      );
-      if (oldAccount) {
-        const oldBalanceChange =
-          editingTransaction.type === "income"
-            ? -editingTransaction.amount
-            : editingTransaction.amount;
-        accountStore.update(oldAccount.id, {
-          balance: oldAccount.balance + oldBalanceChange,
-        });
-      }
+    if (!editingTransaction) return;
 
-      // Apply new transaction balance
-      const newAccount = accounts.find(
-        (acc) => acc.name === transactionData.account
-      );
-      if (newAccount) {
-        const newBalanceChange =
-          transactionData.type === "income"
-            ? parseFloat(transactionData.amount)
-            : -parseFloat(transactionData.amount);
-        accountStore.update(newAccount.id, {
-          balance: newAccount.balance + newBalanceChange,
-        });
-      }
-
-      transactionStore.update(editingTransaction.id, transactionData);
-      setEditingTransaction(null);
-      toast.success("Đã cập nhật giao dịch thành công!");
-    }
+    transactionStore.update(editingTransaction.id, transactionData);
+    setEditingTransaction(null);
+    toast.success("Đã cập nhật giao dịch thành công!");
   };
 
   const handleDeleteTransaction = () => {
-    if (deletingTransaction) {
-      // Revert transaction balance
-      const account = accounts.find(
-        (acc) => acc.name === deletingTransaction.account
-      );
-      if (account) {
-        const balanceChange =
-          deletingTransaction.type === "income"
-            ? -deletingTransaction.amount
-            : deletingTransaction.amount;
-        accountStore.update(account.id, {
-          balance: account.balance + balanceChange,
-        });
-      }
+    if (!deletingTransaction) return;
 
-      transactionStore.remove(deletingTransaction.id);
-      toast.success("Đã xóa giao dịch thành công!");
-      setDeletingTransaction(null);
-    }
+    transactionStore.remove(deletingTransaction.id);
+    setDeletingTransaction(null);
+    toast.success("Đã xóa giao dịch thành công!");
   };
 
   const formatCurrency = (amount: number) => {
@@ -149,6 +104,7 @@ export function Transactions() {
     const matchesSearch =
       t.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.category.toLowerCase().includes(searchQuery.toLowerCase());
+
     return matchesType && matchesSearch;
   });
 
@@ -160,44 +116,62 @@ export function Transactions() {
     .filter((t) => t.type === "expense")
     .reduce((sum, t) => sum + t.amount, 0);
 
+  const filterButtonClass = (active: boolean, type?: "income" | "expense") => {
+    if (active && type === "income") {
+      return "!bg-green-500 text-white shadow-md";
+    }
+
+    if (active && type === "expense") {
+      return "!bg-red-500 text-white shadow-md";
+    }
+
+    if (active) {
+      return "!bg-gradient-to-r !from-orange-400 !to-rose-400 text-white shadow-md";
+    }
+
+    return "!bg-gray-100 text-gray-700 hover:!bg-gray-200";
+  };
+
   return (
     <>
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <h1 className="text-3xl text-gray-800 mb-1">Giao dịch</h1>
+            <h1 className="mb-1 text-4xl font-bold text-gray-900">Giao dịch</h1>
             <p className="text-gray-600">
               Quản lý tất cả các giao dịch thu chi của bạn
             </p>
           </div>
+
           <button
+            type="button"
             onClick={() => setShowAddTransaction(true)}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-400 to-rose-400 text-white rounded-xl hover:from-orange-500 hover:to-rose-500 transition-all shadow-lg hover:shadow-xl"
+            className="inline-flex items-center justify-center gap-2 rounded-xl !bg-gradient-to-r !from-orange-400 !to-rose-400 px-6 py-3 font-semibold text-white shadow-lg transition hover:!from-orange-500 hover:!to-rose-500"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="h-5 w-5" />
             Thêm giao dịch
           </button>
         </div>
 
-        {/* Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-            <p className="text-sm text-gray-600 mb-2">Tổng thu</p>
-            <p className="text-2xl text-green-600">
+        <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-3">
+          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-lg">
+            <p className="mb-2 text-sm text-gray-600">Tổng thu</p>
+            <p className="text-2xl font-semibold text-green-600">
               {formatCurrency(totalIncome)}
             </p>
           </div>
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-            <p className="text-sm text-gray-600 mb-2">Tổng chi</p>
-            <p className="text-2xl text-red-600">
+
+          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-lg">
+            <p className="mb-2 text-sm text-gray-600">Tổng chi</p>
+            <p className="text-2xl font-semibold text-red-600">
               {formatCurrency(totalExpense)}
             </p>
           </div>
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-            <p className="text-sm text-gray-600 mb-2">Số dư ròng</p>
+
+          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-lg">
+            <p className="mb-2 text-sm text-gray-600">Số dư ròng</p>
             <p
-              className={`text-2xl ${
+              className={`text-2xl font-semibold ${
                 totalIncome - totalExpense >= 0
                   ? "text-green-600"
                   : "text-red-600"
@@ -208,47 +182,49 @@ export function Transactions() {
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 mb-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+        <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-lg">
+          <div className="flex flex-col gap-4 md:flex-row">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+
               <input
                 type="text"
                 placeholder="Tìm kiếm theo mô tả hoặc danh mục..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                className="h-12 w-full rounded-xl border border-gray-300 bg-white pl-12 pr-4 text-gray-900 placeholder:text-gray-400 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
               />
             </div>
+
             <div className="flex gap-2">
               <button
+                type="button"
                 onClick={() => setFilterType("all")}
-                className={`px-6 py-3 rounded-xl transition-all ${
+                className={`rounded-xl px-6 py-3 font-medium transition ${filterButtonClass(
                   filterType === "all"
-                    ? "bg-gradient-to-r from-orange-400 to-rose-400 text-white shadow-md"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
+                )}`}
               >
                 Tất cả
               </button>
+
               <button
+                type="button"
                 onClick={() => setFilterType("income")}
-                className={`px-6 py-3 rounded-xl transition-all ${
-                  filterType === "income"
-                    ? "bg-green-500 text-white shadow-md"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
+                className={`rounded-xl px-6 py-3 font-medium transition ${filterButtonClass(
+                  filterType === "income",
+                  "income"
+                )}`}
               >
                 Thu
               </button>
+
               <button
+                type="button"
                 onClick={() => setFilterType("expense")}
-                className={`px-6 py-3 rounded-xl transition-all ${
-                  filterType === "expense"
-                    ? "bg-red-500 text-white shadow-md"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
+                className={`rounded-xl px-6 py-3 font-medium transition ${filterButtonClass(
+                  filterType === "expense",
+                  "expense"
+                )}`}
               >
                 Chi
               </button>
@@ -256,14 +232,15 @@ export function Transactions() {
           </div>
         </div>
 
-        {/* Transactions List */}
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+        <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-lg">
           {filteredTransactions.length === 0 ? (
             <div className="p-12 text-center">
-              <p className="text-gray-500 mb-4">Không tìm thấy giao dịch nào</p>
+              <p className="mb-4 text-gray-500">Không tìm thấy giao dịch nào</p>
+
               <button
+                type="button"
                 onClick={() => setShowAddTransaction(true)}
-                className="text-orange-500 hover:text-orange-600"
+                className="font-medium !bg-transparent text-orange-500 hover:text-orange-600"
               >
                 Thêm giao dịch đầu tiên
               </button>
@@ -271,66 +248,72 @@ export function Transactions() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead className="border-b border-gray-200 bg-gray-50">
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs uppercase tracking-wider text-gray-600">
                       Ngày
                     </th>
-                    <th className="px-6 py-4 text-left text-xs text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs uppercase tracking-wider text-gray-600">
                       Danh mục
                     </th>
-                    <th className="px-6 py-4 text-left text-xs text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs uppercase tracking-wider text-gray-600">
                       Mô tả
                     </th>
-                    <th className="px-6 py-4 text-left text-xs text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs uppercase tracking-wider text-gray-600">
                       Tài khoản
                     </th>
-                    <th className="px-6 py-4 text-right text-xs text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-right text-xs uppercase tracking-wider text-gray-600">
                       Số tiền
                     </th>
-                    <th className="px-6 py-4 text-center text-xs text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-center text-xs uppercase tracking-wider text-gray-600">
                       Thao tác
                     </th>
                   </tr>
                 </thead>
+
                 <tbody className="divide-y divide-gray-200">
                   {filteredTransactions.map((transaction) => (
                     <tr
                       key={transaction.id}
-                      className="hover:bg-gray-50 transition-colors"
+                      className="transition hover:bg-gray-50"
                     >
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
                         {transaction.date}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+
+                      <td className="whitespace-nowrap px-6 py-4">
                         <div className="flex items-center gap-2">
                           <div
-                            className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                            className={`flex h-8 w-8 items-center justify-center rounded-lg ${
                               transaction.type === "income"
                                 ? "bg-green-100 text-green-600"
                                 : "bg-red-100 text-red-600"
                             }`}
                           >
                             {transaction.type === "income" ? (
-                              <TrendingUp className="w-4 h-4" />
+                              <TrendingUp className="h-4 w-4" />
                             ) : (
-                              <TrendingDown className="w-4 h-4" />
+                              <TrendingDown className="h-4 w-4" />
                             )}
                           </div>
+
                           <span className="text-sm text-gray-800">
                             {transaction.category}
                           </span>
                         </div>
                       </td>
+
                       <td className="px-6 py-4 text-sm text-gray-800">
                         {transaction.description}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+
+                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
                         {transaction.account}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
+
+                      <td className="whitespace-nowrap px-6 py-4 text-right">
                         <span
-                          className={`text-sm ${
+                          className={`text-sm font-medium ${
                             transaction.type === "income"
                               ? "text-green-600"
                               : "text-red-600"
@@ -340,19 +323,23 @@ export function Transactions() {
                           {formatCurrency(transaction.amount)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
+
+                      <td className="whitespace-nowrap px-6 py-4 text-center">
                         <div className="flex items-center justify-center gap-2">
                           <button
+                            type="button"
                             onClick={() => setEditingTransaction(transaction)}
-                            className="p-2 rounded-lg text-gray-600 hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                            className="flex h-9 w-9 items-center justify-center rounded-xl !bg-gray-100 text-gray-500 transition hover:!bg-orange-100 hover:text-orange-600"
                           >
-                            <Edit2 className="w-4 h-4" />
+                            <Edit2 className="h-4 w-4" />
                           </button>
+
                           <button
+                            type="button"
                             onClick={() => setDeletingTransaction(transaction)}
-                            className="p-2 rounded-lg text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors"
+                            className="flex h-9 w-9 items-center justify-center rounded-xl !bg-gray-100 text-gray-500 transition hover:!bg-red-100 hover:text-red-600"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                       </td>
@@ -365,7 +352,6 @@ export function Transactions() {
         </div>
       </div>
 
-      {/* Modals */}
       {showAddTransaction && (
         <AddTransactionModal
           onClose={() => setShowAddTransaction(false)}
