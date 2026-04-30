@@ -244,20 +244,25 @@ export function FinanceAIChatbox() {
         </div>
         <div className="mt-2 flex flex-wrap gap-2">
           <button
+            type="button"
             onClick={() => setInputValue("Phân tích chi tiêu của tôi")}
-            className="text-xs px-3 py-1 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+            className="rounded-full !bg-gray-100 px-3 py-1 text-xs text-gray-700 transition hover:!bg-gray-200"
           >
             💡 Phân tích chi tiêu
           </button>
+
           <button
+            type="button"
             onClick={() => setInputValue("Làm sao để tiết kiệm hơn?")}
-            className="text-xs px-3 py-1 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+            className="rounded-full !bg-gray-100 px-3 py-1 text-xs text-gray-700 transition hover:!bg-gray-200"
           >
             💰 Lời khuyên tiết kiệm
           </button>
+
           <button
+            type="button"
             onClick={() => setInputValue("Đưa ra mục tiêu tài chính")}
-            className="text-xs px-3 py-1 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+            className="rounded-full !bg-gray-100 px-3 py-1 text-xs text-gray-700 transition hover:!bg-gray-200"
           >
             🎯 Mục tiêu tài chính
           </button>

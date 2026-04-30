@@ -14,11 +14,8 @@ export function Accounts() {
 
   useEffect(() => {
     const unsubscribe = accountStore.subscribe(setAccounts);
-
     return () => {
-      if (typeof unsubscribe === "function") {
-        unsubscribe();
-      }
+      if (typeof unsubscribe === "function") unsubscribe();
     };
   }, []);
 
@@ -38,19 +35,19 @@ export function Accounts() {
   };
 
   const handleEditAccount = (accountData: any) => {
-    if (editingAccount) {
-      accountStore.update(editingAccount.id, accountData);
-      setEditingAccount(null);
-      toast.success(`Đã cập nhật tài khoản "${accountData.name}" thành công!`);
-    }
+    if (!editingAccount) return;
+
+    accountStore.update(editingAccount.id, accountData);
+    setEditingAccount(null);
+    toast.success(`Đã cập nhật tài khoản "${accountData.name}" thành công!`);
   };
 
   const handleDeleteAccount = () => {
-    if (deletingAccount) {
-      accountStore.remove(deletingAccount.id);
-      toast.success(`Đã xóa tài khoản "${deletingAccount.name}" thành công!`);
-      setDeletingAccount(null);
-    }
+    if (!deletingAccount) return;
+
+    accountStore.remove(deletingAccount.id);
+    toast.success(`Đã xóa tài khoản "${deletingAccount.name}" thành công!`);
+    setDeletingAccount(null);
   };
 
   const formatCurrency = (amount: number) => {
@@ -93,112 +90,114 @@ export function Accounts() {
 
   return (
     <>
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <h1 className="text-3xl text-gray-800 mb-1">Tài khoản</h1>
+            <h1 className="mb-1 text-4xl font-bold text-gray-900">Tài khoản</h1>
             <p className="text-gray-600">Quản lý các tài khoản và ví của bạn</p>
           </div>
 
           <button
+            type="button"
             onClick={() => setShowAddAccount(true)}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-400 to-rose-400 text-white rounded-xl hover:from-orange-500 hover:to-rose-500 transition-all shadow-lg hover:shadow-xl"
+            className="inline-flex items-center justify-center gap-2 rounded-xl !bg-gradient-to-r !from-orange-400 !to-rose-400 px-6 py-3 font-semibold text-white shadow-lg transition hover:!from-orange-500 hover:!to-rose-500"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="h-5 w-5" />
             Thêm tài khoản
           </button>
         </div>
 
-        <div className="bg-gradient-to-br from-orange-400 to-rose-400 rounded-2xl p-8 mb-8 shadow-xl">
-          <div className="flex items-center gap-3 mb-4">
-            <Wallet className="w-8 h-8 text-white" />
-            <p className="text-white text-opacity-90">Tổng số dư</p>
+        <div className="mb-8 rounded-3xl !bg-gradient-to-br !from-orange-400 !to-rose-400 p-8 shadow-xl">
+          <div className="mb-4 flex items-center gap-3">
+            <Wallet className="h-8 w-8 text-white" />
+            <p className="text-white/90">Tổng số dư</p>
           </div>
 
-          <p className="text-4xl text-white mb-2">
+          <p className="mb-2 text-4xl font-semibold text-white">
             {formatCurrency(totalBalance)}
           </p>
 
-          <p className="text-white text-opacity-75">
-            Từ {accounts.length} tài khoản
-          </p>
+          <p className="text-white/75">Từ {accounts.length} tài khoản</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {accounts.map((account) => (
-            <div
-              key={account.id}
-              className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="text-4xl">{account.icon}</div>
-
-                  <div>
-                    <h3 className="text-lg text-gray-800 mb-1">
-                      {account.name}
-                    </h3>
-
-                    <span
-                      className={`text-xs px-2 py-1 rounded-full ${getTypeColor(
-                        account.type
-                      )}`}
-                    >
-                      {getTypeLabel(account.type)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mb-4">
-                <p className="text-sm text-gray-600 mb-1">Số dư</p>
-                <p className="text-2xl text-gray-800">
-                  {formatCurrency(account.balance)}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2 pt-4 border-t border-gray-200">
-                <button
-                  onClick={() => setEditingAccount(account)}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
-                >
-                  <Edit2 className="w-4 h-4" />
-                  <span className="text-sm">Sửa</span>
-                </button>
-
-                <button
-                  onClick={() => setDeletingAccount(account)}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span className="text-sm">Xóa</span>
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {accounts.length === 0 && (
-          <div className="bg-white rounded-2xl p-12 shadow-lg border border-gray-100 text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
-              <Wallet className="w-8 h-8 text-gray-400" />
+        {accounts.length === 0 ? (
+          <div className="rounded-2xl border border-gray-100 bg-white p-12 text-center shadow-lg">
+            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+              <Wallet className="h-8 w-8 text-gray-400" />
             </div>
 
-            <h3 className="text-xl text-gray-800 mb-2">
+            <h3 className="mb-2 text-xl font-semibold text-gray-800">
               Chưa có tài khoản nào
             </h3>
 
-            <p className="text-gray-600 mb-6">
+            <p className="mb-6 text-gray-600">
               Thêm tài khoản đầu tiên để bắt đầu quản lý tài chính
             </p>
 
             <button
+              type="button"
               onClick={() => setShowAddAccount(true)}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-400 to-rose-400 text-white rounded-xl hover:from-orange-500 hover:to-rose-500 transition-all shadow-lg"
+              className="inline-flex items-center justify-center gap-2 rounded-xl !bg-gradient-to-r !from-orange-400 !to-rose-400 px-6 py-3 font-semibold text-white shadow-lg transition hover:!from-orange-500 hover:!to-rose-500"
             >
-              <Plus className="w-5 h-5" />
+              <Plus className="h-5 w-5" />
               Thêm tài khoản
             </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {accounts.map((account) => (
+              <div
+                key={account.id}
+                className="rounded-2xl border border-gray-100 bg-white p-6 shadow-lg transition hover:shadow-xl"
+              >
+                <div className="mb-5 flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="text-4xl">{account.icon}</div>
+
+                    <div>
+                      <h3 className="mb-1 text-lg font-semibold text-gray-900">
+                        {account.name}
+                      </h3>
+
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-medium ${getTypeColor(
+                          account.type
+                        )}`}
+                      >
+                        {getTypeLabel(account.type)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mb-5">
+                  <p className="mb-1 text-sm text-gray-600">Số dư</p>
+                  <p className="text-2xl font-semibold text-gray-900">
+                    {formatCurrency(account.balance)}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 border-t border-gray-200 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setEditingAccount(account)}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl !bg-gray-100 px-4 py-3 text-gray-600 transition hover:!bg-orange-100 hover:text-orange-600"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                    <span className="text-sm font-medium">Sửa</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDeletingAccount(account)}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl !bg-gray-100 px-4 py-3 text-gray-600 transition hover:!bg-red-100 hover:text-red-600"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span className="text-sm font-medium">Xóa</span>
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
