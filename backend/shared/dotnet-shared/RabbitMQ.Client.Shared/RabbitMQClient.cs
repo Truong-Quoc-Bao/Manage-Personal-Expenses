@@ -49,7 +49,7 @@ namespace RabbitMQ.Client.Shared
 
             var json = JsonSerializer.Serialize(message, new JsonSerializerOptions 
             { 
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase 
+                PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower 
             });
             var body = Encoding.UTF8.GetBytes(json);
 

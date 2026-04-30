@@ -1,8 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace TransactionService.Core.Entities
 {
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public enum TransactionType
     {
         Income,
@@ -29,7 +31,7 @@ namespace TransactionService.Core.Entities
         public decimal Amount { get; set; }
 
         [Column("transaction_type")]
-        public TransactionType TransactionType { get; set; } = TransactionType.Expense;
+        public TransactionType TransactionType { get; set; }
 
         [MaxLength(255)]
         [Column("description")]

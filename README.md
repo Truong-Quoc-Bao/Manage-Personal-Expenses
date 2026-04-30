@@ -21,8 +21,9 @@
 │   │   │   │   │   ├── 📄 transaction-created.consumer.js
 │   │   │   │   │   ├── 📄 transaction-deleted.consumer.js
 │   │   │   │   │   └── 📄 transaction-updated.consumer.js
-│   │   │   │   └── 📁 publishers
-│   │   │   │       └── 📄 balance-update.publisher.js
+│   │   │   │   ├── 📁 publishers
+│   │   │   │   │   └── 📄 balance-update.publisher.js
+│   │   │   │   └── 📄 index.js
 │   │   │   ├── 📁 generated
 │   │   │   │   └── 📁 prisma
 │   │   │   │       ├── 📁 internal
@@ -37,6 +38,8 @@
 │   │   │   │       ├── 📄 enums.ts
 │   │   │   │       ├── 📄 models.ts
 │   │   │   │       └── 📄 query_engine-windows.dll.node
+│   │   │   ├── 📁 grpc
+│   │   │   │   └── 📄 account.grpc.js
 │   │   │   ├── 📁 middlewares
 │   │   │   │   ├── 📄 auth.middleware.js
 │   │   │   │   ├── 📄 error.middleware.js
@@ -53,7 +56,8 @@
 │   │   │   │   └── 📄 index.js
 │   │   │   ├── 📁 utils
 │   │   │   │   └── 📄 index.js
-│   │   │   └── 📁 validators
+│   │   │   └── 📁 validator
+│   │   │       ├── 📄 account.validator.js
 │   │   │       └── 📄 index.js
 │   │   ├── 📁 tests
 │   │   ├── ⚙️ .gitignore
@@ -63,6 +67,15 @@
 │   │   ├── ⚙️ package.json
 │   │   └── 📄 prisma.config.ts
 │   ├── 📁 analytics_service
+│   │   ├── 📁 database
+│   │   │   ├── 📄 init.mongo.js
+│   │   │   ├── 📄 seed.js
+│   │   │   ├── 📄 seed_anomaly_logs.js
+│   │   │   ├── 📄 seed_category_summary.js
+│   │   │   ├── 📄 seed_dashboard_cache.js
+│   │   │   ├── 📄 seed_monthly_reports.js
+│   │   │   ├── 📄 seed_spending_trends.js
+│   │   │   └── 📄 seed_user_analytics.js
 │   │   ├── 📁 src
 │   │   │   ├── 📁 config
 │   │   │   │   ├── 📄 database.js
@@ -73,12 +86,21 @@
 │   │   │   ├── 📁 dtos
 │   │   │   │   └── 📄 analytics.dto.js
 │   │   │   ├── 📁 events
-│   │   │   │   └── 📁 consumers
-│   │   │   │       └── 📄 transaction-events.consumer.js
+│   │   │   │   ├── 📁 consumers
+│   │   │   │   │   └── 📄 transaction-events.consumer.js
+│   │   │   │   └── 📄 index.js
 │   │   │   ├── 📁 middlewares
 │   │   │   │   ├── 📄 auth.middleware.js
 │   │   │   │   ├── 📄 error.middleware.js
 │   │   │   │   └── 📄 validation.middleware.js
+│   │   │   ├── 📁 model
+│   │   │   │   ├── 📄 anomalyLog.model.js
+│   │   │   │   ├── 📄 categorySummary.model.js
+│   │   │   │   ├── 📄 dashboardCache.model.js
+│   │   │   │   ├── 📄 index.js
+│   │   │   │   ├── 📄 monthlyReport.model.js
+│   │   │   │   ├── 📄 spendingTrend.model.js
+│   │   │   │   └── 📄 userAnalytics.model.js
 │   │   │   ├── 📁 repositories
 │   │   │   │   └── 📄 analytics.repository.js
 │   │   │   ├── 📁 routes
@@ -106,15 +128,16 @@
 │   │   │   │   │   └── 📄 ErrorHandlingMiddleware.cs
 │   │   │   │   ├── 📁 Properties
 │   │   │   │   │   └── ⚙️ launchSettings.json
+│   │   │   │   ├── 📁 Workers
+│   │   │   │   │   └── 📄 AuthBackgroundWorker.cs
 │   │   │   │   ├── 📄 AuthService.API.csproj
 │   │   │   │   ├── 📄 AuthService.API.http
-│   │   │   │   ├── 📄 Program.cs
-│   │   │   │   └── ⚙️ appsettings.json
+│   │   │   │   └── 📄 Program.cs
 │   │   │   ├── 📁 AuthService.Application
 │   │   │   │   ├── 📁 Mappings
 │   │   │   │   │   └── 📄 AutoMapper.cs
 │   │   │   │   ├── 📁 Services
-│   │   │   │   │   ├── 📄 AuthService.cs
+│   │   │   │   │   ├── 📄 AuthLogic.cs
 │   │   │   │   │   └── 📄 TokenService.cs
 │   │   │   │   ├── 📁 Validators
 │   │   │   │   │   └── 📄 index.cs
@@ -124,11 +147,15 @@
 │   │   │   │   ├── 📁 DTOs
 │   │   │   │   │   ├── 📄 LoginRequestDto.cs
 │   │   │   │   │   ├── 📄 LoginResponseDto.cs
-│   │   │   │   │   └── 📄 RegisterRequestDto.cs
+│   │   │   │   │   ├── 📄 RegisterRequestDto.cs
+│   │   │   │   │   ├── 📄 UserRegistrationConsumeEvent.cs
+│   │   │   │   │   └── 📄 UserRegistrationPublishEvent.cs
 │   │   │   │   ├── 📁 Entities
+│   │   │   │   │   ├── 📄 ApplicationUser.cs
 │   │   │   │   │   └── 📄 AuthSession.cs
 │   │   │   │   ├── 📁 Interfaces
 │   │   │   │   │   ├── 📄 IAuthRepository.cs
+│   │   │   │   │   ├── 📄 IAuthService.cs
 │   │   │   │   │   ├── 📄 IRabbitMQPublisher.cs
 │   │   │   │   │   └── 📄 ITokenService.cs
 │   │   │   │   ├── 📄 AuthService.Core.csproj
@@ -141,9 +168,20 @@
 │   │   │       │   └── 📄 ServiceCollectionExtensions.cs
 │   │   │       ├── 📁 MessageBroker
 │   │   │       │   └── 📄 RabbitMQPublisher.cs
+│   │   │       ├── 📁 Repositories
+│   │   │       │   └── 📄 AuthRepository.cs
 │   │   │       ├── 📄 AuthService.Infrastructure.csproj
 │   │   │       └── 📄 Class1.cs
 │   │   └── 🐳 Dockerfile
+│   ├── 📁 budget_service
+│   │   ├── 📁 prisma
+│   │   │   └── 📄 schema.prisma
+│   │   ├── ⚙️ .gitignore
+│   │   ├── 🐳 Dockerfile
+│   │   ├── 📄 app.js
+│   │   ├── ⚙️ package-lock.json
+│   │   ├── ⚙️ package.json
+│   │   └── 📄 prisma.config.ts
 │   ├── 📁 category_service
 │   │   ├── 📁 prisma
 │   │   │   └── 📄 schema.prisma
@@ -173,6 +211,8 @@
 │   │   │   │       ├── 📄 enums.ts
 │   │   │   │       ├── 📄 models.ts
 │   │   │   │       └── 📄 query_engine-windows.dll.node
+│   │   │   ├── 📁 grpc
+│   │   │   │   └── 📄 category.grpc.js
 │   │   │   ├── 📁 middlewares
 │   │   │   │   ├── 📄 auth.middleware.js
 │   │   │   │   ├── 📄 error.middleware.js
@@ -228,10 +268,11 @@
 │   │   │   ├── 📁 dtos
 │   │   │   │   └── 📄 notification.dto.js
 │   │   │   ├── 📁 events
-│   │   │   │   └── 📁 consumers
-│   │   │   │       ├── 📄 balance-update.consumer.js
-│   │   │   │       ├── 📄 transaction-created.consumer.js
-│   │   │   │       └── 📄 user-registered.consumer.js
+│   │   │   │   ├── 📁 consumers
+│   │   │   │   │   ├── 📄 balance-update.consumer.js
+│   │   │   │   │   ├── 📄 transaction-created.consumer.js
+│   │   │   │   │   └── 📄 user-registered.consumer.js
+│   │   │   │   └── 📄 index.js
 │   │   │   ├── 📁 jobs
 │   │   │   │   └── 📄 monthly-report.job.js
 │   │   │   ├── 📁 middlewares
@@ -268,6 +309,11 @@
 │   │   │       ├── 📄 IRabbitMQClient.cs
 │   │   │       ├── 📄 RabbitMQ.Client.Shared.csproj
 │   │   │       └── 📄 RabbitMQClient.cs
+│   │   ├── 📁 protos
+│   │   │   ├── 📄 account.proto
+│   │   │   ├── 📄 category.proto
+│   │   │   ├── 📄 index.js
+│   │   │   └── ⚙️ package.json
 │   │   └── 📁 rabbitmq-client
 │   │       ├── 📁 src
 │   │       │   └── 📄 index.js
@@ -279,21 +325,20 @@
 │   │   │   │   ├── 📁 Controllers
 │   │   │   │   │   └── 📄 TransactionsController.cs
 │   │   │   │   ├── 📁 Filters
-│   │   │   │   │   └── 📄 ValidationFilter
+│   │   │   │   │   └── 📄 ValidationFilter.cs
 │   │   │   │   ├── 📁 Middlewares
-│   │   │   │   │   ├── 📄 ErrorHandlingMiddleware.cs
-│   │   │   │   │   └── 📄 JwtAuthMiddleware.cs
+│   │   │   │   │   └── 📄 ErrorHandlingMiddleware.cs
 │   │   │   │   ├── 📁 Properties
 │   │   │   │   │   └── ⚙️ launchSettings.json
+│   │   │   │   ├── 📁 Workers
+│   │   │   │   │   └── 📄 TransactionBackgroundWorker.cs
 │   │   │   │   ├── 📄 Program.cs
 │   │   │   │   ├── 📄 TransactionService.API.csproj
-│   │   │   │   ├── 📄 TransactionService.API.http
-│   │   │   │   └── ⚙️ appsettings.json
+│   │   │   │   └── 📄 TransactionService.API.http
 │   │   │   ├── 📁 TransactionService.Application
 │   │   │   │   ├── 📁 Mappings
-│   │   │   │   │   └── 📄 AutoMapper.cs
+│   │   │   │   │   └── 📄 AutoMapperTransaction.cs
 │   │   │   │   ├── 📁 Services
-│   │   │   │   │   ├── 📄 ITransactionService.cs
 │   │   │   │   │   └── 📄 TransactionService.cs
 │   │   │   │   ├── 📁 Validators
 │   │   │   │   │   └── 📄 CreateTransactionValidator.cs
@@ -301,29 +346,33 @@
 │   │   │   │   └── 📄 TransactionService.Application.csproj
 │   │   │   ├── 📁 TransactionService.Core
 │   │   │   │   ├── 📁 DTOs
-│   │   │   │   │   ├── 📄 CreateTransactionDto.cs
-│   │   │   │   │   └── 📄 TransactionDto.cs
+│   │   │   │   │   ├── 📄 CreateTransactionRequestDto.cs
+│   │   │   │   │   ├── 📄 CreateTransactionResponseDto.cs
+│   │   │   │   │   ├── 📄 TransactionDto.cs
+│   │   │   │   │   └── 📄 TransactionResponseDto.cs
 │   │   │   │   ├── 📁 Entities
 │   │   │   │   │   └── 📄 Transaction.cs
 │   │   │   │   ├── 📁 Exceptions
 │   │   │   │   │   └── 📄 BusinessException.cs
 │   │   │   │   ├── 📁 Interfaces
-│   │   │   │   │   ├── 📄 IMessagePublisher.cs
+│   │   │   │   │   ├── 📄 IAccountInternalService.cs
+│   │   │   │   │   ├── 📄 IRabbitMQPublisher.cs
 │   │   │   │   │   ├── 📄 ITransactionRepository.cs
-│   │   │   │   │   └── 📄 IUnitOfWork.cs
+│   │   │   │   │   └── 📄 ITransactionService.cs
 │   │   │   │   ├── 📄 Class1.cs
 │   │   │   │   └── 📄 TransactionService.Core.csproj
 │   │   │   └── 📁 TransactionService.Infrastructure
 │   │   │       ├── 📁 Data
-│   │   │       │   ├── 📁 Repositories
-│   │   │       │   │   └── 📄 TransactionRepository.cs
 │   │   │       │   ├── 📄 TransactionDbContexFactory.cs
 │   │   │       │   └── 📄 TransactionDbContext.cs
 │   │   │       ├── 📁 Extensions
 │   │   │       │   └── 📄 ServiceCollectionExtension.cs
 │   │   │       ├── 📁 MessageBroker
-│   │   │       │   ├── 📄 RabbitMQConfig.cs
 │   │   │       │   └── 📄 RabbitMQPublisher.cs
+│   │   │       ├── 📁 Repositories
+│   │   │       │   └── 📄 TransactionRepository.cs
+│   │   │       ├── 📁 Services
+│   │   │       │   └── 📄 AccountInternalService.cs
 │   │   │       ├── 📁 src
 │   │   │       │   ├── 📁 TransactionService
 │   │   │       │   │   └── 📁 Infrastructure
@@ -345,11 +394,14 @@
 │       │   ├── 📁 controllers
 │       │   │   └── 📄 user.controller.js
 │       │   ├── 📁 dtos
-│       │   │   └── 📄 user.dto.js
+│       │   │   ├── 📄 user.consume.dto.js
+│       │   │   ├── 📄 user.dto.js
+│       │   │   └── 📄 user.publish.event.js
 │       │   ├── 📁 events
 │       │   │   ├── 📁 consumer
 │       │   │   │   └── 📄 user-create.consumer.js
-│       │   │   └── 📄 index.js
+│       │   │   ├── 📄 index.js
+│       │   │   └── 📄 routingKey.config.js
 │       │   ├── 📁 middlewares
 │       │   │   ├── 📄 auth.middleware.js
 │       │   │   ├── 📄 error.middleware.js
@@ -376,8 +428,10 @@
 │       ├── ⚙️ package.json
 │       └── 📄 prisma.config.ts
 ├── 📁 data
+│   ├── 📄 analytics_schema.js
+│   ├── 📄 schema_test.sql
 │   ├── 📄 transactions_2025_jan_oct.sql
-│   └── 📄 transactions_v2.sql
+│   └── 📄 transactions_with_user_id.sql
 ├── 📁 frontend
 │   ├── 📁 public
 │   │   └── 🖼️ vite.svg
@@ -399,6 +453,5 @@
 ├── ⚙️ .gitignore
 ├── 📝 README.md
 ├── ⚙️ docker-compose.yml
-├── ⚙️ package-lock.json
-└── 📄 schema_test.sql
+└── ⚙️ package-lock.json
 ```

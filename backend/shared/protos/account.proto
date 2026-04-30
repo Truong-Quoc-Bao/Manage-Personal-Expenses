@@ -8,11 +8,10 @@ service AccountProtoService {
 
 message GetAccountRequest {
   string account_id = 1;
-  double amount_to_check = 2;
+  string user_id = 2;
 }
 
 message AccountResponse {
   bool exists = 1;
-  bool has_enough_balance = 2;
-  string message = 3;
+  string message = 2;
 }

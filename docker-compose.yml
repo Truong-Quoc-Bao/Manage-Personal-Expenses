@@ -246,16 +246,6 @@ services:
       - .env
     ports:
       - "${GATEWAY_PORT}:3000"
-    environment:
-      - NODE_ENV=development
-      - JWT_SECRET=${JWT_SECRET}
-      - AUTH_SERVICE_URL=${AUTH_SERVICE_URL}
-      - USER_SERVICE_URL=${USER_SERVICE_URL}
-      - ACCOUNT_SERVICE_URL=${ACCOUNT_SERVICE_URL}
-      - TRANSACTION_SERVICE_URL=${TRANSACTION_SERVICE_URL}
-      - CATEGORY_SERVICE_URL=${CATEGORY_SERVICE_URL}
-      - ANALYTICS_SERVICE_URL=${ANALYTICS_SERVICE_URL}
-      - NOTIFICATION_SERVICE_URL=${NOTIFICATION_SERVICE_URL}
     depends_on:
       - auth-service
       - user-service
@@ -264,6 +254,7 @@ services:
       - category-service
       - analytics-service
       - notification-service
+      - budget-service
     networks:
       - finance-network
     volumes:

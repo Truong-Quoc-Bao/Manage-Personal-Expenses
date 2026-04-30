@@ -1,6 +1,6 @@
 using System.Net;
 
-namespace AuthService.API.Middlewares
+namespace TransactionService.API.Middlewares
 {
     public class ErrorHandlingMiddleware
     {

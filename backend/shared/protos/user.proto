@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+option csharp_namespace = "Auth.Infrastructure.Protos";
+
+service UserProtoService {
+  rpc GetUserStatus (GetUserRequest) returns (UserResponse);
+}
+
+message GetUserRequest {
+  string email = 1;
+}
+
+message UserResponse {
+  bool exists = 1;
+  string message = 2;
+}

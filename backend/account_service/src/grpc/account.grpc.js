@@ -3,6 +3,7 @@ const protoLoader = require('@grpc/proto-loader');
 const path = require('path');
 const { ACCOUNT_PROTO_PATH } = require('protos');
 const ACCOUNT_PROTO_PORT = process.env.GRPC_ACCOUNT_SERVICE_PORT;
+const accountService = require('../services/account.service');
 
 const packageDefinition = protoLoader.loadSync(ACCOUNT_PROTO_PATH, {
     keepCase: true,
@@ -16,22 +17,15 @@ const accountProto = grpc.loadPackageDefinition(packageDefinition).AccountProtoS
 
 const getAccountStatus = async (call, callback) => {
     try {
-        const { account_id, amount_to_check } = call.request;
-        console.log(`Received gRPC request for account_id: ${account_id}, amount_to_check: ${amount_to_check}`);
+        const { account_id, user_id } = call.request;
+        console.log(`Received gRPC request for account_id: ${account_id}, user_id: ${user_id}`);
         
-        // const account = await accountService.getAccountById(account_id);
-
-        // if (!account) {
-        //     return callback(null, { exists: false, has_enough_balance: false, message: "Account not found" });
-        // }
-
-        // const hasBalance = account.balance >= amount_to_check;
+        const exists = await accountService.checkExistAccount(account_id, user_id);
         
-        // callback(null, {
-        //     exists: true,
-        //     has_enough_balance: hasBalance,
-        //     message: hasBalance ? "Success" : "Insufficient balance"
-        // });
+        callback(null, {
+            exists: exists,
+            message: exists ? "Account exists" : "Account not found"
+        });
     } catch (error) {
         callback({
             code: grpc.status.INTERNAL,

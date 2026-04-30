@@ -48,7 +48,7 @@ namespace AuthService.Application.Services
                     createdAt = DateTime.UtcNow
                 };
 
-                await _rabbitMQPublisher.PublishAsync(userCreatedEvent, "user.user_create");
+                await _rabbitMQPublisher.PublishAsync(userCreatedEvent, "user.user_created");
             }
 
             return result;

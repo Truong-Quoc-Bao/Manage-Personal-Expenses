@@ -10,6 +10,7 @@ using TransactionService.Core.Interfaces;
 using TransactionService.Infrastructure.MessageBroker;
 using TransactionService.Infrastructure.Protos;
 using TransactionService.Infrastructure.Services;
+using TransactionService.Infrastructure.Repositories;
 
 namespace TransactionService.Infrastructure.Extensions
 {
@@ -24,6 +25,8 @@ namespace TransactionService.Infrastructure.Extensions
 
             services.AddScoped<IRabbitMQPublisher, RabbitMQPublisher>();
 
+            services.AddScoped<ITransactionRepository, TransactionRepository>();
+
             services.AddDbContext<TransactionDbContext>(options =>
             {
                 options.UseNpgsql(connectionString, npgsqlOptions =>
@@ -32,18 +35,6 @@ namespace TransactionService.Infrastructure.Extensions
                     npgsqlOptions.CommandTimeout(30);
                 });
             });
-
-            services.AddAuthentication("Bearer")
-                .AddJwtBearer("Bearer", options => options.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuer = true,
-                    ValidateAudience = true,
-                    ValidateLifetime = true,
-                    ValidateIssuerSigningKey = true,
-                    ValidIssuer = configuration["Jwt:Issuer"],
-                    ValidAudience = configuration["Jwt:Audience"],
-                    IssuerSigningKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(configuration["Jwt:SecretKey"])),                    
-                });
 
             services.AddGrpcClient<CategoryProtoService.CategoryProtoServiceClient>(options =>
             {
@@ -56,6 +47,8 @@ namespace TransactionService.Infrastructure.Extensions
             });
                 
             services.AddScoped<IAccountInternalService, AccountInternalService>();
+
+            services.AddScoped<ICategoryInternalService, CategoryInternalService>();
 
             return services;
         }

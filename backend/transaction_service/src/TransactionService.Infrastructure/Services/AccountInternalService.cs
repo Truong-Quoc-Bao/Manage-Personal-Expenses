@@ -12,21 +12,23 @@ namespace TransactionService.Infrastructure.Services
             _accountClient = accountClient;
         }
 
-        public async Task<(bool Exists, bool HasBalance)> ValidateAccountAsync(Guid accountId, decimal amount)
+        public async Task<bool> ValidateAccountAsync(Guid accountId, Guid userId)
         {
             var request = new GetAccountRequest
             {
                 AccountId = accountId.ToString(),
-                AmountToCheck = (double)amount
+                UserId = userId.ToString()
             };
             try 
             {
                 var response = await _accountClient.GetAccountStatusAsync(request);
-                return (response.Exists, response.HasEnoughBalance);
+                Console.WriteLine($"Account Service response: Message={response.Message}, Exists={response.Exists}");
+                return response.Exists;
             }
             catch (Exception ex)
             {
-                return (false, false);
+                Console.WriteLine($"Error calling Account Service: {ex.Message}");
+                return false;
             }
         }
     }

@@ -8,9 +8,11 @@ service CategoryProtoService {
 
 message GetCategoryRequest {
   string category_id = 1;
+  string user_id = 2;
+  string transaction_type = 3;
 }
 
 message CategoryResponse {
-  bool exists = 1;
-  string message = 3;
+  bool valid = 1;
+  string message = 2;
 }

@@ -19,6 +19,16 @@ const findOneCategory = async (category_id) => {
   });
 };
 
+const findOneCategoryForTransactionCheck = async (category_id, user_id, type) => {
+  return prisma.category.findFirst({
+    where: {
+      category_id: category_id,
+      user_id: user_id,
+      type: type,
+    }
+  });
+};
+
 const createCategories = async ({ userId , cat }) => {
   console.log("Creating repo category with data:", { userId, cat }); // Debug log to check input data
   return prisma.category.create({
@@ -66,5 +76,6 @@ const deleteCategory = async (categoryId) => {
   });
 };
 module.exports = {
-  findCategories,createCategories,updateCategory,findOneCategory,deleteCategory
+  findCategories,createCategories,updateCategory,findOneCategory,deleteCategory,
+  findOneCategoryForTransactionCheck
 };

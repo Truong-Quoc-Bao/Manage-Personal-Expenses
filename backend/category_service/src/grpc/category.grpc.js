@@ -3,6 +3,7 @@ const protoLoader = require('@grpc/proto-loader');
 const path = require('path');
 const { CATEGORY_PROTO_PATH } = require('protos');
 const CATEGORY_PROTO_PORT = process.env.GRPC_CATEGORY_SERVICE_PORT;
+const categoryService = require('../services/category.service');
 
 const packageDefinition = protoLoader.loadSync(CATEGORY_PROTO_PATH, {
     keepCase: true,
@@ -16,22 +17,19 @@ const categoryProto = grpc.loadPackageDefinition(packageDefinition).CategoryProt
 
 const getCategoryStatus = async (call, callback) => {
     try {
-        const { category_id } = call.request;
-        console.log(`Received gRPC request for category_id: ${category_id}`);
-        
-        // const account = await accountService.getAccountById(account_id);
+        const { category_id, user_id, transaction_type } = call.request;
+        console.log(`Received gRPC request for category_id: ${category_id}, user_id: ${user_id}, transaction_type: ${transaction_type}`);
 
-        // if (!account) {
-        //     return callback(null, { exists: false, has_enough_balance: false, message: "Account not found" });
-        // }
+        const isValid = await categoryService.checkValidCategory({
+            categoryId: category_id,
+            userId: user_id,
+            transactionType: transaction_type
+        });
 
-        // const hasBalance = account.balance >= amount_to_check;
-        
-        // callback(null, {
-        //     exists: true,
-        //     has_enough_balance: hasBalance,
-        //     message: hasBalance ? "Success" : "Insufficient balance"
-        // });
+        callback(null, {
+            valid: isValid,
+            message: isValid ? "Category validation successful" : "Category validation failed"
+        });
     } catch (error) {
         callback({
             code: grpc.status.INTERNAL,

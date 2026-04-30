@@ -10,6 +10,8 @@ const {
   findTotalByUserId,
 } = require("../repositories/account.repository");
 
+const accountRepository = require("../repositories/account.repository");
+
 const getTotalBalanceService = async ({ userId }) => {
   if (!userId) {
     const error = new Error("userId is required");
@@ -203,10 +205,16 @@ const createNewAccount = async ({
   return create;
 };
 
+const checkExistAccount = async (accountId, userId) => {
+  const account = await accountRepository.findAccountForTransactionCheck({ accountId, userId });
+  return !!account;
+};
+
 module.exports = {
   createNewAccount,
   getAccountsServices,
   updateAccountServices,
   deleteAccountServices,
   getTotalBalanceService,
+  checkExistAccount,
 };
