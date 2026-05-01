@@ -1,5 +1,6 @@
 const rabbitMQClient = require("../../../shared/rabbitmq-client");
 const transactionCreatedConsumer = require("./consumers/transaction_created.consumer");
+const transactionUpdatedConsumer = require("./consumers/transaction_updated.consumer");
 
 async function startRabbitMQ() {
     try {
@@ -7,6 +8,8 @@ async function startRabbitMQ() {
         console.log("Connected to RabbitMQ");
 
         await rabbitMQClient.consume("transaction.created.queue", "transaction.created", transactionCreatedConsumer.handleTransactionCreated);
+        await rabbitMQClient.consume("transaction.updated.queue", "transaction.updated", transactionUpdatedConsumer.handleTransactionUpdated);
+
     } catch (err) {
         console.error("Failed to connect to RabbitMQ:", err);
         process.exit(1);

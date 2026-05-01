@@ -31,5 +31,17 @@ namespace TransactionService.Infrastructure.Repositories
             return transaction;
         }
 
+        public async Task<Transaction?> UpdateTransactionAsync(Guid userId, Guid transactionId, Transaction updatedTransaction)
+        {
+            var existingTransaction = await _context.Transactions.FirstOrDefaultAsync(t => t.UserId == userId && t.TransId == transactionId);
+            if (existingTransaction == null){
+                return null;
+            }
+
+            _context.Entry(existingTransaction).CurrentValues.SetValues(updatedTransaction);
+
+            await _context.SaveChangesAsync();
+            return existingTransaction;
+        }
     }
 }
