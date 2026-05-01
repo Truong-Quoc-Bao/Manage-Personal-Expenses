@@ -44,7 +44,6 @@ namespace TransactionService.Application.Services
         public async Task<TransactionResponseDto> CreateTransactionAsync(Guid userId, CreateTransactionRequestDto request)
         {
             var transactionEntity = _mapper.Map<Transaction>(request);
-            transactionEntity.UserId = userId;
 
             var accountCheck = await _accountInternalService.ValidateAccountAsync(transactionEntity.AccountId, userId);
             var categoryCheck = true;
@@ -59,6 +58,37 @@ namespace TransactionService.Application.Services
                 var createdTransaction = await _transactionRepository.CreateTransactionAsync(transactionEntity);
                 await _rabbitMQPublisher.PublishAsync(_mapper.Map<CreateTransactionEventDto>(createdTransaction), "transaction.created");
                 return _mapper.Map<TransactionResponseDto>(createdTransaction);
+            }
+
+            throw new Exception("Invalid transaction details");
+        }
+
+        public async Task<TransactionResponseDto> UpdateTransactionAsync(Guid userId, Guid transactionId, UpdateTransactionRequestDto request)
+        {
+            var transactionEntity = _mapper.Map<Transaction>(request);
+            transactionEntity.TransId = transactionId;
+
+            var accountCheck = await _accountInternalService.ValidateAccountAsync(transactionEntity.AccountId, userId);
+            var categoryCheck = true;
+
+            if(transactionEntity.CategoryId != null)
+            {
+                categoryCheck = await _categoryInternalService.ValidateCategoryAsync(transactionEntity.CategoryId.Value, userId, transactionEntity.TransactionType.ToString());
+            }
+
+            if(accountCheck && categoryCheck)
+            {
+                
+                var updatedTransaction = await _transactionRepository.UpdateTransactionAsync(userId, transactionId, transactionEntity);
+                if (updatedTransaction == null)
+                {
+                    throw new Exception("Transaction not found");
+                }
+
+                updatedTransaction.Amount = transactionEntity.Amount - updatedTransaction.Amount;
+
+                await _rabbitMQPublisher.PublishAsync(_mapper.Map<UpdateTransactionEventDto>(updatedTransaction), "transaction.updated");
+                return _mapper.Map<TransactionResponseDto>(updatedTransaction);
             }
 
             throw new Exception("Invalid transaction details");
