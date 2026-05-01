@@ -33,6 +33,7 @@ const {
   deleteAllCategorySummary,
   // Dashboard Cache
   getDashboardCache,
+  getDashboardCachebyAccount,
   upsertDashboardCache,
   invalidateDashboardCache,
   // Monthly Report
@@ -68,145 +69,149 @@ const {
 
 // USER ANALYTICS
 // GET    /                          → all user analytics
-// GET    /user_analytics/:accountId → get by accountId
-// POST   /user_analytics/:accountId → create
-// PUT    /user_analytics/:accountId → update
-// DELETE /user_analytics/:accountId → delete
+// GET    /user_analytics/:userId → get by userId
+// POST   /user_analytics/:userId → create
+// PUT    /user_analytics/:userId → update
+// DELETE /user_analytics/:userId → delete
 // ================================================================
 router.get('/', getAllUserAnalytics);
  
-router.get('/user_analytics/:accountId',    getUserAnalytics);
-// router.post('/user_analytics/:accountId',   createUserAnalytics);
-// router.put('/user_analytics/:accountId',    updateUserAnalytics);
-// router.delete('/user_analytics/:accountId', deleteUserAnalytics);
+router.get('/user_analytics/:userId',    getUserAnalytics);
+// router.post('/user_analytics/:userId',   createUserAnalytics);
+// router.put('/user_analytics/:userId',    updateUserAnalytics);
+router.put('/user_analytics',    updateUserAnalytics);
+
+// router.delete('/user_analytics/:userId', deleteUserAnalytics);
  
 // ================================================================
 // ANOMALY LOGS
-// GET    /anomaly_logs/:accountId           → all logs for account
-// GET    /anomaly_logs/:accountId/unread    → unread logs
-// GET    /anomaly_logs/:accountId/unread/count → count unread
+// GET    /anomaly_logs/:userId           → all logs for account
+// GET    /anomaly_logs/:userId/unread    → unread logs
+// GET    /anomaly_logs/:userId/unread/count → count unread
 // GET    /anomaly_logs/detail/:logId        → get single log by _id
-// POST   /anomaly_logs/:accountId           → create
+// POST   /anomaly_logs/:userId           → create
 // PUT    /anomaly_logs/detail/:logId        → update
-// PATCH  /anomaly_logs/:accountId/read_all  → mark all read
+// PATCH  /anomaly_logs/:userId/read_all  → mark all read
 // PATCH  /anomaly_logs/detail/:logId/dismiss → dismiss single
 // DELETE /anomaly_logs/detail/:logId        → delete single
-// DELETE /anomaly_logs/:accountId           → delete all for account
+// DELETE /anomaly_logs/:userId           → delete all for account
 // ================================================================
-router.get('/anomaly_logs/:accountId',              getAnomalyLogs);
-router.get('/anomaly_logs/:accountId/unread',       getUnreadAnomalyLogs);
-router.get('/anomaly_logs/:accountId/unread/count', countUnreadAnomalyLogs);
+router.get('/anomaly_logs/:userId/unread/count', countUnreadAnomalyLogs);
+router.get('/anomaly_logs/:userId/unread',       getUnreadAnomalyLogs);
+router.get('/anomaly_logs/:userId',              getAnomalyLogs);
 router.get('/anomaly_logs/detail/:logId',           getAnomalyLogById);
  
-// router.post('/anomaly_logs/:accountId', createAnomalyLog);
+// router.post('/anomaly_logs/:userId', createAnomalyLog);
  
 // router.put('/anomaly_logs/detail/:logId', updateAnomalyLog);
  
-// router.patch('/anomaly_logs/:accountId/read_all',    markAllAnomalyLogsRead);
+// router.patch('/anomaly_logs/:userId/read_all',    markAllAnomalyLogsRead);
 // router.patch('/anomaly_logs/detail/:logId/dismiss',  dismissAnomalyLog);
  
 // router.delete('/anomaly_logs/detail/:logId', deleteAnomalyLog);
-// router.delete('/anomaly_logs/:accountId',    deleteAllAnomalyLogs);
+// router.delete('/anomaly_logs/:userId',    deleteAllAnomalyLogs);
  
 // ================================================================
 // CATEGORY SUMMARY
-// GET    /category_summary/:accountId              → all for account
-// GET    /category_summary/:accountId/by_month     → ?year=&month=
-// GET    /category_summary/:accountId/over_budget  → over budget list
+// GET    /category_summary/:userId              → all for account
+// GET    /category_summary/:userId/by_month     → ?year=&month=
+// GET    /category_summary/:userId/over_budget  → over budget list
 // GET    /category_summary/detail/:id              → single by _id
-// POST   /category_summary/:accountId              → create
-// PUT    /category_summary/:accountId/upsert       → upsert by (account,category,year,month)
+// POST   /category_summary/:userId              → create
+// PUT    /category_summary/:userId/upsert       → upsert by (account,category,year,month)
 // PUT    /category_summary/detail/:id              → update by _id
 // DELETE /category_summary/detail/:id              → delete single
-// DELETE /category_summary/:accountId              → delete all for account
+// DELETE /category_summary/:userId              → delete all for account
 // ================================================================
-router.get('/category_summary/:accountId',             getCategorySummary);
-router.get('/category_summary/:accountId/by_month',    getCategorySummaryByMonth);
-router.get('/category_summary/:accountId/over_budget', getOverBudgetCategories);
+router.get('/category_summary/:userId/by_month',    getCategorySummaryByMonth);
+router.get('/category_summary/:userId/over_budget', getOverBudgetCategories);
+router.get('/category_summary/:userId',             getCategorySummary);
 router.get('/category_summary/detail/:id',             getCategorySummaryById);
  
-// router.post('/category_summary/:accountId', createCategorySummary);
+// router.post('/category_summary/:userId', createCategorySummary);
  
-// router.put('/category_summary/:accountId/upsert', upsertCategorySummary);
+router.put('/category_summary/:userId/upsert', upsertCategorySummary);
 // router.put('/category_summary/detail/:id',        updateCategorySummary);
  
 // router.delete('/category_summary/detail/:id', deleteCategorySummary);
-// router.delete('/category_summary/:accountId', deleteAllCategorySummary);
+// router.delete('/category_summary/:userId', deleteAllCategorySummary);
  
 // ================================================================
 // DASHBOARD CACHE
-// GET    /dashboard_cache/:accountId → get cache (null if expired)
-// PUT    /dashboard_cache/:accountId → upsert cache
-// DELETE /dashboard_cache/:accountId → invalidate cache
+// GET    /dashboard_cache/:userId → get cache (null if expired)
+// PUT    /dashboard_cache/:userId → upsert cache
+// DELETE /dashboard_cache/:userId → invalidate cache
 // ================================================================
-router.get('/dashboard_cache/:accountId',    getDashboardCache);
-// router.put('/dashboard_cache/:accountId',    upsertDashboardCache);
-// router.delete('/dashboard_cache/:accountId', invalidateDashboardCache);
+router.get('/dashboard_cache/account/:accountId',    getDashboardCachebyAccount);
+router.get('/dashboard_cache/:userId',    getDashboardCache);
+
+router.put('/dashboard_cache/:userId',    upsertDashboardCache);
+// router.delete('/dashboard_cache/:userId', invalidateDashboardCache);
  
 // ================================================================
 // MONTHLY REPORT
-// GET    /monthly_reports/:accountId           → all reports
-// GET    /monthly_reports/:accountId/by_month  → ?year=&month=
-// GET    /monthly_reports/:accountId/recent    → ?limit=
+// GET    /monthly_reports/:userId           → all reports
+// GET    /monthly_reports/:userId/by_month  → ?year=&month=
+// GET    /monthly_reports/:userId/recent    → ?limit=
 // GET    /monthly_reports/detail/:id           → single by _id
-// POST   /monthly_reports/:accountId           → create
-// PUT    /monthly_reports/:accountId/upsert    → upsert by (account,year,month)
+// POST   /monthly_reports/:userId           → create
+// PUT    /monthly_reports/:userId/upsert    → upsert by (account,year,month)
 // PUT    /monthly_reports/detail/:id           → update by _id
 // DELETE /monthly_reports/detail/:id           → delete single
-// DELETE /monthly_reports/:accountId           → delete all for account
+// DELETE /monthly_reports/:userId           → delete all for account
 // ================================================================
-router.get('/monthly_reports/:accountId',          getMonthlyReport);
-router.get('/monthly_reports/:accountId/by_month', getMonthlyReportByMonth);
-router.get('/monthly_reports/:accountId/recent',   getRecentMonthlyReports);
+router.get('/monthly_reports/:userId/by_month', getMonthlyReportByMonth);
+router.get('/monthly_reports/:userId/recent',   getRecentMonthlyReports); //lấy báo cáo theo những tháng trước   
+router.get('/monthly_reports/:userId',          getMonthlyReport);
 router.get('/monthly_reports/detail/:id',          getMonthlyReportById);
  
-// router.post('/monthly_reports/:accountId', createMonthlyReport);
+// router.post('/monthly_reports/:userId', createMonthlyReport);
  
-// router.put('/monthly_reports/:accountId/upsert', upsertMonthlyReport);
+router.put('/monthly_reports/:userId/upsert', upsertMonthlyReport);
 // router.put('/monthly_reports/detail/:id',        updateMonthlyReport);
  
 // router.delete('/monthly_reports/detail/:id', deleteMonthlyReport);
-// router.delete('/monthly_reports/:accountId', deleteAllMonthlyReports);
+// router.delete('/monthly_reports/:userId', deleteAllMonthlyReports);
  
 // ================================================================
 // SPENDING TREND
-// GET    /spending_trends/:accountId                        → all for account
-// GET    /spending_trends/:accountId/category/:categoryId  → by (account, category)
+// GET    /spending_trends/:userId                        → all for account
+// GET    /spending_trends/:userId/category/:categoryId  → by (account, category)
 // GET    /spending_trends/detail/:id                       → single by _id
-// POST   /spending_trends/:accountId                       → create
-// PUT    /spending_trends/:accountId/upsert                → upsert by (account, category)
+// POST   /spending_trends/:userId                       → create
+// PUT    /spending_trends/:userId/upsert                → upsert by (account, category)
 // PUT    /spending_trends/detail/:id                       → update by _id
 // DELETE /spending_trends/detail/:id                       → delete single
-// DELETE /spending_trends/:accountId                       → delete all for account
+// DELETE /spending_trends/:userId                       → delete all for account
 // ================================================================
-router.get('/spending_trends/:accountId',                       getSpendingTrend);
-router.get('/spending_trends/:accountId/category/:categoryId',  getSpendingTrendByCategory);
+router.get('/spending_trends/:userId',                       getSpendingTrend);
+router.get('/spending_trends/:userId/category/:categoryId',  getSpendingTrendByCategory);
 router.get('/spending_trends/detail/:id',                       getSpendingTrendById);
  
-// router.post('/spending_trends/:accountId', createSpendingTrend);
+// router.post('/spending_trends/:userId', createSpendingTrend);
  
-// router.put('/spending_trends/:accountId/upsert', upsertSpendingTrend);
+// router.put('/spending_trends/:userId/upsert', upsertSpendingTrend);
 // router.put('/spending_trends/detail/:id',        updateSpendingTrend);
  
 // router.delete('/spending_trends/detail/:id', deleteSpendingTrend);
-// router.delete('/spending_trends/:accountId', deleteAllSpendingTrends);
+// router.delete('/spending_trends/:userId', deleteAllSpendingTrends);
  
 // ================================================================
 // TRANSACTIONS
-// GET    /transactions/:accountId                      → list (with ?limit=&skip=)
-// GET    /transactions/:accountId/date_range           → ?from=&to=
-// GET    /transactions/:accountId/category/:categoryId → by category
+// GET    /transactions/:userId                      → list (with ?limit=&skip=)
+// GET    /transactions/:userId/date_range           → ?from=&to=
+// GET    /transactions/:userId/category/:categoryId → by category
 // GET    /transactions/detail/:transId                 → single by trans_id
-// POST   /transactions/:accountId                      → create
+// POST   /transactions/:userId                      → create
 // PUT    /transactions/detail/:transId                 → update
 // DELETE /transactions/detail/:transId                 → delete
 // ================================================================
-router.get('/transactions/:accountId',                      getTransactions);
-router.get('/transactions/:accountId/date_range',           getTransactionsByDateRange);
-router.get('/transactions/:accountId/category/:categoryId', getTransactionsByCategory);
+router.get('/transactions/:userId/date_range',           getTransactionsByDateRange);
+router.get('/transactions/:userId/category/:categoryId', getTransactionsByCategory);
+router.get('/transactions/:userId',                      getTransactions);
 router.get('/transactions/detail/:transId',                 getTransactionByTransId);
  
-// router.post('/transactions/:accountId', createTransaction);
+// router.post('/transactions/:userId', createTransaction);
  
 // router.put('/transactions/detail/:transId', updateTransaction);
  

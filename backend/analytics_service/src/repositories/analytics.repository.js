@@ -1,13 +1,13 @@
 'use strict';
 
-const user_analytics  = require('../model/userAnalytics.model.js');
+const user_analytics = require('../model/userAnalytics.model.js');
 const anomaly_logs = require('../model/anomalyLog.model.js');
 const category_summary = require('../model/categorySummary.model.js');
-const dashboard_cache  = require('../model/dashboardCache.model.js');
-const monthly_reports  = require('../model/monthlyReport.model.js');
-const spending_trends  = require('../model/spendingTrend.model.js');
-const accounts  = require('../model/account.model.js');
-const transaction  = require('../model/transaction.model.js');
+const dashboard_cache = require('../model/dashboardCache.model.js');
+const monthly_reports = require('../model/monthlyReport.model.js');
+const spending_trends = require('../model/spendingTrend.model.js');
+const accounts = require('../model/account.model.js');
+const transaction = require('../model/transaction.model.js');
 
 
 
@@ -16,72 +16,79 @@ const repo = {
   // ================================================================
   // ACCOUNT
   // ================================================================
-  findAccountByAccountId: async (accountId) => {
-    return await accounts.findOne({ account_id: accountId }).lean();
+  findAccountByuserId: async (userId) => {
+    return await accounts.findOne({ user_id: userId }).lean();
   },
- 
+
   // ================================================================
   // USER ANALYTICS
   // ================================================================
-  findUserAnalyticsByAccountId: async (accountId) => {
-    return await user_analytics.findOne({ account_id: accountId }).lean();
+  findUserAnalyticsByuserId: async (userId) => {
+    return await user_analytics.findOne({ user_id: userId }).lean();
   },
- 
+
   findAllUserAnalytics: async () => {
     return await user_analytics.find().lean();
   },
- 
+
   createUserAnalytics: async (data) => {
     return await user_analytics.create(data);
   },
- 
-  updateUserAnalyticsByAccountId: async (accountId, updateData) => {
+
+  // updateUserAnalyticsByuserId: async (userId, updateData) => {
+  //   return await user_analytics.findOneAndUpdate(
+  //     { user_id: userId },
+  //     { $set: updateData },
+  //     { new: true, runValidators: true }
+  //   ).lean();
+  // },
+  updateUserAnalyticsByuserId: async (userId, updateData, options = {}) => {
     return await user_analytics.findOneAndUpdate(
-      { account_id: accountId },
-      { $set: updateData },
-      { new: true, runValidators: true }
+      { user_id: userId },
+      updateData, // ❗ KHÔNG wrap $set nữa
+      { new: true, runValidators: true, ...options }
     ).lean();
   },
- 
-  deleteUserAnalyticsByAccountId: async (accountId) => {
-    return await user_analytics.findOneAndDelete({ account_id: accountId }).lean();
+
+  deleteUserAnalyticsByuserId: async (userId) => {
+    return await user_analytics.findOneAndDelete({ user_id: userId }).lean();
   },
- 
+
   // ================================================================
   // ANOMALY LOGS
   // ================================================================
-  findAnomalyLogsByAccountId: async (accountId) => {
-    return await anomaly_logs.find({ account_id: accountId })
+  findAnomalyLogsByuserId: async (userId) => {
+    return await anomaly_logs.find({ user_id: userId })
       .sort({ detected_at: -1 })
       .lean();
   },
- 
+
   findAnomalyLogById: async (logId) => {
     return await anomaly_logs.findById(logId).lean();
   },
- 
-  findUnreadAnomalyLogsByAccountId: async (accountId) => {
+
+  findUnreadAnomalyLogsByuserId: async (userId) => {
     return await anomaly_logs.find({
-      account_id: accountId,
+      user_id: userId,
       is_read: false,
       is_dismissed: false,
     })
       .sort({ detected_at: -1 })
       .lean();
   },
- 
-  countUnreadAnomalyLogs: async (accountId) => {
+
+  countUnreadAnomalyLogs: async (userId) => {
     return await anomaly_logs.countDocuments({
-      account_id: accountId,
+      user_id: userId,
       is_read: false,
       is_dismissed: false,
     });
   },
- 
+
   createAnomalyLog: async (data) => {
     return await anomaly_logs.create(data);
   },
- 
+
   updateAnomalyLogById: async (logId, updateData) => {
     return await anomaly_logs.findByIdAndUpdate(
       logId,
@@ -89,14 +96,14 @@ const repo = {
       { new: true, runValidators: true }
     ).lean();
   },
- 
-  markAllAnomalyLogsRead: async (accountId) => {
+
+  markAllAnomalyLogsRead: async (userId) => {
     return await anomaly_logs.updateMany(
-      { account_id: accountId, is_read: false },
+      { user_id: userId, is_read: false },
       { $set: { is_read: true } }
     );
   },
- 
+
   dismissAnomalyLogById: async (logId) => {
     return await anomaly_logs.findByIdAndUpdate(
       logId,
@@ -104,52 +111,52 @@ const repo = {
       { new: true }
     ).lean();
   },
- 
+
   deleteAnomalyLogById: async (logId) => {
     return await anomaly_logs.findByIdAndDelete(logId).lean();
   },
- 
-  deleteAllAnomalyLogsByAccountId: async (accountId) => {
-    return await anomaly_logs.deleteMany({ account_id: accountId });
+
+  deleteAllAnomalyLogsByuserId: async (userId) => {
+    return await anomaly_logs.deleteMany({ user_id: userId });
   },
- 
+
   // ================================================================
   // CATEGORY SUMMARY
   // ================================================================
-  findCategorySummaryByAccountId: async (accountId) => {
-    return await category_summary.find({ account_id: accountId })
+  findCategorySummaryByuserId: async (userId) => {
+    return await category_summary.find({ user_id: userId })
       .sort({ year: -1, month: -1 })
       .lean();
   },
- 
-  findCategorySummaryByAccountMonth: async (accountId, year, month) => {
-    return await category_summary.find({ account_id: accountId, year, month })
+
+  findCategorySummaryByAccountMonth: async (userId, year, month) => {
+    return await category_summary.find({ user_id: userId, year, month })
       .sort({ total_amount: -1 })
       .lean();
   },
- 
+
   findCategorySummaryById: async (id) => {
     return await category_summary.findById(id).lean();
   },
- 
-  findOverBudgetByAccountId: async (accountId) => {
-    return await category_summary.find({ account_id: accountId, is_over_budget: true })
+
+  findOverBudgetByuserId: async (userId) => {
+    return await category_summary.find({ user_id: userId, is_over_budget: true })
       .sort({ year: -1, month: -1 })
       .lean();
   },
- 
+
   createCategorySummary: async (data) => {
     return await category_summary.create(data);
   },
- 
-  upsertCategorySummary: async (accountId, categoryId, year, month, data) => {
+
+  upsertCategorySummary: async (userId, categoryId, year, month, data) => {
     return await category_summary.findOneAndUpdate(
-      { account_id: accountId, category_id: categoryId, year, month },
-      { $set: data },
+      { user_id: userId, category_id: categoryId, year, month },
+      data, // ✅ KHÔNG bọc $set nữa
       { new: true, upsert: true, runValidators: true }
     ).lean();
   },
- 
+
   updateCategorySummaryById: async (id, updateData) => {
     return await category_summary.findByIdAndUpdate(
       id,
@@ -157,78 +164,85 @@ const repo = {
       { new: true, runValidators: true }
     ).lean();
   },
- 
+
   deleteCategorySummaryById: async (id) => {
     return await category_summary.findByIdAndDelete(id).lean();
   },
- 
-  deleteAllCategorySummaryByAccountId: async (accountId) => {
-    return await category_summary.deleteMany({ account_id: accountId });
+
+  deleteAllCategorySummaryByuserId: async (userId) => {
+    return await category_summary.deleteMany({ user_id: userId });
   },
- 
+
   createManyCategorySummary: async (dataArray) => {
     return await category_summary.insertMany(dataArray);
   },
- 
+
   // ================================================================
   // DASHBOARD CACHE
   // ================================================================
+  findDashboardCacheByuserId: async (userId) => {
+    return await dashboard_cache.findOne({
+      user_id: userId,
+      // expires_at: { $gt: new Date() },
+    }).lean();
+  },
+
   findDashboardCacheByAccountId: async (accountId) => {
     return await dashboard_cache.findOne({
       account_id: accountId,
       // expires_at: { $gt: new Date() },
     }).lean();
   },
- 
-  upsertDashboardCache: async (accountId, data, ttlMs = 15 * 60 * 1000) => {
+
+  upsertDashboardCache: async (userId, data, ttlMs = 15 * 60 * 1000) => {
     const expires_at = new Date(Date.now() + ttlMs);
     return await dashboard_cache.findOneAndUpdate(
-      { account_id: accountId },
+      { user_id: userId , account_id: data.account_id},
       { $set: { ...data, expires_at } },
       { new: true, upsert: true, runValidators: true }
     ).lean();
   },
- 
-  invalidateDashboardCache: async (accountId) => {
-    return await dashboard_cache.deleteOne({ account_id: accountId });
+
+  invalidateDashboardCache: async (userId) => {
+    return await dashboard_cache.deleteOne({ user_id: userId });
   },
- 
+
   // ================================================================
   // MONTHLY REPORT
   // ================================================================
-  findMonthlyReportByAccountId: async (accountId) => {
-    return await monthly_reports.find({ account_id: accountId })
+  findMonthlyReportByuserId: async (userId) => {
+    return await monthly_reports.find({ user_id: userId })
       .sort({ year: -1, month: -1 })
       .lean();
   },
- 
-  findMonthlyReportByAccountMonth: async (accountId, year, month) => {
-    return await monthly_reports.findOne({ account_id: accountId, year, month }).lean();
+
+  findMonthlyReportByAccountMonth: async (userId, year, month) => {
+    return await monthly_reports.findOne({ user_id: userId, year, month }).lean();
   },
- 
-  findRecentMonthlyReports: async (accountId, limit = 6) => {
-    return await monthly_reports.find({ account_id: accountId })
+
+  findRecentMonthlyReports: async (userId, limit = 6) => {
+    return await monthly_reports.find({ user_id: userId })
       .sort({ year: -1, month: -1 })
       .limit(limit)
       .lean();
   },
- 
+
   findMonthlyReportById: async (id) => {
     return await monthly_reports.findById(id).lean();
   },
- 
+
   createMonthlyReport: async (data) => {
     return await monthly_reports.create(data);
   },
- 
-  upsertMonthlyReport: async (accountId, year, month, data) => {
+
+  upsertMonthlyReport: async (userId, year, month, data) => {
     return await monthly_reports.findOneAndUpdate(
-      { account_id: accountId, year, month },
+      { user_id: userId, year, month },
       { $set: data },
       { new: true, upsert: true, runValidators: true }
     ).lean();
   },
- 
+
   updateMonthlyReportById: async (id, updateData) => {
     return await monthly_reports.findByIdAndUpdate(
       id,
@@ -236,48 +250,48 @@ const repo = {
       { new: true, runValidators: true }
     ).lean();
   },
- 
+
   deleteMonthlyReportById: async (id) => {
     return await monthly_reports.findByIdAndDelete(id).lean();
   },
- 
-  deleteAllMonthlyReportsByAccountId: async (accountId) => {
-    return await monthly_reports.deleteMany({ account_id: accountId });
+
+  deleteAllMonthlyReportsByuserId: async (userId) => {
+    return await monthly_reports.deleteMany({ user_id: userId });
   },
- 
+
   createManyMonthlyReport: async (dataArray) => {
     return await monthly_reports.insertMany(dataArray);
   },
- 
+
   // ================================================================
   // SPENDING TREND
   // ================================================================
-  findSpendingTrendByAccountId: async (accountId) => {
-    return await spending_trends.find({ account_id: accountId })
+  findSpendingTrendByuserId: async (userId) => {
+    return await spending_trends.find({ user_id: userId })
       .sort({ category_type: 1, category_name: 1 })
       .lean();
   },
- 
-  findSpendingTrendByAccountAndCategory: async (accountId, categoryId) => {
-    return await spending_trends.findOne({ account_id: accountId, category_id: categoryId }).lean();
+
+  findSpendingTrendByAccountAndCategory: async (userId, categoryId) => {
+    return await spending_trends.findOne({ user_id: userId, category_id: categoryId }).lean();
   },
- 
+
   findSpendingTrendById: async (id) => {
     return await spending_trends.findById(id).lean();
   },
- 
+
   createSpendingTrend: async (data) => {
     return await spending_trends.create(data);
   },
- 
-  upsertSpendingTrend: async (accountId, categoryId, data) => {
+
+  upsertSpendingTrend: async (userId, categoryId, data) => {
     return await spending_trends.findOneAndUpdate(
-      { account_id: accountId, category_id: categoryId },
+      { user_id: userId, category_id: categoryId },
       { $set: { ...data, updated_at: new Date() } },
       { new: true, upsert: true, runValidators: true }
     ).lean();
   },
- 
+
   updateSpendingTrendById: async (id, updateData) => {
     return await spending_trends.findByIdAndUpdate(
       id,
@@ -285,49 +299,49 @@ const repo = {
       { new: true, runValidators: true }
     ).lean();
   },
- 
+
   deleteSpendingTrendById: async (id) => {
     return await spending_trends.findByIdAndDelete(id).lean();
   },
- 
-  deleteAllSpendingTrendsByAccountId: async (accountId) => {
-    return await spending_trends.deleteMany({ account_id: accountId });
+
+  deleteAllSpendingTrendsByuserId: async (userId) => {
+    return await spending_trends.deleteMany({ user_id: userId });
   },
- 
+
   // ================================================================
   // TRANSACTION
   // ================================================================
-  findTransactionsByAccountId: async (accountId, { limit = 20, skip = 0 } = {}) => {
-    return await transaction.find({ account_id: accountId })
+  findTransactionsByuserId: async (userId, { limit = 20, skip = 0 } = {}) => {
+    return await transaction.find({ user_id: userId })
       .sort({ date: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
   },
- 
+
   findTransactionByTransId: async (transId) => {
     return await transaction.findOne({ trans_id: transId }).lean();
   },
- 
-  findTransactionsByAccountAndDateRange: async (accountId, from, to) => {
+
+  findTransactionsByAccountAndDateRange: async (userId, from, to) => {
     return await transaction.find({
-      account_id: accountId,
+      user_id: userId,
       date: { $gte: from, $lte: to },
     })
       .sort({ date: -1 })
       .lean();
   },
- 
-  findTransactionsByAccountAndCategory: async (accountId, categoryId) => {
-    return await transaction.find({ account_id: accountId, category_id: categoryId })
+
+  findTransactionsByAccountAndCategory: async (userId, categoryId) => {
+    return await transaction.find({ user_id: userId, category_id: categoryId })
       .sort({ date: -1 })
       .lean();
   },
- 
+
   createTransaction: async (data) => {
     return await transaction.create(data);
   },
- 
+
   updateTransactionByTransId: async (transId, updateData) => {
     return await transaction.findOneAndUpdate(
       { trans_id: transId },
@@ -335,13 +349,13 @@ const repo = {
       { new: true, runValidators: true }
     ).lean();
   },
- 
+
   deleteTransactionByTransId: async (transId) => {
     return await transaction.findOneAndDelete({ trans_id: transId }).lean();
   },
 
 
-  
+
   // findUserAnomalyLogsByUserId: async (userId) => {
   //   return await anomaly_logs.find({ user_id: userId }).lean();
   // },
