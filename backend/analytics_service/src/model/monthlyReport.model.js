@@ -1,226 +1,184 @@
-'use strict';
+// ============================================================
+// monthlyReport.model.js
+// Collection: monthly_reports
+// Database  : finance_db
+// ============================================================
 
-/**
- * ============================================================
- * Model: MonthlyReport
- * Collection: monthly_reports
- * Unique key: (account_id, year, month)
- * ============================================================
- *
- * Báo cáo tổng hợp thu/chi theo tháng cho một ví.
- * Bao gồm: income/expense by category, weekly trend,
- *           daily cashflow, top expenses, so sánh với tháng trước,
- *           AI report.
- */
-
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 const { Schema } = mongoose;
 
 // ── Sub-schemas ───────────────────────────────────────────────
-
-/** { category_id, category_name, amount } */
-const CategoryAmountSchema = new Schema(
+const summarySchema = new Schema(
   {
-    category_id:   { type: String, required: true },
-    category_name: { type: String, default: null },
-    amount:        { type: Number, default: 0 },
+    total_income: { type: Number, default: 0, min: 0, comment: "Total income for the month (VND)" },
+    total_expense: { type: Number, default: 0, min: 0, comment: "Total expense for the month (VND)" },
+    savings: { type: Number, default: 0, comment: "total_income - total_expense (can be negative)" },
+    savings_rate: { type: Number, default: 0, comment: "savings / total_income × 100 (%)" },
+    transaction_count: { type: Number, default: 0, min: 0, comment: "Total number of transactions" },
   },
   { _id: false }
 );
 
-/** { week, income, expense } */
-const WeeklyTrendSchema = new Schema(
+const categoryBreakdownSchema = new Schema(
   {
-    week:    { type: Number, required: true },  // 1–5
-    income:  { type: Number, default: 0 },
-    expense: { type: Number, default: 0 },
+    category_id: { type: String, required: true, trim: true },
+    category_name: { type: String, required: true, trim: true },
+    amount: { type: Number, required: true, default: 0, min: 0 },
   },
   { _id: false }
 );
 
-/** { day, income, expense } */
-const DailyCashflowSchema = new Schema(
+const weeklyTrendSchema = new Schema(
   {
-    day:     { type: Number, required: true },  // 1–31
-    income:  { type: Number, default: 0 },
-    expense: { type: Number, default: 0 },
+    week: { type: Number, required: true, min: 1, max: 6, comment: "Week number within the month (1–6)" },
+    income: { type: Number, default: 0, min: 0 },
+    expense: { type: Number, default: 0, min: 0 },
   },
   { _id: false }
 );
 
-/** Top expense item */
-const TopExpenseSchema = new Schema(
+const dailyCashflowSchema = new Schema(
   {
-    trans_id:    { type: String, required: true },
-    description: { type: String, default: null },
-    amount:      { type: Number, default: 0 },
-    category_id: { type: String, default: null },
-    date:        { type: Date, default: null },
+    day: { type: Number, required: true, min: 1, max: 31, comment: "Day of month (1–31)" },
+    income: { type: Number, default: 0, min: 0 },
+    expense: { type: Number, default: 0, min: 0 },
   },
   { _id: false }
 );
 
-/** Summary tổng */
-const SummarySchema = new Schema(
+const topExpenseSchema = new Schema(
   {
-    total_income:      { type: Number, default: 0 },
-    total_expense:     { type: Number, default: 0 },
-    savings:           { type: Number, default: 0 },
-    savings_rate:      { type: Number, default: 0 },  // %
-    transaction_count: { type: Number, default: 0 },
+    trans_id: { type: String, required: true, trim: true, comment: "UUID – transaction" },
+    description: { type: String, default: null, trim: true },
+    amount: { type: Number, required: true, min: 0 },
+    category_id: { type: String, required: true, trim: true },
   },
   { _id: false }
 );
 
-/** So sánh với tháng trước */
-const ComparisonSchema = new Schema(
+const aiReportSchema = new Schema(
   {
-    prev_income:        { type: Number, default: null },
-    prev_expense:       { type: Number, default: null },
-    income_change_pct:  { type: Number, default: null },
-    expense_change_pct: { type: Number, default: null },
+    generated: { type: Boolean, default: false, comment: "Whether the AI report has been generated" },
+    content: { type: String, default: null, comment: "AI-generated report content; null until generated" },
   },
   { _id: false }
 );
 
-/** AI report (text + metadata) */
-const AiReportSchema = new Schema(
-  {
-    generated:    { type: Boolean, default: false },
-    content:      { type: Schema.Types.Mixed, default: null },
-    generated_at: { type: Date, default: null },
-  },
-  { _id: false }
-);
-
-// ── Main schema ───────────────────────────────────────────────
+// ── Main Schema ───────────────────────────────────────────────
 const monthly_reports = new Schema(
   {
-    /** UUID ví */
-    account_id: {
+    user_id: {
       type: String,
       required: true,
       trim: true,
+      comment: "UUID – owner of the report",
     },
 
-    /** Năm (YYYY) */
     year: {
       type: Number,
       required: true,
+      comment: "4-digit year (e.g. 2025)",
     },
 
-    /** Tháng (1–12) */
     month: {
       type: Number,
       required: true,
       min: 1,
       max: 12,
+      comment: "Month number 1–12",
     },
 
-    /** Tóm tắt thu/chi/tiết kiệm */
     summary: {
-      type: SummarySchema,
-      default: () => ({}),
+      type: summarySchema,
+      required: true,
+      comment: "Aggregated income / expense / savings for the month",
     },
 
-    /** Thu theo danh mục */
     income_by_category: {
-      type: [CategoryAmountSchema],
+      type: [categoryBreakdownSchema],
       default: [],
+      comment: "Income broken down by category",
     },
 
-    /** Chi theo danh mục */
     expense_by_category: {
-      type: [CategoryAmountSchema],
+      type: [categoryBreakdownSchema],
       default: [],
+      comment: "Expenses broken down by category",
     },
 
-    /** Xu hướng theo tuần */
     weekly_trend: {
-      type: [WeeklyTrendSchema],
+      type: [weeklyTrendSchema],
       default: [],
+      comment: "Per-week rollup of income and expense",
     },
 
-    /** Dòng tiền theo ngày */
     daily_cashflow: {
-      type: [DailyCashflowSchema],
+      type: [dailyCashflowSchema],
       default: [],
+      comment: "Per-day income and expense for charting",
     },
 
-    /** Top 5–10 giao dịch lớn nhất */
     top_expenses: {
-      type: [TopExpenseSchema],
+      type: [topExpenseSchema],
       default: [],
+      comment: "Top N highest single transactions of the month",
     },
 
-    /** So sánh với tháng liền trước */
     comparison: {
-      type: ComparisonSchema,
-      default: () => ({}),
+      type: Schema.Types.Mixed,
+      default: {},
+      comment: "Month-over-month comparison data (populated lazily)",
     },
 
-    /** Báo cáo AI */
     ai_report: {
-      type: AiReportSchema,
-      default: () => ({}),
+      type: aiReportSchema,
+      default: () => ({ generated: false, content: null }),
+      comment: "AI-generated narrative report for the month",
     },
 
-    /** Trạng thái báo cáo */
     status: {
       type: String,
-      enum: ['draft', 'generated', 'reviewed'],
-      default: 'draft',
+      required: true,
+      enum: ["generated", "pending", "failed"],
+      default: "generated",
+      comment: "Report generation status",
     },
 
-    /** Thời điểm generate xong */
     generated_at: {
       type: Date,
       default: null,
+      comment: "Timestamp when the report was first generated",
+    },
+
+    updated_at: {
+      type: Date,
+      default: null,
+      comment: "Timestamp of the last update to this report",
     },
   },
   {
-    collection: 'monthly_reports',
-    timestamps: { createdAt: false, updatedAt: 'updated_at' },
+    timestamps: false,
+    collection: "monthly_reports",
     versionKey: false,
   }
 );
 
-// ── Indexes (mirrors init_mongo.js) ──────────────────────────
+// ── Indexes ───────────────────────────────────────────────────
+monthly_reports.index({ user_id: 1 }, { name: "idx_monthly_reports_user_id" });
 monthly_reports.index(
-  { account_id: 1, year: -1, month: -1 },
-  { unique: true, name: 'idx_account_year_month' }
+  { user_id: 1, year: 1, month: 1 },
+  { unique: true, name: "idx_monthly_reports_unique" }
 );
-monthly_reports.index({ generated_at: -1 }, { name: 'idx_generated_at' });
-monthly_reports.index({ status: 1, account_id: 1 }, { name: 'idx_status_account' });
+monthly_reports.index(
+  { user_id: 1, year: -1, month: -1 },
+  { name: "idx_monthly_reports_user_ym_desc" }
+);
+monthly_reports.index(
+  { status: 1 },
+  { name: "idx_monthly_reports_status" }
+);
 
-// ── Static helpers ────────────────────────────────────────────
-/**
- * Lấy báo cáo theo account + tháng.
- */
-monthly_reports.statics.findByAccountMonth = function (accountId, year, month) {
-  return this.findOne({ account_id: accountId, year, month });
-};
+// ── Model ─────────────────────────────────────────────────────
+const MonthlyReport = mongoose.model("MonthlyReport", monthly_reports);
 
-/**
- * Lấy N tháng gần nhất của một account.
- * @param {string} accountId
- * @param {number} limit
- */
-monthly_reports.statics.findRecent = function (accountId, limit = 6) {
-  return this.find({ account_id: accountId })
-    .sort({ year: -1, month: -1 })
-    .limit(limit);
-};
-
-/**
- * Đánh dấu report là 'generated' và set generated_at.
- */
-monthly_reports.statics.markGenerated = function (accountId, year, month) {
-  return this.findOneAndUpdate(
-    { account_id: accountId, year, month },
-    { $set: { status: 'generated', generated_at: new Date() } },
-    { new: true }
-  );
-};
-
-module.exports = mongoose.model('MonthlyReport', monthly_reports);
+module.exports = MonthlyReport;
