@@ -1058,7 +1058,405 @@ const service = {
     if (!result) throw new Error('Transaction not found');
     return result;
   },
+  //===================================================================================================
+  // HELPER: tính week number (1-5) từ ngày trong tháng
+  _getWeekNumber: (day) => {
+    return Math.ceil(day / 7);
+  },
 
+  // HELPER: cập nhật user_analytics khi có transaction mới
+  _updateUserAnalytics: async function (transaction) {
+    const { user_id, amount, transaction_type, date } = transaction;
+    const txDate = new Date(date);
+    const txYear = txDate.getFullYear();
+    const txMonth = txDate.getMonth() + 1; // 1-based
+    const isExpense = transaction_type === 'Expense';
+    const isIncome = transaction_type === 'Income';
+    const amt = Number(amount);
+
+    // Lấy user_analytics hiện tại
+    const ua = await repo.findUserAnalyticsByuserId(user_id);
+    if (!ua) {
+      console.error(`[handleTransaction] user_analytics not found for user_id: ${user_id}`);
+      return null;
+    }
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+
+    // Tính total_income / total_expense / current_balance mới
+    const newTotalIncome = isIncome ? ua.total_income + amt : ua.total_income;
+    const newTotalExpense = isExpense ? ua.total_expense + amt : ua.total_expense;
+    const newBalance = newTotalIncome - newTotalExpense;
+
+    // Tính current_month (chỉ cập nhật nếu transaction thuộc tháng hiện tại)
+    let currentMonthUpdate = { ...ua.current_month };
+    if (txYear === currentYear && txMonth === currentMonth) {
+      if (isIncome) currentMonthUpdate.income = (ua.current_month?.income || 0) + amt;
+      if (isExpense) currentMonthUpdate.expense = (ua.current_month?.expense || 0) + amt;
+      currentMonthUpdate.savings = currentMonthUpdate.income - currentMonthUpdate.expense;
+      currentMonthUpdate.savings_rate = currentMonthUpdate.income > 0
+        ? parseFloat(((currentMonthUpdate.savings / currentMonthUpdate.income) * 100).toFixed(2))
+        : 0;
+    }
+
+    // Cập nhật top_categories nếu là expense
+    let topCategories = ua.top_categories ? [...ua.top_categories] : [];
+    if (isExpense && transaction.category_id) {
+      const idx = topCategories.findIndex(c => c.category_id === transaction.category_id);
+      if (idx >= 0) {
+        topCategories[idx] = {
+          ...topCategories[idx],
+          total_amount: topCategories[idx].total_amount + amt
+        };
+      }
+      // Nếu category chưa có trong top_categories thì không tự thêm (chỉ update nếu đã tồn tại)
+    }
+
+    return await repo.updateUserAnalyticsByuserId(user_id, {
+      $set: {
+        total_income: newTotalIncome,
+        total_expense: newTotalExpense,
+        current_balance: newBalance,
+        current_month: currentMonthUpdate,
+        top_categories: topCategories,
+      },
+      $currentDate: { updated_at: true }
+    });
+  },
+
+  // HELPER: cập nhật category_summary khi có transaction mới
+  _updateCategorySummary: async function (transaction) {
+    const { user_id, account_id, category_id, amount, transaction_type, date, trans_id } = transaction;
+    if (!category_id) return null;
+
+    const txDate = new Date(date);
+    const year = txDate.getFullYear();
+    const month = txDate.getMonth() + 1;
+    const day = txDate.getDate();
+    const amt = Number(amount);
+
+    // Lấy category_summary hiện tại (upsert theo user_id + category_id + year + month)
+    const existing = await repo.findCategorySummaryByCategoryAndMonth(user_id, category_id, year, month)
+      .catch(() => null);
+
+    if (existing) {
+      // Cập nhật total_amount, transaction_count
+      const newTotal = existing.total_amount + amt;
+      const newCount = existing.transaction_count + 1;
+      const budgetLimit = existing.budget_limit || 0;
+      const isOverBudget = budgetLimit > 0 ? newTotal > budgetLimit : false;
+
+      // Cập nhật daily_breakdown
+      const breakdown = existing.daily_breakdown ? [...existing.daily_breakdown] : [];
+      const dayIdx = breakdown.findIndex(d => d.day === day);
+      if (dayIdx >= 0) {
+        breakdown[dayIdx] = {
+          ...breakdown[dayIdx],
+          amount: breakdown[dayIdx].amount + amt,
+          trans_id: [...(breakdown[dayIdx].trans_id || []), trans_id]
+        };
+      } else {
+        breakdown.push({ day, amount: amt, trans_id: [trans_id] });
+        breakdown.sort((a, b) => a.day - b.day);
+      }
+
+      return await repo.upsertCategorySummary(
+        user_id,
+        category_id,
+        year,
+        month,
+        {
+          $set: {
+            total_amount: newTotal,
+            transaction_count: newCount,
+            is_over_budget: isOverBudget,
+            daily_breakdown: breakdown,
+          },
+          $currentDate: { updated_at: true }
+        }
+      );
+    } else {
+      // Tạo mới
+      const categoryInfo = await repo.findCategoryById(category_id).catch(() => null);
+      const newDoc = {
+        user_id,
+        account_id: account_id || null,
+        category_id,
+        category_name: categoryInfo?.category_name || transaction.category_name || '',
+        category_type: transaction_type === 'Income' ? 'income' : 'expense',
+        year,
+        month,
+        total_amount: amt,
+        transaction_count: 1,
+        budget_limit: 0,
+        is_over_budget: false,
+        daily_breakdown: [{ day, amount: amt, trans_id: [trans_id] }],
+      };
+      return await repo.upsertCategorySummary(
+        user_id,
+        category_id,
+        year,
+        month,
+        { $set: newDoc, $currentDate: { updated_at: true } }
+      );
+    }
+  },
+
+  // HELPER: cập nhật dashboard_cache
+  _updateDashboardCache: async function (transaction) {
+    const { user_id, account_id, trans_id, amount, transaction_type, description, date, category_id } = transaction;
+    if (!account_id) return null;
+
+    const amt = Number(amount);
+    const isExpense = transaction_type === 'Expense';
+    const isIncome = transaction_type === 'Income';
+
+    // Lấy cache hiện tại theo user_id + account_id
+    const cache = await repo.findDashboardCacheByAccountId(account_id).catch(() => null);
+    if (!cache) return null;
+
+    const summary = { ...(cache.summary || {}) };
+    if (isExpense) {
+      summary.current_balance = (summary.current_balance || 0) - amt;
+      summary.monthly_expense = (summary.monthly_expense || 0) + amt;
+      summary.monthly_savings = (summary.monthly_income || 0) - summary.monthly_expense;
+      summary.savings_rate = summary.monthly_income > 0
+        ? parseFloat(((summary.monthly_savings / summary.monthly_income) * 100).toFixed(2))
+        : 0;
+    } else if (isIncome) {
+      summary.current_balance = (summary.current_balance || 0) + amt;
+      summary.monthly_income = (summary.monthly_income || 0) + amt;
+      summary.monthly_savings = summary.monthly_income - (summary.monthly_expense || 0);
+      summary.savings_rate = summary.monthly_income > 0
+        ? parseFloat(((summary.monthly_savings / summary.monthly_income) * 100).toFixed(2))
+        : 0;
+    }
+
+    // Cập nhật recent_transactions (prepend, giữ tối đa 5)
+    const newTx = {
+      trans_id,
+      description: description || '',
+      amount: amt,
+      type: transaction_type.toLowerCase(),
+      date,
+      category_id: category_id || null
+    };
+    const recent = [newTx, ...(cache.recent_transactions || [])].slice(0, 5);
+
+    // TTL 15 phút từ bây giờ
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    return await repo.upsertDashboardCache(
+      user_id,
+      {
+        summary,
+        recent_transactions: recent,
+        streak: cache.streak,
+        top_account_id: cache.top_account_id,
+        expires_at: expiresAt,
+      },
+      15 * 60 * 1000
+    );
+  },
+
+  // HELPER: cập nhật monthly_report
+  _updateMonthlyReport: async function (transaction) {
+    const { user_id, trans_id, amount, transaction_type, description, date, category_id } = transaction;
+    if (!date) return null;
+
+    const txDate = new Date(date);
+    const year = txDate.getFullYear();
+    const month = txDate.getMonth() + 1;
+    const day = txDate.getDate();
+    const amt = Number(amount);
+    const isExpense = transaction_type === 'Expense';
+    const isIncome = transaction_type === 'Income';
+    const week = Math.ceil(day / 7);
+
+    // Lấy monthly_report hiện tại
+    const report = await repo.findMonthlyReportByAccountMonth(user_id, year, month).catch(() => null);
+    if (!report) return null;
+
+    // --- summary ---
+    const summary = { ...(report.summary || {}) };
+    if (isIncome) {
+      summary.total_income = (summary.total_income || 0) + amt;
+    }
+    if (isExpense) {
+      summary.total_expense = (summary.total_expense || 0) + amt;
+    }
+    summary.savings = (summary.total_income || 0) - (summary.total_expense || 0);
+    summary.savings_rate = summary.total_income > 0
+      ? parseFloat(((summary.savings / summary.total_income) * 100).toFixed(2))
+      : 0;
+    summary.transaction_count = (summary.transaction_count || 0) + 1;
+
+    // --- income_by_category / expense_by_category ---
+    const targetCatArray = isIncome ? 'income_by_category' : 'expense_by_category';
+    const catArray = report[targetCatArray] ? [...report[targetCatArray]] : [];
+    if (category_id) {
+      const catIdx = catArray.findIndex(c => c.category_id === category_id);
+      if (catIdx >= 0) {
+        catArray[catIdx] = { ...catArray[catIdx], amount: catArray[catIdx].amount + amt };
+      } else {
+        const categoryInfo = await repo.findCategoryById(category_id).catch(() => null);
+        catArray.push({
+          category_id,
+          category_name: categoryInfo?.category_name || transaction.category_name || '',
+          amount: amt
+        });
+      }
+    }
+
+    // --- weekly_trend ---
+    const weeklyTrend = report.weekly_trend ? [...report.weekly_trend] : [];
+    const wIdx = weeklyTrend.findIndex(w => w.week === week);
+    if (wIdx >= 0) {
+      weeklyTrend[wIdx] = {
+        ...weeklyTrend[wIdx],
+        income: isIncome ? weeklyTrend[wIdx].income + amt : weeklyTrend[wIdx].income,
+        expense: isExpense ? weeklyTrend[wIdx].expense + amt : weeklyTrend[wIdx].expense,
+      };
+    } else {
+      weeklyTrend.push({
+        week,
+        income: isIncome ? amt : 0,
+        expense: isExpense ? amt : 0,
+      });
+      weeklyTrend.sort((a, b) => a.week - b.week);
+    }
+
+    // --- daily_cashflow ---
+    const dailyCashflow = report.daily_cashflow ? [...report.daily_cashflow] : [];
+    const dIdx = dailyCashflow.findIndex(d => d.day === day);
+    if (dIdx >= 0) {
+      dailyCashflow[dIdx] = {
+        ...dailyCashflow[dIdx],
+        income: isIncome ? dailyCashflow[dIdx].income + amt : dailyCashflow[dIdx].income,
+        expense: isExpense ? dailyCashflow[dIdx].expense + amt : dailyCashflow[dIdx].expense,
+      };
+    } else {
+      dailyCashflow.push({
+        day,
+        income: isIncome ? amt : 0,
+        expense: isExpense ? amt : 0,
+      });
+      dailyCashflow.sort((a, b) => a.day - b.day);
+    }
+
+    // --- top_expenses (chỉ expense, giữ top 5 theo amount) ---
+    let topExpenses = report.top_expenses ? [...report.top_expenses] : [];
+    if (isExpense && trans_id) {
+      topExpenses.push({
+        trans_id,
+        description: description || '',
+        amount: amt,
+        category_id: category_id || null,
+      });
+      topExpenses.sort((a, b) => b.amount - a.amount);
+      topExpenses = topExpenses.slice(0, 5);
+    }
+
+    return await repo.upsertMonthlyReport(
+      user_id,
+      year,
+      month,
+      {
+        $set: {
+          summary,
+          [targetCatArray]: catArray,
+          weekly_trend: weeklyTrend,
+          daily_cashflow: dailyCashflow,
+          top_expenses: topExpenses,
+          status: 'generated',
+        },
+        $currentDate: { updated_at: true }
+      }
+    );
+  },
+
+  //===================================================================================================
+  handleTransactionCreated: async function (message) {
+    const transaction = message;
+    const { user_id, account_id, trans_id } = transaction;
+
+    console.log(`[handleTransactionCreated] Processing trans_id: ${trans_id}, user_id: ${user_id}`);
+
+    try {
+      // Cập nhật song song 4 collections
+      const [uaResult, csResult, dcResult, mrResult] = await Promise.allSettled([
+        this._updateUserAnalytics(transaction),
+        this._updateCategorySummary(transaction),
+        this._updateDashboardCache(transaction),
+        this._updateMonthlyReport(transaction),
+      ]);
+
+      if (uaResult.status === 'rejected') console.error(`[handleTransactionCreated] user_analytics error:`, uaResult.reason);
+      if (csResult.status === 'rejected') console.error(`[handleTransactionCreated] category_summary error:`, csResult.reason);
+      if (dcResult.status === 'rejected') console.error(`[handleTransactionCreated] dashboard_cache error:`, dcResult.reason);
+      if (mrResult.status === 'rejected') console.error(`[handleTransactionCreated] monthly_report error:`, mrResult.reason);
+
+      console.log(`[handleTransactionCreated] Done for trans_id: ${trans_id}`);
+      return { account_id, trans_id };
+    } catch (err) {
+      console.error(`[handleTransactionCreated] Fatal error:`, err);
+      return null;
+    }
+  },
+
+  handleTransactionUpdated: async function (message) {
+    // message phải chứa cả old_transaction và new_transaction để tính delta
+    // Format: { old_transaction: {...}, new_transaction: {...} }
+    // Nếu chỉ gửi new_transaction (không có old), fallback về xử lý như created
+    const { old_transaction, new_transaction } = message;
+
+    if (!old_transaction || !new_transaction) {
+      // Fallback: nếu chỉ có 1 object (không có old/new wrapper) → xử lý như created
+      console.warn(`[handleTransactionUpdated] Missing old_transaction or new_transaction, treating as created`);
+      return await this.handleTransactionCreated(message);
+    }
+
+    const { user_id, account_id, trans_id } = new_transaction;
+    console.log(`[handleTransactionUpdated] Processing trans_id: ${trans_id}, user_id: ${user_id}`);
+
+    try {
+      // Tạo "reverse" transaction từ old (đảo ngược effect)
+      const reverseOld = {
+        ...old_transaction,
+        amount: -Number(old_transaction.amount),
+      };
+
+      // Cập nhật song song: reverse old rồi apply new
+      const [
+        uaReverse, csReverse, dcReverse, mrReverse,
+        uaNew, csNew, dcNew, mrNew
+      ] = await Promise.allSettled([
+        this._updateUserAnalytics(reverseOld),
+        this._updateCategorySummary(reverseOld),
+        this._updateDashboardCache(reverseOld),
+        this._updateMonthlyReport(reverseOld),
+        this._updateUserAnalytics(new_transaction),
+        this._updateCategorySummary(new_transaction),
+        this._updateDashboardCache(new_transaction),
+        this._updateMonthlyReport(new_transaction),
+      ]);
+
+      const results = { uaReverse, csReverse, dcReverse, mrReverse, uaNew, csNew, dcNew, mrNew };
+      for (const [key, val] of Object.entries(results)) {
+        if (val.status === 'rejected') {
+          console.error(`[handleTransactionUpdated] ${key} error:`, val.reason);
+        }
+      }
+
+      console.log(`[handleTransactionUpdated] Done for trans_id: ${trans_id}`);
+      return { account_id, trans_id };
+    } catch (err) {
+      console.error(`[handleTransactionUpdated] Fatal error:`, err);
+      return null;
+    }
+  }
 
 
 
