@@ -10,13 +10,32 @@ datasource db {
 }
 
 model Budget {
-  budget_id   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id     String?      @db.Uuid
-  category_id String?      @db.Uuid
-  amount_limit Decimal @db.Decimal(15, 2)
-  date         DateTime @db.Date
-  created_at  DateTime @default(now())
+  budget_id      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id        String?  @db.Uuid
+  category_id    String?  @db.Uuid
+
+  title          String?
+  current_amount Decimal  @default(0) @db.Decimal(15, 2)
+  amount_limit   Decimal  @db.Decimal(15, 2)
+
+  date           DateTime @db.Date
+  date_start     DateTime? @db.Date
+  date_end       DateTime? @db.Date
+
+  status         Status?   
+  status_active  Boolean?
+
+  note           String?
+  created_at     DateTime @default(now())
+  updated_at     DateTime?
 
   @@map("budgets")
+  @@schema("budgets_service")
+}
+
+enum Status {
+  warning
+  completed
+
   @@schema("budgets_service")
 }
