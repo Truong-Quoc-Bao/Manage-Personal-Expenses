@@ -39,8 +39,8 @@ app.use("/", router);
 
 const startServer = async () => {
     try {
-        await connectDB(); // 👈 connect Mongo trước
-        // await rabbitMQClient.startRabbitMQ();
+        await connectDB(); // connect Mongo trước
+        await rabbitMQClient.startRabbitMQ();
 
         app.listen(PORT, () => {
             console.log(`Analytics service is running on port ${PORT}`);

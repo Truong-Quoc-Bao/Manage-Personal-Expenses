@@ -1379,8 +1379,10 @@ const service = {
 
   //===================================================================================================
   handleTransactionCreated: async function (message) {
+    console.log(`[handleTransactionCreated] Received message:`, message);
     const transaction = message;
-    const { user_id, account_id, trans_id } = transaction;
+    const user_id = "4f4b144d-e3f8-4e6b-9e32-408030a85698";
+    const { account_id, trans_id } = transaction;
 
     console.log(`[handleTransactionCreated] Processing trans_id: ${trans_id}, user_id: ${user_id}`);
 
