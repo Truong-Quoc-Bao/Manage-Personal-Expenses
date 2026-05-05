@@ -9,7 +9,7 @@ const {
 
 const UserPublishEvent = require("../dtos/user.publish.event");
 const { USER_STATUS } = require("../types/user.types");
-const rabbitMQ = require("../shared/rabbitmq-client");
+const rabbitMQ = require("../../../shared/rabbitmq-client");
 
 const getUserProfile = async (userId) => {
   if (!userId) {
