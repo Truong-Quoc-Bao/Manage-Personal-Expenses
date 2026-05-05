@@ -1,6 +1,25 @@
 version: '3.8'
 
 services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: finance-n8n
+    env_file:
+      - .env
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=https://unnibbed-unthrilled-averi.ngrok-free.dev
+      - GENERIC_TIMEZONE=Asia/Ho_Chi_Minh
+      - N8N_PAYLOAD_SIZE_MAX=10
+    ports:
+      - "${N8N_PORT}:5678"
+    volumes:
+      - n8n-data:/home/node/.n8n
+    networks:
+      - finance-network
+
   mongodb:
     image: mongo:7
     container_name: finance-mongodb
@@ -237,6 +256,26 @@ services:
       - /app/backend/budget_service/node_modules
       - /app/backend/shared/rabbitmq-client/node_modules
 
+  ai-service:
+    build:
+      context: .
+      dockerfile: backend/ai_service/Dockerfile
+    container_name: finance-ai-service
+    env_file:
+      - .env
+    ports:
+      - "${AI_PORT}:4005"
+    depends_on:
+      - gateway
+      - rabbitmq
+    networks:
+      - finance-network
+    volumes:
+      - ./backend/ai_service:/app/backend/ai_service
+      - ./backend/shared/rabbitmq-client:/app/backend/shared/rabbitmq-client
+      - /app/backend/ai_service/node_modules
+      - /app/backend/shared/rabbitmq-client/node_modules
+
   gateway:
     build:
       context: .
@@ -285,3 +324,4 @@ volumes:
   mongodb-data:
   redis-data:
   rabbitmq-data:
+  n8n-data:
