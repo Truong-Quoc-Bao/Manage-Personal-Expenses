@@ -44,6 +44,7 @@ namespace TransactionService.Application.Services
         public async Task<TransactionResponseDto> CreateTransactionAsync(Guid userId, CreateTransactionRequestDto request)
         {
             var transactionEntity = _mapper.Map<Transaction>(request);
+            transactionEntity.UserId = userId;
 
             var accountCheck = await _accountInternalService.ValidateAccountAsync(transactionEntity.AccountId, userId);
             var categoryCheck = true;
@@ -56,7 +57,9 @@ namespace TransactionService.Application.Services
             if(accountCheck && categoryCheck)
             {
                 var createdTransaction = await _transactionRepository.CreateTransactionAsync(transactionEntity);
-                await _rabbitMQPublisher.PublishAsync(_mapper.Map<CreateTransactionEventDto>(createdTransaction), "transaction.created");
+                var transactionEventDto = _mapper.Map<CreateTransactionEventDto>(createdTransaction);
+
+                await _rabbitMQPublisher.PublishAsync(transactionEventDto, "transaction.created");
                 return _mapper.Map<TransactionResponseDto>(createdTransaction);
             }
 
@@ -79,19 +82,36 @@ namespace TransactionService.Application.Services
             if(accountCheck && categoryCheck)
             {
                 
-                var updatedTransaction = await _transactionRepository.UpdateTransactionAsync(userId, transactionId, transactionEntity);
-                if (updatedTransaction == null)
+                var existedTransaction = await _transactionRepository.UpdateTransactionAsync(userId, transactionId, transactionEntity);
+                if (existedTransaction == null)
                 {
                     throw new Exception("Transaction not found");
                 }
 
-                updatedTransaction.Amount = transactionEntity.Amount - updatedTransaction.Amount;
+                if((transactionEntity.Amount - existedTransaction.Amount) != 0 || transactionEntity.TransactionType != existedTransaction.TransactionType)
+                {
+                    var updateEventDto = _mapper.Map<UpdateTransactionEventDto>(existedTransaction);  
+                    updateEventDto.AmountUpdate = transactionEntity.Amount;
+                    updateEventDto.TransactionTypeUpdate = transactionEntity.TransactionType.ToString();
 
-                await _rabbitMQPublisher.PublishAsync(_mapper.Map<UpdateTransactionEventDto>(updatedTransaction), "transaction.updated");
-                return _mapper.Map<TransactionResponseDto>(updatedTransaction);
+                    await _rabbitMQPublisher.PublishAsync(updateEventDto, "transaction.updated");
+                }
+
+
+                return _mapper.Map<TransactionResponseDto>(transactionEntity);
             }
 
             throw new Exception("Invalid transaction details");
+        }
+
+        public async Task<TransactionResponseDto> DeleteTransactionAsync(Guid userId, Guid transactionId)
+        {
+            var transactionEntity = await _transactionRepository.DeleteTransactionAsync(userId, transactionId);
+
+            var deleteEventDto = _mapper.Map<DeleteTransactionEventDto>(transactionEntity);
+            await _rabbitMQPublisher.PublishAsync(deleteEventDto, "transaction.deleted");
+
+            return _mapper.Map<TransactionResponseDto>(transactionEntity);
         }
     }
 }   
