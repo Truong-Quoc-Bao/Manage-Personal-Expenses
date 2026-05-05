@@ -9,6 +9,8 @@ namespace TransactionService.Core.Interfaces
         Task<Transaction?> GetTransactionByIdAsync(Guid userId, Guid transactionId);
         Task<Transaction> CreateTransactionAsync(Transaction transaction);
         Task<Transaction?> UpdateTransactionAsync(Guid userId, Guid transactionId, Transaction updatedTransaction);
+
+        Task<Transaction> DeleteTransactionAsync(Guid userId, Guid transactionId);
         // Task DeleteTransactionAsync(Guid transactionId);
     }
 }
