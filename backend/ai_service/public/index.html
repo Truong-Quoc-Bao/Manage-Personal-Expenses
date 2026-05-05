@@ -292,6 +292,106 @@
         background-color: #e11d48;
       }
 
+      /* Voice preview */
+      #voice-preview {
+        background: #fffbeb; /* Màu vàng nhạt cảnh báo */
+        border-left: 4px solid #f59e0b;
+        margin: 5px 10px;
+        padding: 8px;
+        border-radius: 8px;
+        font-size: 12px;
+      }
+      .voice-preview {
+        min-height: 24px;
+        padding: 0 4px 6px;
+        font-size: 13px;
+        color: #888;
+        font-style: italic;
+        display: none;
+      }
+      .voice-preview.active {
+        display: block;
+      }
+      .voice-preview.interim {
+        color: #666;
+      }
+      .voice-preview.error {
+        color: #dc2626;
+        font-style: normal;
+      }
+
+      .input-row {
+        display: flex;
+        gap: 8px;
+        align-items: flex-end;
+      }
+
+      textarea {
+        flex: 1;
+        resize: none;
+        border: 0.5px solid #ddd;
+        border-radius: 20px;
+        padding: 10px 16px;
+        font-size: 14px;
+        font-family: inherit;
+        line-height: 1.4;
+        outline: none;
+        max-height: 120px;
+        overflow-y: auto;
+        transition: border-color 0.15s;
+        background: white;
+      }
+      textarea:focus {
+        border-color: #999;
+      }
+      textarea::placeholder {
+        color: #bbb;
+      }
+
+      /* Mic button */
+      .btn-mic {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        border: 0.5px solid #ddd;
+        background: white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #555;
+        flex-shrink: 0;
+        transition: all 0.15s;
+        position: relative;
+      }
+      .btn-mic:hover {
+        border-color: #999;
+        color: #1a1a1a;
+      }
+      .btn-mic.recording {
+        border-color: #dc2626;
+        background: #fef2f2;
+        color: #dc2626;
+      }
+      .btn-mic.recording::after {
+        content: '';
+        position: absolute;
+        inset: -4px;
+        border-radius: 50%;
+        border: 2px solid #dc2626;
+        opacity: 0.4;
+        animation: ripple 1.2s infinite;
+      }
+      @keyframes ripple {
+        0% {
+          transform: scale(1);
+          opacity: 0.4;
+        }
+        100% {
+          transform: scale(1.5);
+          opacity: 0;
+        }
+      }
       /* Floating Chat Widget Styles */
       .chat-widget-container {
         position: fixed;
@@ -411,6 +511,61 @@
           transform: scale(1);
         }
       }
+
+      /* --- STYLE CHO HỘI ĐỒNG AI --- */
+      .debate-container {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 15px;
+      }
+
+      .debate-card {
+        padding: 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        line-height: 1.4;
+        border-left: 5px solid; /* Vạch màu bên trái cho sang */
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+      }
+
+      .debate-author {
+        font-weight: 800;
+        font-size: 10px;
+        text-transform: uppercase;
+        margin-bottom: 4px;
+        display: flex;
+        align-items: center;
+      }
+
+      /* Màu đỏ cho Tiết kiệm */
+      .saver {
+        background: #fff1f2;
+        border-color: #ef4444;
+        color: #991b1b;
+      }
+      /* Màu hồng cho YOLO */
+      .yolo {
+        background: #fdf2f8;
+        border-color: #ec4899;
+        color: #9d174d;
+      }
+      /* Màu xanh cho Nhà đầu tư */
+      .rational {
+        background: #eff6ff;
+        border-color: #3b82f6;
+        color: #1e40af;
+      }
+      /* CSS cho Phiếu khám bệnh */
+      .medical-report {
+        background: #fff;
+        border: 2px solid #000;
+        font-family: 'Courier New', Courier, monospace; /* Font chữ máy in bệnh viện */
+        padding: 20px;
+      }
+      .health-score-circle {
+        /* Hình tròn hiện số điểm (Vd: 65/100) */
+      }
     </style>
   </head>
   <body class="text-gray-800 p-4 h-screen flex flex-col overflow-hidden">
@@ -482,7 +637,7 @@
           <div
             class="w-8 h-8 rounded-full bg-pink-400 flex items-center justify-center text-white font-bold text-sm"
           >
-            M
+            QB
           </div>
           <span class="text-sm font-medium">Quốc Bảo</span>
         </div>
@@ -655,6 +810,63 @@
       </div>
     </div>
 
+    <button
+      onclick="runDeepScan()"
+      class="bg-gradient-to-r from-red-500 to-pink-500 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg hover:scale-105 transition-all"
+    >
+      🔍 KHÁM SỨC KHỎE VÍ
+    </button>
+
+    <!-- Modal Phiếu Khám Bệnh -->
+    <div
+      id="scan-modal"
+      class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] hidden flex items-center justify-center p-4"
+    >
+      <div
+        class="bg-[#fffdf5] w-full max-w-md border-2 border-gray-800 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] p-6 relative overflow-hidden"
+      >
+        <!-- Trang trí kiểu bệnh viện -->
+        <div
+          class="absolute top-0 right-0 bg-red-500 text-white px-10 py-1 rotate-45 translate-x-8 translate-y-4 font-bold text-xs"
+        >
+          TOP SECRET
+        </div>
+
+        <div class="border-b-2 border-gray-800 pb-4 mb-4 text-center">
+          <h2 class="text-2xl font-black uppercase tracking-tighter">Phiếu Kết Quả Xét Nghiệm</h2>
+          <p class="text-xs font-mono">Bệnh viện Tài chính Money Guard</p>
+        </div>
+
+        <div id="scan-loading" class="text-center py-10">
+          <i class="fa-solid fa-spinner fa-spin text-4xl text-gray-400"></i>
+          <p class="mt-4 font-mono italic">Đang chụp X-Quang ví tiền...</p>
+        </div>
+
+        <div id="scan-result" class="hidden font-mono text-sm space-y-4">
+          <div class="flex justify-between items-center bg-gray-100 p-2 border border-gray-800">
+            <span>CHỈ SỐ TIẾT KIỆM:</span>
+            <span id="res-score" class="font-bold text-xl text-red-600">--/100</span>
+          </div>
+          <p><b>CHẨN ĐOÁN:</b> <span id="res-disease" class="bg-yellow-200">...</span></p>
+          <div>
+            <b>TRIỆU CHỨNG:</b>
+            <ul id="res-symptoms" class="list-disc ml-5"></ul>
+          </div>
+          <p><b>PHÁC ĐỒ ĐIỀU TRỊ:</b> <span id="res-advice">...</span></p>
+          <p class="text-xs bg-red-100 p-2 border border-red-400">
+            <b>CẢNH BÁO TỪ BÁC SĨ:</b> <span id="res-future">...</span>
+          </p>
+
+          <button
+            onclick="document.getElementById('scan-modal').classList.add('hidden')"
+            class="w-full bg-gray-800 text-white py-2 font-bold mt-4"
+          >
+            XÁC NHẬN ĐÃ ĐỌC (VÀ ĐANG RUN)
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- ========================================== -->
     <!-- FLOATING CHAT WIDGET (BOT)                 -->
     <!-- ========================================== -->
@@ -756,9 +968,44 @@
         <!-- Các nút gợi ý sẽ được nạp tự động bằng JS -->
       </div>
 
+      <!-- Smart Voice Preview Panel -->
+      <div
+        id="voice-preview"
+        class="mx-3 my-2 p-3 bg-blue-50 border-l-4 border-blue-500 rounded-lg hidden shadow-sm"
+      >
+        <div class="flex flex-col">
+          <div class="flex items-start space-x-2">
+            <i class="fa-solid fa-quote-left text-blue-300 text-xs mt-1"></i>
+            <span id="voice-text" class="text-sm text-gray-700 font-medium italic leading-tight"
+              >Money Guard đang nghe...</span
+            >
+          </div>
+
+          <!-- Nhóm nút xác nhận thủ công -->
+          <div id="voice-actions" class="flex justify-end space-x-2 mt-2 hidden">
+            <button
+              type="button"
+              id="btn-voice-cancel"
+              class="px-3 py-1 text-[10px] font-bold text-gray-500 hover:text-red-500 uppercase tracking-wider"
+            >
+              <i class="fa-solid fa-trash-can mr-1"></i> Hủy
+            </button>
+            <button
+              type="button"
+              id="btn-voice-confirm"
+              class="px-4 py-1 bg-blue-600 text-white text-[10px] font-bold rounded-full hover:bg-blue-700 shadow-sm uppercase tracking-wider"
+            >
+              <i class="fa-solid fa-paper-plane mr-1"></i> Xác nhận & Gửi
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Chat Input Form (Nút gửi và viền màu xanh) -->
       <form id="chat-form" class="flex items-center p-3 bg-white border-t border-gray-100 shrink-0">
         <input type="file" id="file-input" accept="image/*" class="hidden" />
+
+        <!-- Nút Camera -->
         <button
           type="button"
           id="upload-btn"
@@ -766,10 +1013,20 @@
         >
           <i class="fa-solid fa-camera"></i>
         </button>
+
+        <!-- NÚT MIC -->
+        <button
+          type="button"
+          id="btn-mic"
+          class="text-gray-400 hover:text-red-500 px-2 text-lg transition-all"
+        >
+          <i class="fa-solid fa-microphone"></i>
+        </button>
+
         <input
           type="text"
           id="user-input"
-          placeholder="Bạn cần cái gì nè ..."
+          placeholder="Nói hoặc nhập ..."
           autocomplete="off"
           class="flex-1 bg-gray-100 border-none rounded-full px-4 py-2 mx-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
         />
@@ -901,6 +1158,36 @@
             scales: { x: { grid: { display: false } }, y: { grid: { borderDash: [4, 4] } } },
           },
         });
+      }
+
+      async function runDeepScan() {
+        const modal = document.getElementById('scan-modal');
+        const loading = document.getElementById('scan-loading');
+        const result = document.getElementById('scan-result');
+
+        modal.classList.remove('hidden');
+        loading.classList.remove('hidden');
+        result.classList.add('hidden');
+
+        try {
+          const res = await fetch('/api/ai-deep-scan');
+          const data = await res.json();
+
+          // Điền dữ liệu vào phiếu
+          document.getElementById('res-score').innerText = data.score + '/100';
+          document.getElementById('res-disease').innerText = data.disease;
+          document.getElementById('res-advice').innerText = data.advice;
+          document.getElementById('res-future').innerText = data.future;
+
+          const symptomsList = document.getElementById('res-symptoms');
+          symptomsList.innerHTML = data.symptoms.map((s) => `<li>${s}</li>`).join('');
+
+          loading.classList.add('hidden');
+          result.classList.remove('hidden');
+        } catch (err) {
+          alert('Bác sĩ Moni bị ngất rồi, Bảo thử lại sau nhé!');
+          modal.classList.add('hidden');
+        }
       }
     </script>
   </body>

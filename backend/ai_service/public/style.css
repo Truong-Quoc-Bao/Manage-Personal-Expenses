@@ -681,3 +681,486 @@ canvas {
   white-space: nowrap;
   border-width: 0;
 }
+
+body {
+  background-color: #f3f4f6;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+.card {
+  background-color: white;
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  padding: 1.25rem;
+}
+
+/* token*/
+
+.ai-meta-container {
+  margin-top: 8px;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 8px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.tech-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: #64748b;
+  margin-bottom: 2px;
+}
+
+.tech-label {
+  font-weight: 500;
+}
+.tech-value {
+  font-weight: bold;
+  color: #0f172a;
+}
+
+.cost-highlight {
+  color: #e11d48 !important; /* Màu đỏ đô cho chi phí */
+  font-weight: 800;
+}
+
+.model-badge-mini {
+  background: #0084ff;
+  color: white;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 8px;
+  text-transform: uppercase;
+}
+/* --- Style cho nội dung chữ bên trong bong bóng --- */
+.chat-content {
+  word-break: break-word;
+}
+#model-selector option {
+  background-color: white !important;
+  color: #1f2937 !important; /* Màu xám đậm cho dễ đọc */
+  padding: 10px;
+}
+
+/* --- Hiệu ứng xuất hiện của tin nhắn --- */
+.message {
+  animation: messageSlideIn 0.3s ease-out forwards;
+  position: relative;
+}
+
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- Nhãn thông số AI (Industrial Look) --- */
+.ai-meta-info {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px border-gray-100;
+  justify-content: flex-end;
+}
+
+.badge-tech {
+  font-family: 'JetBrains Mono', 'Consolas', monospace;
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.badge-model {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+.badge-token {
+  background: #ecfdf5;
+  color: #059669;
+}
+.badge-cost {
+  background: #fff7ed;
+  color: #ea580c;
+  font-weight: 800;
+  border: 1px solid #ffedd5;
+}
+
+/* Ẩn thanh cuộn nhưng vẫn cho vuốt ngang */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Style cho từng viên thuốc (Chip) */
+.suggestion-chip {
+  white-space: nowrap;
+  background: #f0f2f5;
+  border: 1px solid #e4e6eb;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #050505;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.suggestion-chip:hover {
+  background: #e4e6eb;
+  transform: translateY(-1px);
+}
+
+.suggestion-chip i {
+  color: #0084ff;
+  font-size: 10px;
+}
+
+/* Dấu sao hiển thị trong markdown */
+.chat-content strong {
+  color: #1e293b;
+  font-weight: 700;
+}
+/* --- AI Model Selector - Thiết kế dạng Chip hiện đại --- */
+.model-selector-wrapper {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  padding: 4px 10px;
+  border-radius: 99px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+}
+
+.model-selector-wrapper:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+#model-selector {
+  background: transparent;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+#model-selector option {
+  background: white;
+  color: #1f2937;
+  font-weight: normal;
+}
+
+/* --- Nhãn Token & Cost - Nhìn như Log của Dev --- */
+.ai-meta-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  justify-content: flex-end;
+  opacity: 0.8;
+}
+
+.badge-tech {
+  font-size: 9px;
+  font-family: 'JetBrains Mono', 'Consolas', monospace;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge-model {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+.badge-token {
+  background: #ecfdf5;
+  color: #059669;
+}
+.badge-cost {
+  background: #fff7ed;
+  color: #ea580c;
+  font-weight: bold;
+}
+
+/* --- Cải tiến bong bóng chat --- */
+.message {
+  position: relative;
+  transition: all 0.3s ease;
+  animation: slideUp 0.4s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message.bot {
+  background: white;
+  border: 1px solid #f1f5f9;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.message.user {
+  background: linear-gradient(135deg, #0084ff, #0066cc);
+  box-shadow: 0 4px 12px rgba(0, 132, 255, 0.25);
+}
+
+/* Heatmap Styles */
+.heatmap-cell {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background-color: #ffe4e6;
+  margin: 2px;
+}
+.heatmap-cell.level-1 {
+  background-color: #fecdd3;
+}
+.heatmap-cell.level-2 {
+  background-color: #fb7185;
+}
+.heatmap-cell.level-3 {
+  background-color: #e11d48;
+}
+
+/* Voice preview */
+.voice-preview {
+  min-height: 24px;
+  padding: 0 4px 6px;
+  font-size: 13px;
+  color: #888;
+  font-style: italic;
+  display: none;
+}
+.voice-preview.active {
+  display: block;
+}
+.voice-preview.interim {
+  color: #666;
+}
+.voice-preview.error {
+  color: #dc2626;
+  font-style: normal;
+}
+
+.input-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+textarea {
+  flex: 1;
+  resize: none;
+  border: 0.5px solid #ddd;
+  border-radius: 20px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1.4;
+  outline: none;
+  max-height: 120px;
+  overflow-y: auto;
+  transition: border-color 0.15s;
+  background: white;
+}
+textarea:focus {
+  border-color: #999;
+}
+textarea::placeholder {
+  color: #bbb;
+}
+
+/* Mic button */
+.btn-mic {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 0.5px solid #ddd;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #555;
+  flex-shrink: 0;
+  transition: all 0.15s;
+  position: relative;
+}
+.btn-mic:hover {
+  border-color: #999;
+  color: #1a1a1a;
+}
+.btn-mic.recording {
+  border-color: #dc2626;
+  background: #fef2f2;
+  color: #dc2626;
+}
+.btn-mic.recording::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid #dc2626;
+  opacity: 0.4;
+  animation: ripple 1.2s infinite;
+}
+@keyframes ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+/* Floating Chat Widget Styles */
+.chat-widget-container {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  width: 380px;
+  height: 600px;
+  max-height: 80vh;
+  background: white;
+  border-radius: 1.5rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: translateY(120%);
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 50;
+  border: 1px solid #f3f4f6;
+}
+.chat-widget-container.open {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* Chat Messages Custom Scrollbar */
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  background-color: #f9fafb;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.chat-messages::-webkit-scrollbar {
+  width: 6px;
+}
+.chat-messages::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 10px;
+}
+
+/* Chat Bubbles */
+.message {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: 15px;
+  font-size: 14px;
+  line-height: 1.5;
+  word-wrap: break-word;
+}
+
+/* Tin nhắn của Bot (AI) - Nền trắng, chữ đen đậm */
+.message.bot {
+  background-color: white;
+  color: #1f2937;
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  border: 1px solid #f3f4f6;
+  align-self: flex-start;
+}
+
+/* Tin nhắn của Người dùng (Bảo) - Nền xanh dương, chữ trắng */
+.message.user {
+  background-color: #0084ff; /* Màu xanh dương đậm chuẩn Messenger */
+  color: white; /* Chữ màu trắng */
+  border-bottom-right-radius: 4px;
+  align-self: flex-end;
+  box-shadow: 0 1px 2px rgba(0, 132, 255, 0.2); /* Tạo bóng mờ màu xanh cho đẹp */
+}
+
+.message.bot p {
+  margin-bottom: 0.5em;
+}
+.message.bot p:last-child {
+  margin-bottom: 0;
+}
+.message.bot ul {
+  padding-left: 1.5em;
+  list-style-type: disc;
+  margin-bottom: 0.5em;
+}
+
+/* Typing indicator */
+.typing {
+  align-self: flex-start;
+  background-color: white;
+  padding: 10px 14px;
+  border-radius: 15px;
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  display: flex;
+  gap: 4px;
+  border: 1px solid #f3f4f6;
+}
+.typing .dot {
+  width: 6px;
+  height: 6px;
+  background-color: #9ca3af;
+  border-radius: 50%;
+  animation: typing 1.4s infinite ease-in-out both;
+}
+.typing .dot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+.typing .dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+@keyframes typing {
+  0%,
+  80%,
+  100% {
+    transform: scale(0);
+  }
+  40% {
+    transform: scale(1);
+  }
+}

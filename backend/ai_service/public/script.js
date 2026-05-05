@@ -823,7 +823,7 @@ function addMessage(text, isUser = false, aiInfo = null) {
     contentDiv.innerHTML =
       typeof marked !== 'undefined' && safeText.trim() !== ''
         ? marked.parse(safeText)
-        : safeText || 'Moni không có phản hồi';
+        : safeText || 'Money Guard không có phản hồi';
   } else {
     contentDiv.textContent = safeText;
   }
@@ -916,6 +916,7 @@ chatForm.addEventListener('submit', async (e) => {
 
   userInput.value = '';
   imagePreviewContainer.style.display = 'none';
+  if (voicePreview) voicePreview.classList.add('hidden');
   userInput.disabled = true;
   showTypingIndicator();
 
@@ -972,9 +973,10 @@ chatForm.addEventListener('submit', async (e) => {
       cost: data.cost || 0,
     });
     if (data.reply.includes('🚨') || data.reply.includes('⚠️')) {
-      showToast('Moni vừa đưa ra cảnh báo tài chính!', 'error');
+      showToast('Money Guard vừa đưa ra cảnh báo tài chính!', 'error');
     }
 
+    speakResponse(data.reply);
     // Cập nhật dashboard sau khi ghi sổ thành công
     updateDashboard();
   } catch (err) {
@@ -1083,7 +1085,7 @@ function getSmartSuggestions(data) {
       { icon: 'fa-rocket', text: 'Bắt đầu hành trình tiết kiệm' },
       { icon: 'fa-link', text: 'Kết nối ngân hàng tự động' },
       { icon: 'fa-camera', text: 'Chụp thử 1 hóa đơn cafe' },
-      { icon: 'fa-circle-question', text: 'Moni làm được những gì?' },
+      { icon: 'fa-circle-question', text: 'Money Guard làm được những gì?' },
       { icon: 'fa-user-shield', text: 'Dữ liệu của tôi có an toàn không?' },
     ];
   }
@@ -1182,7 +1184,153 @@ function renderSuggestions(data) {
 }
 
 // ==========================================
-// 16. KHỞI TẠO KHI TRANG LOAD
+// 16. HỆ THỐNG VOICE ASSISTANT (XÁC NHẬN THỦ CÔNG)
+// ==========================================
+
+const btnMic = document.getElementById('btn-mic');
+const voicePreview = document.getElementById('voice-preview');
+const voiceText = document.getElementById('voice-text');
+const voiceActions = document.getElementById('voice-actions');
+const btnVoiceConfirm = document.getElementById('btn-voice-confirm');
+const btnVoiceCancel = document.getElementById('btn-voice-cancel');
+
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const recognition = SpeechRecognition ? new SpeechRecognition() : null;
+
+if (recognition) {
+  recognition.lang = 'vi-VN';
+  recognition.continuous = false;
+  recognition.interimResults = true;
+
+  // 1. Nhấn Mic để bắt đầu nói
+  btnMic.addEventListener('click', () => {
+    if (btnMic.classList.contains('recording')) {
+      recognition.stop();
+    } else {
+      recognition.start();
+    }
+  });
+
+  recognition.onstart = () => {
+    btnMic.classList.add('recording', 'text-red-500', 'animate-pulse');
+    voicePreview.classList.remove('hidden');
+    voiceActions.classList.add('hidden'); // Ẩn nút khi đang nói
+    voiceText.innerText = 'Money Guard đang nghe Bảo nói...';
+    userInput.value = '';
+  };
+
+  recognition.onresult = (event) => {
+    // Tạo biến để chứa toàn bộ văn bản nghe được từ lúc bắt đầu đến giờ
+    let finalTranscript = '';
+
+    // Duyệt qua toàn bộ danh sách kết quả mà trình duyệt trả về
+    for (let i = event.resultIndex; i < event.results.length; ++i) {
+      // Lấy đoạn văn bản trong từng kết quả
+      let transcript = event.results[i][0].transcript;
+
+      // Nếu kết quả này là kết quả cuối cùng của đoạn đó
+      if (event.results[i].isFinal) {
+        finalTranscript += transcript;
+      } else {
+        // Nếu đang trong quá trình nhận diện (chưa chắc chắn)
+        finalTranscript += transcript;
+      }
+    }
+
+    // Nếu thực sự nghe được chữ thì mới cập nhật UI
+    if (finalTranscript.trim().length > 0) {
+      voiceText.innerText = `"${finalTranscript}"`;
+      userInput.value = finalTranscript;
+    }
+  };
+
+  recognition.onerror = (event) => {
+    console.error('Lỗi nhận diện giọng nói: ', event.error);
+    if (event.error === 'no-speech') {
+      voiceText.innerText = 'Money Guard không nghe thấy gì, Bảo nói lại nhé!';
+    }
+  };
+
+  recognition.onend = () => {
+    btnMic.classList.remove('recording', 'text-red-500', 'animate-pulse');
+
+    if (userInput.value.trim().length > 0) {
+      // ✅ HIỆN NÚT XÁC NHẬN THỦ CÔNG
+      voiceActions.classList.remove('hidden');
+      voiceText.innerHTML = `🎤 <span class="text-blue-800 font-bold">"${userInput.value}"</span>`;
+    } else {
+      voicePreview.classList.add('hidden');
+    }
+  };
+
+  // 2. Xử lý nút XÁC NHẬN & GỬI
+  btnVoiceConfirm.onclick = () => {
+    userInput.value = '';
+    voicePreview.classList.add('hidden');
+    chatForm.dispatchEvent(new Event('submit')); // Kích hoạt gửi tin
+  };
+
+  // 3. Xử lý nút HỦY
+  btnVoiceCancel.onclick = () => {
+    userInput.value = '';
+    voicePreview.classList.add('hidden');
+    showToast('Đã hủy tin nhắn giọng nói', 'info');
+  };
+}
+
+// --- HÀM PHÁT ÂM THANH PHẢN HỒI ---
+function speakResponse(text) {
+  // Lọc sạch nội dung trước khi nói (Xóa thẻ HTML, Markdown)
+  const cleanText = text.replace(/<.*?>/g, '').replace(/[#*]/g, '').substring(0, 250);
+  const msg = new SpeechSynthesisUtterance(cleanText);
+  msg.lang = 'vi-VN';
+  msg.rate = 1.0;
+  msg.pitch = 1.1;
+  window.speechSynthesis.speak(msg);
+}
+
+//
+//
+//
+
+async function runDeepScan() {
+  console.log('🚀 [UI] Nhấn nút Khám Sức Khỏe');
+  const modal = document.getElementById('scan-modal');
+  const loading = document.getElementById('scan-loading');
+  const result = document.getElementById('scan-result');
+
+  modal.classList.remove('hidden');
+  loading.classList.remove('hidden');
+  result.classList.add('hidden');
+
+  try {
+    const res = await fetch('/api/ai-deep-scan');
+
+    // LOG QUAN TRỌNG: Xem mã trạng thái (200, 403, 500...)
+    console.log('📡 [UI] Server phản hồi Status:', res.status);
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      console.error('❌ [UI] Dữ liệu lỗi từ Server:', errorData);
+      throw new Error(errorData.error || 'Server Error');
+    }
+
+    const data = await res.json();
+    console.log('💎 [UI] Dữ liệu nhận được:', data);
+
+    // ... (Đoạn điền dữ liệu vào HTML giữ nguyên) ...
+
+    loading.classList.add('hidden');
+    result.classList.remove('hidden');
+  } catch (err) {
+    console.error('🚨 [UI] LỖI KHI FETCH:', err);
+    alert(`Bác sĩ Moni bị ngất do lỗi: ${err.message}`);
+    modal.classList.add('hidden');
+  }
+}
+
+// ==========================================
+// 17. KHỞI TẠO KHI TRANG LOAD
 // ==========================================
 
 window.addEventListener('load', () => {

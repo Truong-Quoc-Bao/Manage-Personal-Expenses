@@ -750,3 +750,61 @@ httpServer.listen(PORT, () => {
 //   console.log(`🚀 Server chạy tại: http://localhost:${PORT}`);
 //   console.log(`→ POST /chat với body: { "message": "xin chào" }`);
 // });
+
+// --- HÀM HỖ TRỢ PHÁT HIỆN CHI TIÊU BẤT THƯỜNG ---
+async function getAnomalyStatus(userId, categoryName, amount) {
+  try {
+    const res = await pool.query(
+      `
+      SELECT AVG(t.amount) as average 
+      FROM transactions t
+      JOIN categories c ON t.category_id = c.category_id
+      JOIN accounts a ON t.account_id = a.account_id
+      WHERE a.user_id = $1 AND c.category_name ILIKE $2
+    `,
+      [userId, categoryName],
+    );
+
+    const avg = parseFloat(res.rows[0].average || 0);
+    // Nếu tiêu gấp 3 lần trung bình hạng mục đó thì báo động
+    if (avg > 0 && amount > avg * 3) {
+      return { isAnomaly: true, factor: Math.round(amount / avg) };
+    }
+    return { isAnomaly: false };
+  } catch (err) {
+    return { isAnomaly: false };
+  }
+}
+
+// --- HÀM TẠO NGỮ CẢNH SIÊU CHỦ ĐỘNG (Dán sau đoạn pool.connect) ---
+async function getProactiveContext(userId) {
+  const now = new Date();
+  const month = now.getMonth() + 1;
+
+  const stats = await pool.query(
+    `
+    SELECT 
+      COALESCE(SUM(CASE WHEN transaction_type = 'income' THEN amount ELSE 0 END), 0) as total_inc,
+      COALESCE(SUM(CASE WHEN transaction_type = 'expense' THEN amount ELSE 0 END), 0) as total_exp
+    FROM transactions t JOIN accounts a ON t.account_id = a.account_id
+    WHERE a.user_id = $1 AND EXTRACT(MONTH FROM t.date) = $2 AND EXTRACT(YEAR FROM t.date) = $3
+  `,
+    [userId, month, now.getFullYear()],
+  );
+
+  const { total_inc, total_exp } = stats.rows[0];
+  const balance = parseFloat(total_inc) - parseFloat(total_exp);
+
+  const daysInMonth = new Date(now.getFullYear(), month, 0).getDate();
+  const daysPassed = now.getDate() || 1; // Tránh chia cho 0
+  const dailyAvg = parseFloat(total_exp) / daysPassed;
+  const projectedExp = dailyAvg * daysInMonth;
+
+  return {
+    balance: balance,
+    dailyAvg: Math.round(dailyAvg),
+    status: projectedExp > total_inc ? '🔴 NGUY_HIỂM (Chi vượt Thu)' : '🟢 AN_TOÀN',
+    daysToEmpty: dailyAvg > 0 && balance > 0 ? Math.floor(balance / dailyAvg) : 0,
+    projectedTotal: Math.round(projectedExp),
+  };
+}

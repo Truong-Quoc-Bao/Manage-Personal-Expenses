@@ -859,10 +859,6 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
       [currentUserId, currentMonth, currentYear],
     );
 
-    const totalLimit = parseFloat(budgetRes.rows[0].total_limit);
-    const remainingBudget = totalLimit - totalExpense;
-    const dailyAllowance = daysLeft > 0 ? Math.round(remainingBudget / daysLeft) : 0;
-
     //
     const row = overallStatsRes.rows[0];
     const totalExpense = parseFloat(row.total_expense);
@@ -881,6 +877,10 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     const daysPassed = now.getDate();
     const daysLeft = daysInMonth - daysPassed;
     const projectedTotal = totalExpense + dailyAvg * daysLeft; // dailyAvg Bảo đã có ở trên rồi
+
+    const totalLimit = parseFloat(budgetRes.rows[0].total_limit);
+    const remainingBudget = totalLimit - totalExpense;
+    const dailyAllowance = daysLeft > 0 ? Math.round(remainingBudget / daysLeft) : 0;
 
     // Tạo báo cáo danh mục
     const categoryReport =
@@ -1320,7 +1320,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
                 }
               } else {
                 dbResult +=
-                  'Moni đã lục tung sổ sách nhưng không tìm thấy dữ liệu nào cho yêu cầu này của Bảo cả! 🕵️‍♂️';
+                  'Money Guard đã lục tung sổ sách nhưng không tìm thấy dữ liệu nào cho yêu cầu này của Bảo cả! 🕵️‍♂️';
               }
               // --- KẾT THÚC GOM CHUNG ---
 
@@ -1576,6 +1576,66 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
   }
 });
 
+//
+//
+//
+app.get('/api/ai-deep-scan', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user?.user_id || 1;
+    console.log(`🔍 [SCAN] Bắt đầu quét cho User ID: ${userId}`);
+
+    const result = await pool.query(
+      `
+      SELECT t.description, t.amount, t.date, c.category_name 
+      FROM transactions t 
+      JOIN categories c ON t.category_id = c.category_id
+      JOIN accounts a ON t.account_id = a.account_id
+      WHERE a.user_id = $1 AND EXTRACT(MONTH FROM t.date) = EXTRACT(MONTH FROM CURRENT_DATE)
+      AND t.transaction_type = 'expense'
+    `,
+      [userId],
+    );
+
+    console.log(`📊 [SCAN] Tìm thấy ${result.rows.length} giao dịch.`);
+
+    if (result.rows.length === 0) {
+      console.log('⚠️ [SCAN] Không có dữ liệu chi tiêu, trả về kết quả mặc định.');
+      return res.json({
+        score: 100,
+        disease: 'Ví tiền sạch sẽ tuyệt đối',
+        symptoms: ['Không có chi tiêu nào'],
+        advice: 'Bảo chưa tiêu gì nên không có bệnh để khám!',
+        future: 'Giàu sang phú quý',
+      });
+    }
+
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite-preview' });
+    const prompt = `Phân tích hồ sơ bệnh án tài chính này: ${JSON.stringify(
+      result.rows,
+    )}. Trả về JSON duy nhất: {"score":0-100, "disease":"...", "symptoms":[], "advice":"...", "future":"..."}`;
+
+    console.log('🧠 [SCAN] Đang gửi yêu cầu sang Gemini...');
+    const aiRes = await model.generateContent(prompt);
+    const text = aiRes.response.text();
+
+    // LOG QUAN TRỌNG: Xem AI trả về chữ hay JSON
+    console.log('📝 [SCAN] AI phản hồi thô:', text);
+
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const report = JSON.parse(jsonMatch[0]);
+      console.log('✅ [SCAN] Parse JSON thành công!');
+      res.json(report);
+    } else {
+      console.error('❌ [SCAN] AI không trả về đúng định dạng JSON!');
+      res.status(500).json({ error: 'AI Format Error' });
+    }
+  } catch (err) {
+    console.error('🚨 LỖI TẠI SERVER:', err); // Log lỗi hệ thống
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/chat-stream', authenticateToken, async (req, res) => {
   const { message } = req.body;
   const currentUserId = req.user?.user_id || 1;
@@ -1672,6 +1732,6 @@ app.get('/api/ai-health', (req, res) => {
   res.json(getStatusData());
 });
 
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server và Socket đang chạy tại cổng: ${PORT}`);
 });
