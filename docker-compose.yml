@@ -265,9 +265,6 @@ services:
       - .env
     ports:
       - "${AI_PORT}:4005"
-    depends_on:
-      - gateway
-      - rabbitmq
     networks:
       - finance-network
     volumes:

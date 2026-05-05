@@ -52,7 +52,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 app.use(express.json({ limit: '10mb' })); // tránh bị spam payload lớn
 app.use(express.static('public')); // phục vụ index.html, css, js
 
-const PORT = process.env.PORT || 4005;
+const PORT = process.env.AI_PORT || 4005;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const JWT_SECRET = process.env.JWT_SECRET || 'secret_key';
 
