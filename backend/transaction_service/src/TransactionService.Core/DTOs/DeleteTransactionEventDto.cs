@@ -2,14 +2,14 @@ using System.ComponentModel.DataAnnotations;
 
 namespace TransactionService.Core.DTOs
 {
-    public class CreateTransactionEventDto
+    public class DeleteTransactionEventDto
     {
         [Required]
         public Guid TransId { get; set; }
 
         [Required]
         public Guid UserId { get; set; }
-
+        
         [Required]
         public Guid AccountId { get; set; }
         
@@ -27,5 +27,6 @@ namespace TransactionService.Core.DTOs
         public DateOnly Date { get; set; }
 
         public string? Note { get; set; }
+
     }
 }

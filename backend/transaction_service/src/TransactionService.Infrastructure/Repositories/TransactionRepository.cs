@@ -43,5 +43,17 @@ namespace TransactionService.Infrastructure.Repositories
             await _context.SaveChangesAsync();
             return existingTransaction;
         }
+
+        public async Task<Transaction> DeleteTransactionAsync(Guid userId, Guid transactionId)
+        {
+            var existingTransaction = await _context.Transactions.FirstOrDefaultAsync(t => t.UserId == userId && t.TransId == transactionId);
+            if (existingTransaction == null){
+                throw new Exception("Transaction not found");
+            }
+
+            _context.Transactions.Remove(existingTransaction);
+            await _context.SaveChangesAsync();
+            return existingTransaction;
+        }
     }
 }
