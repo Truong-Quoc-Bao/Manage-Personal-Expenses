@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
+import { authApi, getAuthErrorMessage, takeAccessToken } from "../api/auth.api";
 
 export function Login() {
   const navigate = useNavigate();
@@ -23,11 +24,22 @@ export function Login() {
         return;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const { data } = await authApi.login({
+        email: formData.email.trim(),
+        password: formData.password,
+      });
+
+      const token = takeAccessToken(data);
+      if (!token) {
+        toast.error("Phản hồi đăng nhập không hợp lệ (thiếu token).");
+        return;
+      }
+
+      localStorage.setItem("token", token);
       toast.success("Đăng nhập thành công!");
       navigate("/dashboard");
     } catch (error) {
-      toast.error("Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin!");
+      toast.error(getAuthErrorMessage(error, "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin!"));
     } finally {
       setLoading(false);
     }
@@ -42,17 +54,15 @@ export function Login() {
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
-          <label className="block text-base text-gray-700 mb-2">
-            Email hoặc Tên đăng nhập
-          </label>
+          <label className="block text-base text-gray-700 mb-2">Email</label>
           <input
-            type="text"
+            type="email"
             value={formData.email}
             onChange={(e) =>
               setFormData({ ...formData, email: e.target.value })
             }
             className="w-full px-4 py-4 rounded-2xl border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-400"
-            placeholder="Nhập email hoặc tên đăng nhập"
+            placeholder="Nhập email đăng nhập"
             required
           />
         </div>

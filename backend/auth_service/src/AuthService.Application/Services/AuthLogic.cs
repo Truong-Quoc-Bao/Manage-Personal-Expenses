@@ -56,8 +56,17 @@ namespace AuthService.Application.Services
 
         public async Task<IdentityResult> UpdateStatusUserAsync(UserRegistrationConsumeEvent userRegistrationEvent)
         {
-            var userFindByEmail = await _authRepository.FindByEmailUserAsync(userRegistrationEvent.Email);
-            var userFindById = await _authRepository.FindByIdUserAsync(userRegistrationEvent.UserId);
+            ApplicationUser? userFindByEmail = null;
+            if (!string.IsNullOrWhiteSpace(userRegistrationEvent.Email))
+            {
+                userFindByEmail = await _authRepository.FindByEmailUserAsync(userRegistrationEvent.Email);
+            }
+
+            ApplicationUser? userFindById = null;
+            if (!string.IsNullOrWhiteSpace(userRegistrationEvent.UserId))
+            {
+                userFindById = await _authRepository.FindByIdUserAsync(userRegistrationEvent.UserId);
+            }
 
             if (userFindByEmail == null && userFindById == null)
             {

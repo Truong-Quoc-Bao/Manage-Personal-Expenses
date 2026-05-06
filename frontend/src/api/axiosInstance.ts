@@ -1,8 +1,12 @@
 import axios from 'axios';
 
+const baseURL = 'http://localhost:3000';
+  // import.meta.env.VITE_API_GATEWAY_URL ??
+  // (import.meta.env.DEV ? '' : 'http://localhost:3000');
+
 const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:3000',
-  timeout: 10000,
+  baseURL,
+  // timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },

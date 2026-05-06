@@ -3,7 +3,7 @@ const userService = require("../../services/user.service");
 async function handleUserCreate(data, msg) {
     try {
         console.log("Received user.create event:", data);
-        await userService.createUser(data);
+        await userService.createUserService(data);
         
     } catch (err) {
         console.error("Error processing user.create event:", err);

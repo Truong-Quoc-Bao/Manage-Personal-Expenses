@@ -113,3 +113,9 @@ TestResults/
 # MISC
 # =========================
 *.dbmdl
+
+# GitNexus — local graph index (regenerate: gitnexus analyze)
+.gitnexus/
+AGENTS.md
+CLAUDE.md
+.claude/
