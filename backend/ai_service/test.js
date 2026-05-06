@@ -1,11 +1,17 @@
-// --- TRONG app.js ---
-app.get('/api/ai-deep-scan', authenticateToken, async (req, res) => {
-  try {
-    // ... code xử lý bên trên giữ nguyên ...
-  } catch (err) {
-    console.error('🚨 LỖI TẠI SERVER:', err); // Dòng này sẽ hiện lỗi thật ở Terminal
+# DB_USER=postgres
+# DB_HOST=db.mdzmjrxpntwapuiyhqdo.supabase.co
+# DB_NAME=postgres
+# DB_PASSWORD=datletan16072004
+# DB_PORT=5432
 
-    // SỬA DÒNG NÀY: Trả về JSON để Frontend không bị sập
-    res.status(500).json({ error: err.message });
-  }
-});
+
+
+import { setDefaultResultOrder } from 'dns';
+setDefaultResultOrder('ipv4first'); // ← PHẢI ĐẶT TRƯỚC KHI TẠO POOL
+
+import pg from 'pg';
+const { Pool } = pg;
+
+
+
+AI_DATABASE_URL=postgresql://postgres.mdzmjrxpntwapuiyhqdo:DB_PASSWORD@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres

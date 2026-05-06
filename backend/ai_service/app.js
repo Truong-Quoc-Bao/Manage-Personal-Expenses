@@ -1,39 +1,62 @@
 import dotenv from 'dotenv';
-dotenv.config();
+// dotenv.config();
+dotenv.config({ override: false });
 
 import validator from 'validator';
 import express from 'express';
 import multer from 'multer';
-import pg from 'pg';
+
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import webpush from 'web-push';
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
-import { setDefaultResultOrder } from 'dns';
-import got from 'got';
 
+import got from 'got';
 import { getBestModel, getStatusData } from './super_check.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { MONEY_GUARD_RULES } from './systemRules.js';
 
+import { setDefaultResultOrder } from 'dns';
 setDefaultResultOrder('ipv4first');
 
+import pg from 'pg';
 const { Pool } = pg;
 
 // Cấu hình kết nối (thay thông tin đúng với máy Bảo)
+// const pool = new Pool({
+//   user: process.env.DB_USER,
+//   host: process.env.DB_HOST,
+//   database: process.env.DB_NAME,
+//   password: process.env.DB_PASSWORD,
+//   port: process.env.DB_PORT,
+// });
+
+// export default pool;
+
+// // Kiểm tra kết nối
+// pool.connect((err) => {
+//   if (err) console.error('❌ Lỗi kết nối Postgres:', err.stack);
+//   else console.log('✅ Đã kết nối PostgreSQL thành công');
+// });
+
+const rawUrl = process.env.AI_DATABASE_URL || '';
+const cleanUrl = rawUrl.trim();
+
 const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT,
+  connectionString: cleanUrl,
+  ssl: { rejectUnauthorized: false },
 });
 
-// Kiểm tra kết nối
+// Thêm cái log này để soi tận mắt cái URL nó đang gửi đi
+console.log(`📝 URL đang dùng: "${cleanUrl.substring(0, 30)}..."`);
+
 pool.connect((err) => {
-  if (err) console.error('❌ Lỗi kết nối Postgres:', err.stack);
-  else console.log('✅ Đã kết nối PostgreSQL thành công');
+  if (err) {
+    console.error('❌ Lỗi kết nối Postgres:', err.message);
+  } else {
+    console.log('✅ CHÚC MỪNG BẢO! Đã thông suốt PostgreSQL thành công!');
+  }
 });
 
 // dotenv.config();
