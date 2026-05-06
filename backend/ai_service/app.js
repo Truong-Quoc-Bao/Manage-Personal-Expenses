@@ -40,25 +40,37 @@ const { Pool } = pg;
 //   else console.log('✅ Đã kết nối PostgreSQL thành công');
 // });
 
-const rawUrl = process.env.AI_DATABASE_URL || '';
-const cleanUrl = rawUrl.trim();
+const cleanUrl = process.env.AI_DATABASE_URL || '';
+const SCHEMA_NAME = 'ai_service'; // Tên schema của bạn
 
 const pool = new Pool({
   connectionString: cleanUrl,
   ssl: { rejectUnauthorized: false },
 });
 
-// Thêm cái log này để soi tận mắt cái URL nó đang gửi đi
-console.log(`📝 URL đang dùng: "${cleanUrl.substring(0, 30)}..."`);
-
-pool.connect((err) => {
-  if (err) {
-    console.error('❌ Lỗi kết nối Postgres:', err.message);
-  } else {
-    console.log('✅ CHÚC MỪNG BẢO! Đã thông suốt PostgreSQL thành công!');
-  }
+// Cách để ép tất cả kết nối dùng đúng Schema
+pool.on('connect', (client) => {
+  client.query(`SET search_path TO ${SCHEMA_NAME}, public`)
+    .catch(err => console.error('❌ Lỗi khi set Search Path:', err));
 });
 
+// Đoạn check kết nối của bạn
+pool.connect((err, client, release) => {
+  if (err) {
+    console.log(`📝 URL đang dùng: "${cleanUrl.substring(0, 30)}..."`);
+    console.error('❌ Lỗi kết nối Postgres:', err.message);
+  } else {
+    console.log(`✅ CHÚC MỪNG BẢO! Đã thông suốt tới Schema: ${SCHEMA_NAME}`);
+    
+    // Test thử xem có đọc được bảng trong schema đó không
+    client.query('SELECT current_schema()', (err, res) => {
+      release(); // Giải phóng client lại cho pool
+      if (!err) {
+        console.log('📂 Schema hiện tại đang đứng là:', res.rows[0].current_schema);
+      }
+    });
+  }
+});
 // dotenv.config();
 const app = express();
 
