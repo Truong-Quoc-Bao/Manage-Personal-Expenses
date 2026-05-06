@@ -4,7 +4,8 @@ services:
   n8n:
     image: n8nio/n8n:latest
     container_name: finance-n8n
-    env_file: .env
+    env_file:
+      - .env
     environment:
       - N8N_HOST=localhost
       - N8N_PORT=5678
@@ -273,9 +274,9 @@ services:
     networks:
       - finance-network
     volumes:
-      - ./backend/ai_service:/app
-      - ./backend/shared/rabbitmq-client:/app/node_modules/rabbitmq-client
-      - /app/node_modules
+      - ./backend/ai_service:/app/backend/ai_service
+      - ./backend/shared/rabbitmq-client:/app/backend/shared/rabbitmq-client
+      - /app/backend/ai_service/node_modules
       - /app/backend/shared/rabbitmq-client/node_modules
 
   gateway:
