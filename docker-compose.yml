@@ -1,6 +1,24 @@
 version: '3.8'
 
 services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: finance-n8n
+    env_file: .env
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=https://unnibbed-unthrilled-averi.ngrok-free.dev
+      - GENERIC_TIMEZONE=Asia/Ho_Chi_Minh
+      - N8N_PAYLOAD_SIZE_MAX=10
+    ports:
+      - '${N8N_PORT}:5678'
+    volumes:
+      - n8n-data:/home/node/.n8n
+    networks:
+      - finance-network
+
   mongodb:
     image: mongo:7
     container_name: finance-mongodb
@@ -9,7 +27,7 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: admin
       MONGO_INITDB_DATABASE: analytics_db
     ports:
-      - "${MONGODB_PORT}:27017"
+      - '${MONGODB_PORT}:27017'
     volumes:
       - mongodb-data:/data/db
     networks:
@@ -19,7 +37,7 @@ services:
     image: redis:7-alpine
     container_name: finance-redis
     ports:
-      - "${REDIS_PORT}:6379"
+      - '${REDIS_PORT}:6379'
     volumes:
       - redis-data:/data
     networks:
@@ -33,14 +51,14 @@ services:
       RABBITMQ_DEFAULT_USER: admin
       RABBITMQ_DEFAULT_PASS: admin
     ports:
-      - "${RABBITMQ_PORT}:5672"
-      - "${RABBITMQ_MANAGEMENT_PORT}:15672" #UI
+      - '${RABBITMQ_PORT}:5672'
+      - '${RABBITMQ_MANAGEMENT_PORT}:15672' #UI
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     networks:
       - finance-network
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      test: ['CMD', 'rabbitmq-diagnostics', 'ping']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -61,7 +79,7 @@ services:
       - /app/backend/auth_service/src/AuthService.Application/bin
       - /app/backend/auth_service/src/AuthService.Application/obj
     ports:
-      - "${AUTH_SERVICE_PORT}:3006"
+      - '${AUTH_SERVICE_PORT}:3006'
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:3006
@@ -81,7 +99,7 @@ services:
     env_file:
       - .env
     ports:
-      - "${USER_SERVICE_PORT}:3001"
+      - '${USER_SERVICE_PORT}:3001'
     environment:
       - NODE_ENV=development
     depends_on:
@@ -103,8 +121,8 @@ services:
     env_file:
       - .env
     ports:
-      - "${ACCOUNT_SERVICE_PORT}:3002"
-      - "${GRPC_ACCOUNT_SERVICE_PORT}:50051"
+      - '${ACCOUNT_SERVICE_PORT}:3002'
+      - '${GRPC_ACCOUNT_SERVICE_PORT}:50051'
     environment:
       - NODE_ENV=development
     depends_on:
@@ -136,7 +154,7 @@ services:
       - /app/backend/transaction_service/src/TransactionService.Application/bin
       - /app/backend/transaction_service/src/TransactionService.Application/obj
     ports:
-      - "${TRANSACTION_SERVICE_PORT}:3007"
+      - '${TRANSACTION_SERVICE_PORT}:3007'
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:3007
@@ -154,8 +172,8 @@ services:
     env_file:
       - .env
     ports:
-      - "${CATEGORY_SERVICE_PORT}:3003"
-      - "${GRPC_CATEGORY_SERVICE_PORT}:50052"
+      - '${CATEGORY_SERVICE_PORT}:3003'
+      - '${GRPC_CATEGORY_SERVICE_PORT}:50052'
     environment:
       - NODE_ENV=development
     depends_on:
@@ -178,7 +196,7 @@ services:
     env_file:
       - .env
     ports:
-      - "${ANALYTICS_SERVICE_PORT}:3004"
+      - '${ANALYTICS_SERVICE_PORT}:3004'
     environment:
       - NODE_ENV=development
     depends_on:
@@ -201,7 +219,7 @@ services:
     env_file:
       - .env
     ports:
-      - "${NOTIFICATION_SERVICE_PORT}:3005"
+      - '${NOTIFICATION_SERVICE_PORT}:3005'
     environment:
       - NODE_ENV=development
     depends_on:
@@ -223,7 +241,7 @@ services:
     env_file:
       - .env
     ports:
-      - "${BUDGET_SERVICE_PORT}:3008"
+      - '${BUDGET_SERVICE_PORT}:3008'
     environment:
       - NODE_ENV=development
     depends_on:
@@ -237,6 +255,29 @@ services:
       - /app/backend/budget_service/node_modules
       - /app/backend/shared/rabbitmq-client/node_modules
 
+  ai-service:
+    build:
+      context: .
+      dockerfile: backend/ai_service/Dockerfile
+    container_name: finance-ai-service
+    env_file: .env
+    ports:
+      - '${AI_PORT}:4005'
+    environment:
+      - NODE_ENV=development
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
+    networks:
+      - finance-network
+    volumes:
+      - ./backend/ai_service:/app
+      - ./backend/shared/rabbitmq-client:/app/node_modules/rabbitmq-client
+      - /app/node_modules
+      - /app/backend/shared/rabbitmq-client/node_modules
+
   gateway:
     build:
       context: .
@@ -245,7 +286,7 @@ services:
     env_file:
       - .env
     ports:
-      - "${GATEWAY_PORT}:3000"
+      - '${GATEWAY_PORT}:3000'
     depends_on:
       - auth-service
       - user-service
@@ -270,7 +311,7 @@ services:
     env_file:
       - .env
     ports:
-      - "${FRONTEND_PORT}:5173"
+      - '${FRONTEND_PORT}:5173'
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -285,3 +326,4 @@ volumes:
   mongodb-data:
   redis-data:
   rabbitmq-data:
+  n8n-data:
