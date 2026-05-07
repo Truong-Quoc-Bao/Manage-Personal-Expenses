@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 
 
 const connectDB = async () => {
+        console.log(process.env.MONGODB_URL);
+
     try {
         const conn = await mongoose.connect(process.env.MONGODB_URL, {
             // useNewUrlParser: true,
@@ -11,12 +13,19 @@ const connectDB = async () => {
         console.log("DB:", mongoose.connection.name);
         console.log(`MongoDB Connected: ${conn.connection.host}`);
     } catch (error) {
-        console.error('MongoDB connection error:', error.message);
-        // process.exit(1);
+        console.error("❌ MongoDB connection error:");
 
-        
-        // retry sau 5s (rất cần khi dùng Docker)
+        console.error("Message:", error.message);
+        console.error("Code:", error.code);
+        console.error("Name:", error.name);
+        console.error("Stack:", error.stack);
+
+        // log full object (rất hữu ích)
+        console.error("Full error:", error);
+
+        // retry sau 5s
         setTimeout(connectDB, 5000);
+
     }
 };
 
