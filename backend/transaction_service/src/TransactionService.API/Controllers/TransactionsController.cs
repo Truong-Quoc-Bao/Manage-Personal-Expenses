@@ -54,5 +54,14 @@ namespace TransactionService.API.Controllers
             var createdTransaction = await _transactionService.CreateTransactionAsync(userId, request);
             return CreatedAtAction(nameof(GetTransactionById), new { id = createdTransaction.TransId }, createdTransaction);
         }
+
+        [HttpDelete]
+        [Route("{id:Guid}")]
+        public async Task<IActionResult> DeleteTransaction([FromRoute] Guid id)
+        {
+            var userId = Guid.Parse("4f4b144d-e3f8-4e6b-9e32-408030a85698");
+            var deletedTransaction = await _transactionService.DeleteTransactionByIdAsync(userId, id);
+            return Ok(deletedTransaction);
+        }
     }
 }
