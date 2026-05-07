@@ -4,6 +4,7 @@ option csharp_namespace = "TransactionService.Infrastructure.Protos";
 
 service BudgetProtoService {
   rpc GetBudgetStatus (GetBudgetRequest) returns (BudgetResponse);
+  rpc GetBudgetsByUser (GetBudgetsByUserRequest) returns (GetBudgetsByUserResponse);
 }
 
 message GetBudgetRequest {
@@ -14,4 +15,23 @@ message GetBudgetRequest {
 message BudgetResponse {
   bool   exists  = 1;
   string message = 2;
+}
+
+// --- Analytics support ---
+
+message GetBudgetsByUserRequest {
+  string user_id = 1;
+}
+
+message BudgetInfo {
+  string budget_id    = 1;
+  string category_id  = 2;
+  double amount_limit = 3;
+  string status       = 4;
+}
+
+message GetBudgetsByUserResponse {
+  bool                  valid   = 1;
+  string                message = 2;
+  repeated BudgetInfo   budgets = 3;
 }

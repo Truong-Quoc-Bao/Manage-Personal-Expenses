@@ -4,6 +4,7 @@ option csharp_namespace = "TransactionService.Infrastructure.Protos";
 
 service AccountProtoService {
   rpc GetAccountStatus (GetAccountRequest) returns (AccountResponse);
+  rpc ValidateAnalyticsContext (ValidateAnalyticsContextRequest) returns (ValidateAnalyticsContextResponse);
 }
 
 message GetAccountRequest {
@@ -14,4 +15,22 @@ message GetAccountRequest {
 message AccountResponse {
   bool exists = 1;
   string message = 2;
+}
+
+// --- Analytics support ---
+
+message ValidateAnalyticsContextRequest {
+  string user_id = 1;
+}
+
+message AccountInfo {
+  string account_id = 1;
+  string user_id    = 2;
+  double balance    = 3;
+}
+
+message ValidateAnalyticsContextResponse {
+  bool                  valid    = 1;
+  string                message  = 2;
+  repeated AccountInfo  accounts = 3;
 }
