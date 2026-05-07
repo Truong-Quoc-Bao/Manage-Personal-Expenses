@@ -5,6 +5,7 @@ option csharp_namespace = "TransactionService.Infrastructure.Protos";
 service CategoryProtoService {
   rpc GetCategoryStatus (GetCategoryRequest) returns (CategoryResponse);
   rpc GetCategoryDisplay (GetCategoryRequest) returns (CategoryDisplayResponse);
+  rpc GetCategoriesByUser (GetCategoriesByUserRequest) returns (GetCategoriesByUserResponse);
 }
 
 message GetCategoryRequest {
@@ -23,4 +24,22 @@ message CategoryDisplayResponse {
   string category_name = 2;
   string color = 3;
   string icon_code = 4;
+}
+
+// --- Analytics support ---
+
+message GetCategoriesByUserRequest {
+  string user_id = 1;
+}
+
+message CategoryInfo {
+  string category_id   = 1;
+  string category_name = 2;
+  string type          = 3;
+}
+
+message GetCategoriesByUserResponse {
+  bool                   valid      = 1;
+  string                 message    = 2;
+  repeated CategoryInfo  categories = 3;
 }

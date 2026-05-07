@@ -8,7 +8,7 @@ const {
 
 const deleteBudgetController = async (req, res, next) => {
   try {
-    const userId = req.user?.userId || req.query.userId;
+    const userId = req.user?.userId || "7cb96e5d-3cd9-40dc-ad99-635f08456301";
     const budgetId = req.params.id;
 
     const budgets = await deleteBudgetService({
@@ -27,16 +27,16 @@ const deleteBudgetController = async (req, res, next) => {
 
 const updateBudgetController = async (req, res, next) => {
   try {
-    const userId = req.user?.userId || req.query.userId;
+    const userId = req.user?.userId || "7cb96e5d-3cd9-40dc-ad99-635f08456301";
     const budgetId = req.params.id;
-    const { categoryId, amountLimit, date } = req.body;
+    const { categoryId, amountLimit, dateStart } = req.body;
 
     const budgets = await updateBudgetService({
       userId,
       budgetId,
       categoryId,
       amountLimit,
-      date,
+      dateStart,
     });
 
     return res.status(200).json({
@@ -51,14 +51,14 @@ const updateBudgetController = async (req, res, next) => {
 
 const createBudgetController = async (req, res, next) => {
   try {
-    const userId = req.user?.userId || req.query.userId;
-    const { categoryId, amountLimit, date } = req.body;
+    const userId = req.user?.userId || "7cb96e5d-3cd9-40dc-ad99-635f08456301";
+    const { categoryId, amountLimit, dateStart } = req.body;
 
     const budgets = await createBudgetService({
       userId,
       categoryId,
       amountLimit,
-      date,
+      dateStart,
     });
 
     return res.status(200).json({
@@ -73,14 +73,14 @@ const createBudgetController = async (req, res, next) => {
 
 const getBudgetByUserIdController = async (req, res, next) => {
   try {
-    const userId = req.user?.userId || req.query.userId;
+    const userId = req.user?.userId || "7cb96e5d-3cd9-40dc-ad99-635f08456301";
     const categoryId = req.query.categoryId;
-    const date = req.query.date;
+    const dateStart = req.query.date;
 
     const budgets = await getBudgetByUserIdService({
       userId,
       categoryId,
-      date,
+      dateStart,
     });
 
     return res.status(200).json({
@@ -94,7 +94,7 @@ const getBudgetByUserIdController = async (req, res, next) => {
 };
 const getBudgetByBudgetIdController = async (req, res, next) => {
   try {
-    const userId = req.user?.userId || req.query.userId;
+    const userId = req.user?.userId || "7cb96e5d-3cd9-40dc-ad99-635f08456301";
     const budgetId = req.params.id;
 
     const budgets = await getBudgetByBudgetIdService({

@@ -1,6 +1,6 @@
-const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '.env') });
-const express = require('express');
+const path = require("path");
+require("dotenv").config({ path: path.resolve(__dirname, ".env") });
+const express = require("express");
 const app = express();
 const cors = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
@@ -10,14 +10,15 @@ const authenticateAuthService =
     authenticate.authenticationMiddlewareExceptPublicAuthRoutes;
 const PORT = process.env.PORT;
 
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    // allowedHeaders: ['Content-Type', 'Authorization']
+  })
+);
 
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-}));
-
-app.use(morgan('dev'));
+app.use(morgan("dev"));
 
 const proxyOnError = (serviceLabel) => (err, req, res) => {
     console.error(`Proxy error (${serviceLabel}):`, err);
@@ -73,11 +74,27 @@ app.use('/api/transactions', authenticate, createProxyMiddleware({
     onError: proxyOnError('transactions'),
 }));
 
-app.get('/api/health', (req, res) => {
-    res.status(200).json({ status: 'ok' });
+app.use('/api/ai', createProxyMiddleware({
+    target: process.env.AI_SERVICE_URL || 'http://localhost:4005',
+    changeOrigin: true,
+    logLevel: 'debug',
+    pathRewrite: {
+      '^/api/ai': '',
+    },
+    onError: (err, req, res) => {
+      console.error('Proxy error (AI Service):', err);
+      res.status(500).send('AI Gateway error');
+    },
+  }),
+);
+
+app.get("/api/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
 });
 
 app.listen(PORT, () => {
-    console.log('Transaction service is running on ' + process.env.TRANSACTION_SERVICE_URL);
-    console.log(`Gateway is running on port ${PORT}`);
+  console.log(
+    "Transaction service is running on " + process.env.TRANSACTION_SERVICE_URL
+  );
+  console.log(`Gateway is running on port ${PORT}`);
 });

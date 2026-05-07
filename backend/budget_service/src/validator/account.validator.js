@@ -15,7 +15,7 @@ const budgetValidation = {
       "number.positive": "amountLimit must be greater than 0",
     }),
 
-    date: Joi.string()
+    dateStart: Joi.string()
       .trim()
       .pattern(/^\d{4}(-\d{2})?(-\d{2})?$/)
       .optional()

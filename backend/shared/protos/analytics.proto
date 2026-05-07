@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+option csharp_namespace = "AnalyticsService.Infrastructure.Protos";
+
+service AnalyticsProtoService {
+  rpc GetAnalyticsStatus (GetAnalyticsRequest) returns (AnalyticsResponse);
+}
+
+message GetAnalyticsRequest {
+  string user_id = 1;
+}
+
+message AnalyticsResponse {
+  bool   exists  = 1;
+  string message = 2;
+}
