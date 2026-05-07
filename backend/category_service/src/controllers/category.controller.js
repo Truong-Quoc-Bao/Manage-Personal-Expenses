@@ -3,23 +3,19 @@ const { creaCategories } = require("../services/category.service");
 const { updCategories } = require("../services/category.service");
 const { delCategoryService } = require("../services/category.service");
 
-
-
 const getCategoryList = async (req, res, next) => {
   try {
     // const type = req.query;
-    const userId = "e67f2863-5f03-4dff-b247-478b140ab6c4";
+    const userId = "7cb96e5d-3cd9-40dc-ad99-635f08456301";
 
     const categories = await getCategories({ userId });
 
-    console.log("QUERY:", req.query); 
+    console.log("QUERY:", req.query);
     return res.status(200).json({
       success: true,
       message: "Get categories successfully",
       data: categories,
     });
-
-    
   } catch (error) {
     next(error);
   }
@@ -28,20 +24,21 @@ const getCategoryList = async (req, res, next) => {
 const createCategory = async (req, res, next) => {
   try {
     // const type = req.query;
-    const userId = "e67f2863-5f03-4dff-b247-478b140ab6c4";
+    const userId = "7cb96e5d-3cd9-40dc-ad99-635f08456301";
     const category = req.body;
-    console.log("Creating controller category with data:", { userId, cat: category }); // Debug log to check input data
+    console.log("Creating controller category with data:", {
+      userId,
+      cat: category,
+    }); // Debug log to check input data
 
     const categories = await creaCategories({ userId, cat: category });
 
-    // console.log("QUERY:", req.query); 
+    // console.log("QUERY:", req.query);
     return res.status(200).json({
       success: true,
       message: "POST categories successfully",
       data: categories,
     });
-
-    
   } catch (error) {
     next(error);
   }
@@ -49,10 +46,10 @@ const createCategory = async (req, res, next) => {
 
 const updateCategory = async (req, res, next) => {
   try {
-    const userId = "e67f2863-5f03-4dff-b247-478b140ab6c4";
+    const userId = "7cb96e5d-3cd9-40dc-ad99-635f08456301";
     const category = req.body;
     const catid = req.params.id;
-    const categories = await updCategories({ userId, catid ,cat: category });
+    const categories = await updCategories({ userId, catid, cat: category });
 
     return res.status(200).json({
       success: true,
@@ -66,7 +63,7 @@ const updateCategory = async (req, res, next) => {
 
 const deleteCategory = async (req, res, next) => {
   try {
-    const userId = "e67f2863-5f03-4dff-b247-478b140ab6c4";
+    const userId = "7cb96e5d-3cd9-40dc-ad99-635f08456301";
     // const category = req.body;
     const catid = req.params.id;
     const categories = await delCategoryService({ categoryId: catid });
@@ -81,7 +78,9 @@ const deleteCategory = async (req, res, next) => {
   }
 };
 
-
 module.exports = {
-  getCategoryList,createCategory,updateCategory,deleteCategory
+  getCategoryList,
+  createCategory,
+  updateCategory,
+  deleteCategory,
 };

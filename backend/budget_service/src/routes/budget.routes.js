@@ -10,9 +10,9 @@ const validate = require("../middlewares/validation.middleware");
 
 const router = express.Router();
 
-router.get("/budgets", validate(), getBudgetByUserIdController);
-router.get("/budgets/:id", getBudgetByBudgetIdController);
-router.post("/budgets", validate(), createBudgetController);
-router.put("/budgets/:id", validate(), updateBudgetController);
-router.delete("/budgets/:id", validate(), deleteBudgetController);
+router.get("/", validate(), getBudgetByUserIdController);
+router.get("/:id", getBudgetByBudgetIdController);
+router.post("/", validate(), createBudgetController);
+router.put("/:id", validate(), updateBudgetController);
+router.delete("/:id", validate(), deleteBudgetController);
 module.exports = router;

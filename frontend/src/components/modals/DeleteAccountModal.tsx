@@ -1,81 +1,116 @@
-import React from "react";
-import { useState } from "react";
+import React, { useState } from "react";
 import { X, AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
+import { accountApi } from "../../api/account.api";
+
+type Account = {
+  account_id: string;
+  account_name: string;
+  balance: number | string;
+  type: string;
+  currency?: string | null;
+};
 
 interface DeleteAccountModalProps {
-  account: {
-    id: number;
-    name: string;
-    balance: number;
-    type: string;
-    icon: string;
-    currency: string;
-  };
+  account: Account;
   onClose: () => void;
-  onConfirm: () => void;
+  onSuccess: () => void;
 }
 
 export function DeleteAccountModal({
   account,
   onClose,
-  onConfirm,
+  onSuccess,
 }: DeleteAccountModalProps) {
   const [loading, setLoading] = useState(false);
   const [confirmText, setConfirmText] = useState("");
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | string) => {
     return new Intl.NumberFormat("vi-VN", {
       style: "currency",
       currency: "VND",
-    }).format(amount);
+    }).format(Number(amount));
+  };
+
+  const getAccountIcon = (type: string) => {
+    switch (type) {
+      case "cash":
+        return "💵";
+      case "bank":
+        return "🏦";
+      case "ewallet":
+        return "📱";
+      default:
+        return "💰";
+    }
   };
 
   const handleDelete = async () => {
+    if (!account.account_id) {
+      toast.error("Không tìm thấy accountId để xóa");
+      return;
+    }
+
     setLoading(true);
 
-    // Mock API call
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    try {
+      await accountApi.deleteAccount({
+        accountId: account.account_id,
+      });
 
-    onConfirm();
-    setLoading(false);
+      toast.success(`Đã xóa tài khoản "${account.account_name}" thành công!`);
+      onSuccess();
+      onClose();
+    } catch (error) {
+      console.error("Delete account failed:", error);
+      toast.error("Xóa tài khoản thất bại!");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const isConfirmValid = confirmText.toLowerCase() === "xóa";
+  const isConfirmValid = confirmText.trim().toLowerCase() === "xóa";
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full animate-in zoom-in-95 duration-200">
-        <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <h2 className="text-xl text-gray-800">Xác nhận xóa tài khoản</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+          <h2 className="text-xl font-semibold text-gray-900">
+            Xác nhận xóa tài khoản
+          </h2>
+
           <button
+            type="button"
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            className="rounded-lg !bg-transparent p-2 text-gray-600 hover:!bg-gray-100"
           >
-            <X className="w-5 h-5 text-gray-600" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="p-6 space-y-5">
-          {/* Warning */}
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex gap-3">
-            <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+        <div className="space-y-5 p-6">
+          <div className="flex gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
+            <AlertTriangle className="mt-0.5 h-6 w-6 flex-shrink-0 text-red-600" />
             <div>
-              <p className="text-sm text-red-800 mb-1">
+              <p className="mb-1 text-sm text-red-800">
                 <strong>Cảnh báo:</strong> Hành động này không thể hoàn tác!
               </p>
               <p className="text-sm text-red-700">
-                Tất cả dữ liệu liên quan đến tài khoản này sẽ bị xóa vĩnh viễn.
+                Tài khoản này sẽ bị xóa khỏi hệ thống.
               </p>
             </div>
           </div>
 
-          {/* Account Info */}
-          <div className="bg-gray-50 rounded-xl p-4">
-            <p className="text-sm text-gray-600 mb-3">Bạn sắp xóa:</p>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="text-3xl">{account.icon}</div>
+          <div className="rounded-xl bg-gray-50 p-4">
+            <p className="mb-3 text-sm text-gray-600">Bạn sắp xóa:</p>
+
+            <div className="flex items-center gap-3">
+              <div className="text-3xl">{getAccountIcon(account.type)}</div>
+
               <div>
-                <p className="text-lg text-gray-800">{account.name}</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  {account.account_name}
+                </p>
                 <p className="text-sm text-gray-600">
                   Số dư: {formatCurrency(account.balance)}
                 </p>
@@ -83,35 +118,36 @@ export function DeleteAccountModal({
             </div>
           </div>
 
-          {/* Confirmation Input */}
           <div>
-            <label className="block text-sm text-gray-700 mb-2">
+            <label className="mb-2 block text-sm text-gray-700">
               Để xác nhận, vui lòng nhập "<strong>xóa</strong>" vào ô bên dưới:
             </label>
+
             <input
               type="text"
               value={confirmText}
               onChange={(e) => setConfirmText(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent"
+              className="h-12 w-full rounded-xl border border-gray-300 bg-white px-4 text-gray-900 outline-none focus:ring-2 focus:ring-red-400"
               placeholder="Nhập 'xóa' để xác nhận"
               autoComplete="off"
             />
           </div>
 
-          {/* Actions */}
           <div className="flex gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="flex-1 px-6 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              className="flex-1 rounded-xl !bg-gray-100 px-6 py-3 font-semibold text-gray-700 hover:!bg-gray-200 disabled:opacity-50"
             >
               Hủy
             </button>
+
             <button
+              type="button"
               onClick={handleDelete}
               disabled={loading || !isConfirmValid}
-              className="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 rounded-xl !bg-gradient-to-r !from-red-500 !to-red-600 px-6 py-3 font-semibold text-white shadow-lg hover:!from-red-600 hover:!to-red-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? "Đang xóa..." : "Xóa tài khoản"}
             </button>
