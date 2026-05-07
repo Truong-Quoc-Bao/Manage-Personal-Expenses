@@ -51,6 +51,16 @@ namespace TransactionService.API.Controllers
             return CreatedAtAction(nameof(GetTransactionById), new { id = createdTransaction.TransId }, createdTransaction);
         }
 
+        [HttpPut]
+        [Route("{id:Guid}")]
+        [ServiceFilter(typeof(ValidationFilter))]
+        public async Task<IActionResult> UpdateTransaction([FromRoute] Guid id, [FromBody] UpdateTransactionRequestDto request)
+        {
+            var userId = Guid.Parse("4f4b144d-e3f8-4e6b-9e32-408030a85698");
+            var updatedTransaction = await _transactionService.UpdateTransactionAsync(userId, id, request);
+            return Ok(updatedTransaction);
+        }
+
         [HttpDelete]
         [Route("{id:Guid}")]
         public async Task<IActionResult> DeleteTransaction([FromRoute] Guid id)
