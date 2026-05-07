@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>SePay Cloudflare Error</title>
+  <style>
+    body {
+      font-family: Arial;
+      background: #111;
+      color: #eee;
+      padding: 20px;
+    }
+    pre {
+      background: #222;
+      padding: 15px;
+      overflow-x: auto;
+      border-radius: 8px;
+      border: 1px solid #444;
+    }
+    h1 { color: #ff4d4f; }
+    .info { color: #00d4ff; }
+  </style>
+</head>
+<body>
+
+<h1>❌ SePay API bị Cloudflare chặn</h1>
+
+<p class="info"><b>Endpoint:</b> /v1/link-token</p>
+<p class="info"><b>Status:</b> 403 Forbidden</p>
+<p class="info"><b>IP:</b> 116.110.40.7</p>
+
+<h2>📌 Ray ID</h2>
+<ul>
+  <li>9e9edc46198c6e7c</li>
+  <li>9e9edc482f886e7c</li>
+</ul>
+
+<h2>📄 Response HTML từ Cloudflare</h2>
+
+<pre>
+Sorry, you have been blocked
+
+This website is using a security service to protect itself from online attacks.
+
+Cloudflare Ray ID: 9e9edc46198c6e7c
+Cloudflare Ray ID: 9e9edc482f886e7c
+</pre>
+
+<h2>🧠 Mô tả</h2>
+<p>
+- API /v1/token hoạt động bình thường<br>
+- API /v1/link-token bị Cloudflare block<br>
+- Request gửi từ server Node.js (server-to-server)
+</p>
+
+</body>
+</html>
