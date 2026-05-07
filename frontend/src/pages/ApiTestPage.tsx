@@ -1,57 +1,146 @@
 import React, { useState } from 'react';
-import { authApi, statsApi, chatApi, notificationApi } from '../api/ai.api'; // Sửa lại path cho đúng file chứa code API của bạn
+import { authApi, statsApi, chatApi, notificationApi } from '../api/ai.api';
 
 const ApiTestPage = () => {
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   const runTest = async (apiCall: Promise<any>) => {
     setLoading(true);
-    setResult('Đang gọi API...');
+    setStatus('idle');
+    setResult('🚀 Đang gọi API...');
+
     try {
       const res = await apiCall;
-      setResult(res.data);
+      setResult(res.data || res); // Backup nếu res không có .data
+      setStatus('success');
       console.log('✅ Kết quả:', res.data);
     } catch (err: any) {
-      setResult(err.response?.data || err.message);
+      setResult(err.response?.data || err.message || 'Lỗi không xác định');
+      setStatus('error');
       console.error('❌ Lỗi:', err);
     } finally {
       setLoading(false);
     }
   };
 
+  const clearResult = () => {
+    setResult(null);
+    setStatus('idle');
+  };
+
+  // Helper render button group
+  const Group = ({ title, children }: { title: string; children: React.ReactNode }) => (
+    <div
+      style={{
+        marginBottom: '15px',
+        border: '1px solid #ddd',
+        padding: '10px',
+        borderRadius: '8px',
+      }}
+    >
+      <h4 style={{ marginTop: 0, color: '#555' }}>{title}</h4>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>{children}</div>
+    </div>
+  );
+
   return (
-    <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
-      <h1>🛠 API Testing Demo</h1>
+    <div
+      style={{
+        padding: '20px',
+        maxWidth: '1000px',
+        margin: '0 auto',
+        fontFamily: 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h1>🛠 API Testing Dashboard</h1>
+        <button onClick={clearResult} style={{ padding: '5px 15px', cursor: 'pointer' }}>
+          Xóa log
+        </button>
+      </div>
 
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        {/* AUTH */}
+      {/* NHÓM AUTH */}
+      <Group title="🔐 Authentication">
         <button onClick={() => runTest(authApi.login({ username: 'admin', password: '123' }))}>
-          Test Login
+          Login (Admin)
         </button>
+      </Group>
 
-        {/* STATS */}
-        <button onClick={() => runTest(statsApi.getStats())}>Get Stats</button>
+      {/* NHÓM THỐNG KÊ */}
+      <Group title="📊 Statistics">
+        <button onClick={() => runTest(statsApi.getStats())}>Get General Stats</button>
+        <button onClick={() => runTest(statsApi.getRecentTransactions())}>
+          Get Recent Transactions
+        </button>
+      </Group>
 
-        <button onClick={() => runTest(statsApi.getRecentTransactions())}>Get Transactions</button>
-
-        {/* CHAT */}
-        <button onClick={() => runTest(chatApi.getChatHistory())}>Get Chat History</button>
-
+      {/* NHÓM CHAT & AI */}
+      <Group title="🤖 Chat & AI Services">
+        <button onClick={() => runTest(chatApi.getChatHistory())}>Get History</button>
         <button onClick={() => runTest(chatApi.sendMessage({ message: 'Hello AI' }))}>
-          Send Message
+          Send "Hello AI"
         </button>
+        <button onClick={() => runTest(chatApi.getAiHealth())}>Check AI Health</button>
+      </Group>
 
-        {/* NOTI */}
-        <button onClick={() => runTest(notificationApi.getAll())}>Get Notifications</button>
+      {/* NHÓM THÔNG BÁO */}
+      <Group title="🔔 Notifications">
+        <button onClick={() => runTest(notificationApi.getAll())}>Get All Notifications</button>
+      </Group>
+
+      {/* HIỂN THỊ KẾT QUẢ */}
+      <div style={{ marginTop: '20px' }}>
+        <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          Response:{' '}
+          {loading && <span style={{ fontSize: '14px', color: '#666' }}>⏳ Đang tải...</span>}
+        </h3>
+
+        <div
+          style={{
+            background: '#1e1e1e',
+            color: status === 'error' ? '#ff6b6b' : '#4ade80',
+            padding: '20px',
+            borderRadius: '8px',
+            minHeight: '200px',
+            maxHeight: '500px',
+            overflow: 'auto',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+            borderLeft: `5px solid ${
+              status === 'error' ? '#ff6b6b' : status === 'success' ? '#4ade80' : '#888'
+            }`,
+          }}
+        >
+          <pre
+            style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: '14px' }}
+          >
+            {result
+              ? JSON.stringify(result, null, 2)
+              : '// Chưa có dữ liệu. Hãy chọn một API để test.'}
+          </pre>
+        </div>
       </div>
 
-      <div style={{ background: 'black', padding: '15px', borderRadius: '8px' }}>
-        <h3>Kết quả nhận về từ BE: {loading && '⏳...'}</h3>
-        <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-          {JSON.stringify(result, null, 2)}
-        </pre>
-      </div>
+      <style>{`
+        button {
+          padding: 8px 12px;
+          border-radius: 4px;
+          border: 1px solid #007bff;
+          background: white;
+          color: #007bff;
+          cursor: pointer;
+          transition: 0.2s;
+        }
+        button:hover {
+          background: #007bff;
+          color: white;
+        }
+        button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+      `}</style>
     </div>
   );
 };

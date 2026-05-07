@@ -45,7 +45,9 @@ export const chatApi = {
 
   getDeepScan: () => axiosInstance.get('/api/ai/api/ai-deep-scan'),
 
-  getAiHealth: () => axiosInstance.get('/api/ai/api/ai-health'),
+  // getAiHealth: () => axiosInstance.get('/api/ai/api/ai-health'),
+  // Sửa lại cho đúng cấu trúc Gateway + Route của Backend
+  getAiHealth: () => axiosInstance.get('/api/ai/ping-mo-quan'),
 };
 
 // ─────────────────────────────────────────

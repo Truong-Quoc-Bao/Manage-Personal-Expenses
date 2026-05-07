@@ -30,7 +30,7 @@ export default function AppRoutes() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/accounts" element={<Accounts />} />
           <Route path="/transactions" element={<Transactions />} />
-          <Route path="/budgets" element={<Budgets />} />
+          {/* <Route path="/budgets" element={<Budgets />} /> */}
           <Route path="/statistics" element={<Statistics />} />
           <Route path="/chatbox" element={<ChatBox />} />
         </Route>
