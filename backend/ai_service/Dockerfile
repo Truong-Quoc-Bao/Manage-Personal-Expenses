@@ -2,20 +2,16 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# copy đúng package.json của service
-COPY backend/ai_service/package*.json ./
+COPY ["backend/ai_service/package*.json", "backend/ai_service/"]
 
-# cài tool build
 RUN apk add --no-cache python3 make g++
 
-# install dependency
-RUN npm install
+RUN cd backend/ai_service && npm install
 
-# copy source code của service
-COPY backend/ai_service ./
+COPY ["backend/ai_service/", "backend/ai_service/"]
 
-# mở port
+WORKDIR /app/backend/ai_service
+
 EXPOSE 4005
 
-# chạy app
 CMD ["node", "app.js"]
