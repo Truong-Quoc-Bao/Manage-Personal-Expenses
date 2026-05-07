@@ -79,11 +79,28 @@ const checkValidCategory = async ({ categoryId, userId, transactionType }) => {
   return isValid === null ? false : true;
 };
 
+const getCategoryForDisplay = async ({ categoryId, userId, transactionType }) => {
+  const cat = await categoryRepository.findCategoryForDisplay(
+    categoryId,
+    userId,
+    transactionType.toLowerCase()
+  );
+  if (!cat) {
+    return { found: false, category_name: '', color: '', icon_code: '' };
+  }
+  return {
+    found: true,
+    category_name: cat.category_name,
+    color: cat.color || '',
+    icon_code: cat.icon?.icon_code || '',
+  };
+};
 
 module.exports = {
   getCategories,
   creaCategories,
   updCategories,
   delCategoryService,
-  checkValidCategory
+  checkValidCategory,
+  getCategoryForDisplay,
 };

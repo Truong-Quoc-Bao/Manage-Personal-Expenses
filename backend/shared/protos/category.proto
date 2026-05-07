@@ -4,6 +4,7 @@ option csharp_namespace = "TransactionService.Infrastructure.Protos";
 
 service CategoryProtoService {
   rpc GetCategoryStatus (GetCategoryRequest) returns (CategoryResponse);
+  rpc GetCategoryDisplay (GetCategoryRequest) returns (CategoryDisplayResponse);
 }
 
 message GetCategoryRequest {
@@ -15,4 +16,11 @@ message GetCategoryRequest {
 message CategoryResponse {
   bool valid = 1;
   string message = 2;
+}
+
+message CategoryDisplayResponse {
+  bool found = 1;
+  string category_name = 2;
+  string color = 3;
+  string icon_code = 4;
 }

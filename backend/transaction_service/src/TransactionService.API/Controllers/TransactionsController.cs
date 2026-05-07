@@ -21,19 +21,23 @@ namespace TransactionService.API.Controllers
         }
 
         [HttpGet("/")]
-        public async Task<IActionResult> GetAllTransactions()
+        public async Task<IActionResult> GetAllTransactions(
+            [FromQuery(Name = "category_id")] Guid? categoryId,
+            [FromQuery(Name = "include_category")] bool includeCategory = false)
         {
             var userId = Guid.Parse("4f4b144d-e3f8-4e6b-9e32-408030a85698");
-            var transactions = await _transactionService.GetAllTransactionsAsync(userId);
+            var transactions = await _transactionService.GetAllTransactionsAsync(userId, categoryId, includeCategory);
             return Ok(transactions);
         }
 
         [HttpGet]
         [Route("{id:Guid}")]
-        public async Task<IActionResult> GetTransactionById([FromRoute] Guid id)
+        public async Task<IActionResult> GetTransactionById(
+            [FromRoute] Guid id,
+            [FromQuery(Name = "include_category")] bool includeCategory = false)
         {
             var userId = Guid.Parse("4f4b144d-e3f8-4e6b-9e32-408030a85698");
-            var transaction = await _transactionService.GetTransactionByIdAsync(userId, id);
+            var transaction = await _transactionService.GetTransactionByIdAsync(userId, id, includeCategory);
 
             if (transaction == null)
             {

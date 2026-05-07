@@ -14,9 +14,15 @@ namespace TransactionService.Infrastructure.Repositories
             _context = context;
         }
 
-        public async Task<List<Transaction>> GetAllTransactionsAsync(Guid userId)
+        public async Task<List<Transaction>> GetAllTransactionsAsync(Guid userId, Guid? categoryId = null)
         {
-            return await _context.Transactions.Where(t => t.UserId == userId).ToListAsync();
+            var query = _context.Transactions.Where(t => t.UserId == userId);
+            if (categoryId.HasValue)
+            {
+                query = query.Where(t => t.CategoryId == categoryId.Value);
+            }
+
+            return await query.ToListAsync();
         }
 
         public async Task<Transaction?> GetTransactionByIdAsync(Guid userId, Guid transactionId)

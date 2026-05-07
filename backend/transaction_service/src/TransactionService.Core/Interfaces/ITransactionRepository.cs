@@ -5,7 +5,7 @@ namespace TransactionService.Core.Interfaces
     public interface ITransactionRepository
     {
         // Task CreateTransactionAsync(Transaction transaction);
-        Task<List<Transaction>> GetAllTransactionsAsync(Guid userId);
+        Task<List<Transaction>> GetAllTransactionsAsync(Guid userId, Guid? categoryId = null);
         Task<Transaction?> GetTransactionByIdAsync(Guid userId, Guid transactionId);
         Task<Transaction> CreateTransactionAsync(Transaction transaction);
         Task<Transaction?> UpdateTransactionAsync(Guid userId, Guid transactionId, Transaction updatedTransaction);

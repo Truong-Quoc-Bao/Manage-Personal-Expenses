@@ -12,6 +12,12 @@ namespace TransactionService.Core.DTOs
         [Required]
         public Guid? CategoryId { get; set; }
 
+        public string? CategoryName { get; set; }
+
+        public string? CategoryColor { get; set; }
+
+        public string? CategoryIconCode { get; set; }
+
         [Required]
         public decimal Amount { get; set; }
 
