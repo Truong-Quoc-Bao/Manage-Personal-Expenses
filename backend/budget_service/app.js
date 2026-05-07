@@ -26,4 +26,5 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, async () => {
   console.log(`Account service is running on port ${PORT}`);
+  startGrpcServer();
 });

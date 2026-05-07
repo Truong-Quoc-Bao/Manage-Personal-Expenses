@@ -391,8 +391,8 @@ const service = {
     return await repo.findCategorySummaryByuserId(userId);
   },
 
-  getCategorySummaryByMonth: async (userId, year, month) => {
-    return await repo.findCategorySummaryByAccountMonth(userId, Number(year), Number(month));
+  getCategorySummaryByMonth: async (userId, category_id, year, month) => {
+    return await repo.findCategorySummaryByAccountMonth(userId, category_id, Number(year), Number(month));
   },
 
   getCategorySummaryById: async (id) => {
@@ -1067,18 +1067,36 @@ const service = {
   // HELPER: cập nhật user_analytics khi có transaction mới
   _updateUserAnalytics: async function (transaction) {
     const { user_id, amount, transaction_type, date } = transaction;
-    const txDate = new Date(date);
+    const txDate = date ? new Date(date) : new Date();
     const txYear = txDate.getFullYear();
-    const txMonth = txDate.getMonth() + 1; // 1-based
+    const txMonth = txDate.getMonth() + 1;
     const isExpense = transaction_type === 'Expense';
     const isIncome = transaction_type === 'Income';
     const amt = Number(amount);
 
-    // Lấy user_analytics hiện tại
-    const ua = await repo.findUserAnalyticsByuserId(user_id);
+    // Lấy user_analytics hiện tại, tự tạo nếu chưa có
+    let ua = await repo.findUserAnalyticsByuserId(user_id);
     if (!ua) {
-      console.error(`[handleTransaction] user_analytics not found for user_id: ${user_id}`);
-      return null;
+      console.log(`[_updateUserAnalytics] user_analytics not found, creating new for user_id: ${user_id}`);
+      ua = await repo.createUserAnalytics({
+        user_id,
+        total_income: 0,
+        total_expense: 0,
+        current_balance: 0,
+        current_month: {
+          year: txYear,
+          month: txMonth,
+          income: 0,
+          expense: 0,
+          savings: 0,
+          savings_rate: 0,
+        },
+        top_categories: [],
+        ai_insights: { generated: false, content: null, generated_at: null },
+        budget_alert: { enabled: true, alerts: [], last_checked: null },
+        goal_tracking: { goals: [] },
+        streak: { saving_months: 0, unit: 'months' },
+      });
     }
 
     const now = new Date();
@@ -1086,8 +1104,8 @@ const service = {
     const currentMonth = now.getMonth() + 1;
 
     // Tính total_income / total_expense / current_balance mới
-    const newTotalIncome = isIncome ? ua.total_income + amt : ua.total_income;
-    const newTotalExpense = isExpense ? ua.total_expense + amt : ua.total_expense;
+    const newTotalIncome = isIncome ? (ua.total_income || 0) + amt : (ua.total_income || 0);
+    const newTotalExpense = isExpense ? (ua.total_expense || 0) + amt : (ua.total_expense || 0);
     const newBalance = newTotalIncome - newTotalExpense;
 
     // Tính current_month (chỉ cập nhật nếu transaction thuộc tháng hiện tại)
@@ -1095,7 +1113,7 @@ const service = {
     if (txYear === currentYear && txMonth === currentMonth) {
       if (isIncome) currentMonthUpdate.income = (ua.current_month?.income || 0) + amt;
       if (isExpense) currentMonthUpdate.expense = (ua.current_month?.expense || 0) + amt;
-      currentMonthUpdate.savings = currentMonthUpdate.income - currentMonthUpdate.expense;
+      currentMonthUpdate.savings = (currentMonthUpdate.income || 0) - (currentMonthUpdate.expense || 0);
       currentMonthUpdate.savings_rate = currentMonthUpdate.income > 0
         ? parseFloat(((currentMonthUpdate.savings / currentMonthUpdate.income) * 100).toFixed(2))
         : 0;
@@ -1108,10 +1126,16 @@ const service = {
       if (idx >= 0) {
         topCategories[idx] = {
           ...topCategories[idx],
-          total_amount: topCategories[idx].total_amount + amt
+          total_amount: (topCategories[idx].total_amount || 0) + amt
         };
+      } else {
+        topCategories.push({
+          category_id: transaction.category_id,
+          category_name: transaction.category_name || '',
+          total_amount: amt
+        });
       }
-      // Nếu category chưa có trong top_categories thì không tự thêm (chỉ update nếu đã tồn tại)
+      topCategories.sort((a, b) => b.total_amount - a.total_amount);
     }
 
     return await repo.updateUserAnalyticsByuserId(user_id, {
@@ -1129,6 +1153,9 @@ const service = {
   // HELPER: cập nhật category_summary khi có transaction mới
   _updateCategorySummary: async function (transaction) {
     const { user_id, account_id, category_id, amount, transaction_type, date, trans_id } = transaction;
+
+    console.log('[_updateCategorySummary] date:', date, 'type:', typeof date); // thêm dòng này
+
     if (!category_id) return null;
 
     const txDate = new Date(date);
@@ -1137,14 +1164,27 @@ const service = {
     const day = txDate.getDate();
     const amt = Number(amount);
 
+    if (isNaN(amt)) {
+      throw new Error('Invalid amount');
+    }
+
+    if (isNaN(year) || isNaN(month)) {
+      console.error('[_updateCategorySummary] Invalid date, skipping. date:', date);
+      return null;
+    }
+
+
+    console.log('[_updateCategorySummary] year:', year, 'month:', month); // thêm dòng này
+
     // Lấy category_summary hiện tại (upsert theo user_id + category_id + year + month)
-    const existing = await repo.findCategorySummaryByCategoryAndMonth(user_id, category_id, year, month)
+    const existingArr = await repo.findCategorySummaryByAccountMonth2(user_id, category_id, account_id, year, month)
       .catch(() => null);
+    const existing = existingArr?.[0] || null;
 
     if (existing) {
       // Cập nhật total_amount, transaction_count
-      const newTotal = existing.total_amount + amt;
-      const newCount = existing.transaction_count + 1;
+      const newTotal = (existing.total_amount || 0) + amt;
+      const newCount = (existing.transaction_count || 0) + 1;
       const budgetLimit = existing.budget_limit || 0;
       const isOverBudget = budgetLimit > 0 ? newTotal > budgetLimit : false;
 
@@ -1165,6 +1205,7 @@ const service = {
       return await repo.upsertCategorySummary(
         user_id,
         category_id,
+        account_id,
         year,
         month,
         {
@@ -1179,7 +1220,7 @@ const service = {
       );
     } else {
       // Tạo mới
-      const categoryInfo = await repo.findCategoryById(category_id).catch(() => null);
+      const categoryInfo = await repo.findCategoryById(user_id, category_id).catch(() => null);
       const newDoc = {
         user_id,
         account_id: account_id || null,
@@ -1197,6 +1238,7 @@ const service = {
       return await repo.upsertCategorySummary(
         user_id,
         category_id,
+        account_id,
         year,
         month,
         { $set: newDoc, $currentDate: { updated_at: true } }
@@ -1213,9 +1255,25 @@ const service = {
     const isExpense = transaction_type === 'Expense';
     const isIncome = transaction_type === 'Income';
 
-    // Lấy cache hiện tại theo user_id + account_id
-    const cache = await repo.findDashboardCacheByAccountId(account_id).catch(() => null);
-    if (!cache) return null;
+    // Lấy cache hiện tại theo user_id + account_id, tự tạo nếu chưa có
+    let cache = await repo.findDashboardCacheByAccountId(account_id).catch(() => null);
+    if (!cache) {
+      console.log(`[_updateDashboardCache] dashboard_cache not found, creating new for account_id: ${account_id}`);
+      cache = {
+        user_id,
+        account_id,
+        summary: {
+          current_balance: 0,
+          monthly_income: 0,
+          monthly_expense: 0,
+          monthly_savings: 0,
+          savings_rate: 0,
+        },
+        recent_transactions: [],
+        streak: { saving_months: 0, unit: 'months' },
+        top_account_id: account_id,
+      };
+    }
 
     const summary = { ...(cache.summary || {}) };
     if (isExpense) {
@@ -1240,7 +1298,7 @@ const service = {
       description: description || '',
       amount: amt,
       type: transaction_type.toLowerCase(),
-      date,
+      date: date ? date.toString().slice(0, 10) : new Date().toISOString().slice(0, 10),
       category_id: category_id || null
     };
     const recent = [newTx, ...(cache.recent_transactions || [])].slice(0, 5);
@@ -1251,6 +1309,7 @@ const service = {
     return await repo.upsertDashboardCache(
       user_id,
       {
+        account_id,
         summary,
         recent_transactions: recent,
         streak: cache.streak,
@@ -1268,16 +1327,41 @@ const service = {
 
     const txDate = new Date(date);
     const year = txDate.getFullYear();
+
     const month = txDate.getMonth() + 1;
+
     const day = txDate.getDate();
+
     const amt = Number(amount);
+
     const isExpense = transaction_type === 'Expense';
     const isIncome = transaction_type === 'Income';
+
     const week = Math.ceil(day / 7);
 
-    // Lấy monthly_report hiện tại
-    const report = await repo.findMonthlyReportByAccountMonth(user_id, year, month).catch(() => null);
-    if (!report) return null;
+    // Lấy monthly_report hiện tại, tự tạo nếu chưa có
+    let report = await repo.findMonthlyReportByAccountMonth(user_id, year, month).catch(() => null);
+    if (!report) {
+      console.log(`[_updateMonthlyReport] monthly_report not found, creating new for user_id: ${user_id}, ${year}/${month}`);
+      report = {
+        user_id,
+        year,
+        month,
+        summary: {
+          total_income: 0,
+          total_expense: 0,
+          savings: 0,
+          savings_rate: 0,
+          transaction_count: 0,
+        },
+        income_by_category: [],
+        expense_by_category: [],
+        weekly_trend: [],
+        daily_cashflow: [],
+        top_expenses: [],
+        status: 'generated',
+      };
+    }
 
     // --- summary ---
     const summary = { ...(report.summary || {}) };
@@ -1381,12 +1465,12 @@ const service = {
   handleTransactionCreated: async function (message) {
     console.log(`[handleTransactionCreated] Received message:`, message);
     const transaction = message;
-    const user_id = "4f4b144d-e3f8-4e6b-9e32-408030a85698";
-    const { account_id, trans_id } = transaction;
+    const { account_id, trans_id, user_id } = transaction;
 
     console.log(`[handleTransactionCreated] Processing trans_id: ${trans_id}, user_id: ${user_id}`);
-
+    console.log(`mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm user_id: ${user_id}`);
     try {
+
       // Cập nhật song song 4 collections
       const [uaResult, csResult, dcResult, mrResult] = await Promise.allSettled([
         this._updateUserAnalytics(transaction),
@@ -1396,9 +1480,9 @@ const service = {
       ]);
 
       if (uaResult.status === 'rejected') console.error(`[handleTransactionCreated] user_analytics error:`, uaResult.reason);
-      if (csResult.status === 'rejected') console.error(`[handleTransactionCreated] category_summary error:`, csResult.reason);
-      if (dcResult.status === 'rejected') console.error(`[handleTransactionCreated] dashboard_cache error:`, dcResult.reason);
-      if (mrResult.status === 'rejected') console.error(`[handleTransactionCreated] monthly_report error:`, mrResult.reason);
+      if (csResult?.status === 'rejected') console.error(`[handleTransactionCreated] category_summary error:`, csResult.reason);
+      if (dcResult?.status === 'rejected') console.error(`[handleTransactionCreated] dashboard_cache error:`, dcResult.reason);
+      if (mrResult?.status === 'rejected') console.error(`[handleTransactionCreated] monthly_report error:`, mrResult.reason);
 
       console.log(`[handleTransactionCreated] Done for trans_id: ${trans_id}`);
       return { account_id, trans_id };
@@ -1409,48 +1493,85 @@ const service = {
   },
 
   handleTransactionUpdated: async function (message) {
-    // message phải chứa cả old_transaction và new_transaction để tính delta
-    // Format: { old_transaction: {...}, new_transaction: {...} }
-    // Nếu chỉ gửi new_transaction (không có old), fallback về xử lý như created
-    const { old_transaction, new_transaction } = message;
+    // Message format từ RabbitMQ:
+    // {
+    //   trans_id, user_id,         ← từ message metadata
+    //   account_id, category_id,
+    //   amount,                    ← giá trị CŨ
+    //   amount_update,             ← giá trị MỚI
+    //   transaction_type,          ← type CŨ
+    //   transaction_type_update,   ← type MỚI
+    //   description, date, note
+    // }
+    const {
+      trans_id, user_id, account_id,
+      category_id,
+      amount, amount_update,
+      transaction_type, transaction_type_update,
+      description, date, note,
+    } = message;
 
-    if (!old_transaction || !new_transaction) {
-      // Fallback: nếu chỉ có 1 object (không có old/new wrapper) → xử lý như created
-      console.warn(`[handleTransactionUpdated] Missing old_transaction or new_transaction, treating as created`);
-      return await this.handleTransactionCreated(message);
-    }
-
-    const { user_id, account_id, trans_id } = new_transaction;
     console.log(`[handleTransactionUpdated] Processing trans_id: ${trans_id}, user_id: ${user_id}`);
 
     try {
-      // Tạo "reverse" transaction từ old (đảo ngược effect)
-      const reverseOld = {
-        ...old_transaction,
-        amount: -Number(old_transaction.amount),
+      // Tạo old_transaction (giá trị cũ để reverse)
+      const oldTransaction = {
+        trans_id,
+        user_id,
+        account_id,
+        category_id,
+        amount: Number(amount),
+        transaction_type,
+        description,
+        date,
+        note,
       };
 
-      // Cập nhật song song: reverse old rồi apply new
-      const [
-        uaReverse, csReverse, dcReverse, mrReverse,
-        uaNew, csNew, dcNew, mrNew
-      ] = await Promise.allSettled([
-        this._updateUserAnalytics(reverseOld),
-        this._updateCategorySummary(reverseOld),
-        this._updateDashboardCache(reverseOld),
-        this._updateMonthlyReport(reverseOld),
-        this._updateUserAnalytics(new_transaction),
-        this._updateCategorySummary(new_transaction),
-        this._updateDashboardCache(new_transaction),
-        this._updateMonthlyReport(new_transaction),
+      // Tạo new_transaction (giá trị mới để apply)
+      const newTransaction = {
+        trans_id,
+        user_id,
+        account_id,
+        category_id,
+        amount: Number(amount_update ?? amount),
+        transaction_type: transaction_type_update ?? transaction_type,
+        description,
+        date,
+        note,
+      };
+
+      // Tạo reverse transaction: đảo ngược effect của old
+      // Income cũ → dùng Expense để trừ lại, Expense cũ → dùng Income để cộng lại
+      const reverseTransaction = {
+        ...oldTransaction,
+        transaction_type: transaction_type === 'Income' ? 'Expense' : 'Income',
+      };
+
+      // Bước 1: Reverse old (sequential vì cần đúng thứ tự)
+      const [uaReverse, csReverse, dcReverse, mrReverse] = await Promise.allSettled([
+        this._updateUserAnalytics(reverseTransaction),
+        this._updateCategorySummary(reverseTransaction),
+        this._updateDashboardCache(reverseTransaction),
+        this._updateMonthlyReport(reverseTransaction),
       ]);
 
-      const results = { uaReverse, csReverse, dcReverse, mrReverse, uaNew, csNew, dcNew, mrNew };
-      for (const [key, val] of Object.entries(results)) {
-        if (val.status === 'rejected') {
-          console.error(`[handleTransactionUpdated] ${key} error:`, val.reason);
-        }
-      }
+      if (uaReverse.status === 'rejected') console.error(`[handleTransactionUpdated] uaReverse error:`, uaReverse.reason);
+      if (csReverse.status === 'rejected') console.error(`[handleTransactionUpdated] csReverse error:`, csReverse.reason);
+      if (dcReverse.status === 'rejected') console.error(`[handleTransactionUpdated] dcReverse error:`, dcReverse.reason);
+      if (mrReverse.status === 'rejected') console.error(`[handleTransactionUpdated] mrReverse error:`, mrReverse.reason);
+
+      // Bước 2: Apply new
+      const [uaNew, csNew, dcNew, mrNew] = await Promise.allSettled([
+        this._updateUserAnalytics(newTransaction),
+        this._updateCategorySummary(newTransaction),
+        this._updateDashboardCache(newTransaction),
+        this._updateMonthlyReport(newTransaction),
+      ]);
+
+      if (uaNew.status === 'rejected') console.error(`[handleTransactionUpdated] uaNew error:`, uaNew.reason);
+      if (csNew.status === 'rejected') console.error(`[handleTransactionUpdated] csNew error:`, csNew.reason);
+      if (dcNew.status === 'rejected') console.error(`[handleTransactionUpdated] dcNew error:`, dcNew.reason);
+      if (mrNew.status === 'rejected') console.error(`[handleTransactionUpdated] mrNew error:`, mrNew.reason);
 
       console.log(`[handleTransactionUpdated] Done for trans_id: ${trans_id}`);
       return { account_id, trans_id };
@@ -1458,10 +1579,80 @@ const service = {
       console.error(`[handleTransactionUpdated] Fatal error:`, err);
       return null;
     }
+  },
+
+  handleTransactionDeleted: async function (message) {
+    // Message format từ RabbitMQ:
+    // {
+    //   trans_id, user_id,         ← từ message metadata
+    //   account_id, category_id,
+    //   amount, transaction_type,
+    //   description, date, note
+    // }
+    const {
+      trans_id, user_id, account_id,
+      category_id, amount, transaction_type,
+      description, date, note,
+    } = message;
+
+    console.log(`[handleTransactionDeleted] Processing trans_id: ${trans_id}, user_id: ${user_id}`);
+
+    try {
+      // Tạo reverse transaction: đảo ngược effect của transaction đã xóa
+      const reverseTransaction = {
+        trans_id,
+        user_id,
+        account_id,
+        category_id,
+        amount: Number(amount),
+        transaction_type: transaction_type === 'Income' ? 'Expense' : 'Income',
+        description,
+        date,
+        note,
+      };
+
+      // Reverse effect của transaction đã xóa trên 4 collections
+      const [uaResult, csResult, dcResult, mrResult] = await Promise.allSettled([
+        this._updateUserAnalytics(reverseTransaction),
+        this._updateCategorySummary(reverseTransaction),
+        this._updateDashboardCache(reverseTransaction),
+        this._updateMonthlyReport(reverseTransaction),
+      ]);
+
+      if (uaResult.status === 'rejected') console.error(`[handleTransactionDeleted] user_analytics error:`, uaResult.reason);
+      if (csResult.status === 'rejected') console.error(`[handleTransactionDeleted] category_summary error:`, csResult.reason);
+      if (dcResult.status === 'rejected') console.error(`[handleTransactionDeleted] dashboard_cache error:`, dcResult.reason);
+      if (mrResult.status === 'rejected') console.error(`[handleTransactionDeleted] monthly_report error:`, mrResult.reason);
+
+      // Xóa transaction khỏi collection transaction (nếu có lưu)
+      await repo.deleteTransactionByTransId(trans_id).catch(err =>
+        console.error(`[handleTransactionDeleted] deleteTransaction error:`, err)
+      );
+
+      console.log(`[handleTransactionDeleted] Done for trans_id: ${trans_id}`);
+      return { account_id, trans_id };
+    } catch (err) {
+      console.error(`[handleTransactionDeleted] Fatal error:`, err);
+      return null;
+    }
   }
 
 
 
 };
+
+const grpcClient = require('./grpc/grpc.client');
+
+// Trong một analytics handler:
+const { accountRes, categoryRes, budgetRes } = await grpcClient.validateAnalyticsContext({
+  account_id: 'acc_123',
+  category_id: 'cat_456',
+  budget_id: 'bud_789',
+  user_id: 'usr_001',
+  transaction_type: 'EXPENSE',
+});
+
+// hoặc gọi riêng lẻ:
+const { exists } = await grpcClient.getAccountStatus('acc_123', 'usr_001');
 
 module.exports = service;

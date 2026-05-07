@@ -129,10 +129,21 @@ const repo = {
       .lean();
   },
 
-  findCategorySummaryByAccountMonth: async (userId, year, month) => {
-    return await category_summary.find({ user_id: userId, year, month })
+  findCategorySummaryByAccountMonth: async (userId, category_id, year, month) => {
+    return await category_summary.find({ user_id: userId, category_id: category_id, year, month })
       .sort({ total_amount: -1 })
       .lean();
+  },
+
+  findCategorySummaryByAccountMonth2: async (userId, category_id, account_id, year, month) => {
+    return await category_summary.find({ user_id: userId, category_id: category_id, account_id: account_id, year, month })
+      .sort({ total_amount: -1 })
+      .lean();
+  },
+
+
+  findCategoryById: async (userId, categoryId) => {
+    return await category_summary.findOne({ user_id: userId, category_id: categoryId }).lean();
   },
 
   findCategorySummaryById: async (id) => {
@@ -149,10 +160,10 @@ const repo = {
     return await category_summary.create(data);
   },
 
-  upsertCategorySummary: async (userId, categoryId, year, month, data) => {
+  upsertCategorySummary: async (userId, categoryId, accountId, year, month, data) => {
     return await category_summary.findOneAndUpdate(
-      { user_id: userId, category_id: categoryId, year, month },
-      data, // ✅ KHÔNG bọc $set nữa
+      { user_id: userId, category_id: categoryId, account_id: accountId, year, month },
+      data,
       { new: true, upsert: true, runValidators: true }
     ).lean();
   },
@@ -197,7 +208,7 @@ const repo = {
   upsertDashboardCache: async (userId, data, ttlMs = 15 * 60 * 1000) => {
     const expires_at = new Date(Date.now() + ttlMs);
     return await dashboard_cache.findOneAndUpdate(
-      { user_id: userId , account_id: data.account_id},
+      { user_id: userId, account_id: data.account_id },
       { $set: { ...data, expires_at } },
       { new: true, upsert: true, runValidators: true }
     ).lean();
@@ -238,11 +249,10 @@ const repo = {
   upsertMonthlyReport: async (userId, year, month, data) => {
     return await monthly_reports.findOneAndUpdate(
       { user_id: userId, year, month },
-      { $set: data },
+      data,          // ✅ không wrap thêm $set
       { new: true, upsert: true, runValidators: true }
     ).lean();
   },
-
   updateMonthlyReportById: async (id, updateData) => {
     return await monthly_reports.findByIdAndUpdate(
       id,

@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+option csharp_namespace = "TransactionService.Infrastructure.Protos";
+
+service BudgetProtoService {
+  rpc GetBudgetStatus (GetBudgetRequest) returns (BudgetResponse);
+}
+
+message GetBudgetRequest {
+  string budget_id = 1;
+  string user_id   = 2;
+}
+
+message BudgetResponse {
+  bool   exists  = 1;
+  string message = 2;
+}
