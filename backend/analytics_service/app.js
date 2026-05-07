@@ -8,7 +8,7 @@ const PORT = process.env.PORT;
 const connectDB = require('./src/config/database');
 const rabbitMQClient = require('./src/events');
 const router = require('./src/routes/analytics.routes');
-const {startGrpcServer} = require("./src/grpc/analytics.grpc");
+// const {startGrpcServer} = require("./src/grpc/analytics.grpc");
 
 
 
@@ -46,7 +46,7 @@ const startServer = async () => {
 
         app.listen(PORT, () => {
             console.log(`Analytics service is running on port ${PORT}`);
-            startGrpcServer();
+            // startGrpcServer();
         });
     } catch (error) {
         console.error('Error starting server:', error);

@@ -1641,18 +1641,4 @@ const service = {
 
 };
 
-const grpcClient = require('./grpc/grpc.client');
-
-// Trong một analytics handler:
-const { accountRes, categoryRes, budgetRes } = await grpcClient.validateAnalyticsContext({
-  account_id: 'acc_123',
-  category_id: 'cat_456',
-  budget_id: 'bud_789',
-  user_id: 'usr_001',
-  transaction_type: 'EXPENSE',
-});
-
-// hoặc gọi riêng lẻ:
-const { exists } = await grpcClient.getAccountStatus('acc_123', 'usr_001');
-
 module.exports = service;

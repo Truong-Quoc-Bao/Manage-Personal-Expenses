@@ -120,19 +120,19 @@ const getAnalyticsSummary = async (call, callback) => {
 
 // ─── Khởi động gRPC Server ────────────────────────────────────────────────────
 
-const startGrpcServer = () => {
-    const server = new grpc.Server();
-    server.addService(analyticsProto.service, { getAnalyticsSummary });
+// const startGrpcServer = () => {
+//     const server = new grpc.Server();
+//     server.addService(analyticsProto.service, { getAnalyticsSummary });
 
-    server.bindAsync(`0.0.0.0:${ANALYTICS_PROTO_PORT}`, grpc.ServerCredentials.createInsecure(), (err, port) => {
-        if (err) {
-            console.error(`Error starting gRPC: ${err.message}`);
-            return;
-        }
-        console.log(`Analytics gRPC Server running at 0.0.0.0:${port}`);
-        server.start();
-    });
-};
+//     server.bindAsync(`0.0.0.0:${ANALYTICS_PROTO_PORT}`, grpc.ServerCredentials.createInsecure(), (err, port) => {
+//         if (err) {
+//             console.error(`Error starting gRPC: ${err.message}`);
+//             return;
+//         }
+//         console.log(`Analytics gRPC Server running at 0.0.0.0:${port}`);
+//         server.start();
+//     });
+// };
 
 module.exports = {
     getAccountStatus,

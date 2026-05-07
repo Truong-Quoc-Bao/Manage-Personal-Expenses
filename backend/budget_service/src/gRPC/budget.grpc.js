@@ -1,6 +1,5 @@
 const grpc = require('@grpc/grpc-js');
 const protoLoader = require('@grpc/proto-loader');
-const path = require('path');
 const { BUDGET_PROTO_PATH } = require('protos');
 const BUDGET_PROTO_PORT = process.env.GRPC_BUDGET_SERVICE_PORT;
 const budgetService = require('../services/budget.service');
@@ -43,12 +42,12 @@ const startGrpcServer = () => {
     const server = new grpc.Server();
     server.addService(budgetProto.service, { getBudgetStatus });
 
-    server.bindAsync(`0.0.0.0:${BUDGET_PROTO_PORT}`, grpc.ServerCredentials.createInsecure(), (err, BUDGET_PROTO_PORT) => {
+    server.bindAsync(`0.0.0.0:${BUDGET_PROTO_PORT}`, grpc.ServerCredentials.createInsecure(), (err, port) => {
         if (err) {
             console.error(`Error starting gRPC: ${err.message}`);
             return;
         }
-        console.log(`Budget gRPC Server running at 0.0.0.0:${BUDGET_PROTO_PORT}`);
+        console.log(`Budget gRPC Server running at 0.0.0.0:${port}`);
         server.start();
     });
 };
