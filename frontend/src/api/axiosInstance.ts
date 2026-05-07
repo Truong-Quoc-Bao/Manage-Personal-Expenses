@@ -16,19 +16,31 @@
 //   return config;
 // });
 
-// export default axiosInstance;
+// // export default axiosInstance;
 
-import axios from "axios";
+// import axios from "axios";
+
+// const getBaseURL = () => {
+//   const envURL = import.meta.env.VITE_API_GATEWAY_URL;
+
+//   // Browser chạy local không hiểu host "gateway"
+//   if (window.location.hostname === "localhost") {
+//     return "http://localhost:3000";
+//   }
+
+//   return envURL || "http://localhost:3000";
+// };
+import axios from 'axios';
 
 const getBaseURL = () => {
   const envURL = import.meta.env.VITE_API_GATEWAY_URL;
 
   // Browser chạy local không hiểu host "gateway"
-  if (window.location.hostname === "localhost") {
-    return "http://localhost:3000";
+  if (window.location.hostname === 'localhost') {
+    return 'http://localhost:3000';
   }
 
-  return envURL || "http://localhost:3000";
+  return envURL || 'http://localhost:3000';
 };
 
 const axiosInstance = axios.create({

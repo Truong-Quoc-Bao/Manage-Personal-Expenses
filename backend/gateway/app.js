@@ -31,7 +31,7 @@ app.use(
 );
 
 app.use(
-  "/api/users",
+  '/api/users',
   createProxyMiddleware({
     target: process.env.USER_SERVICE_URL,
     changeOrigin: true,
@@ -44,7 +44,7 @@ app.use(
 );
 
 app.use(
-  "/api/categories",
+  '/api/categories',
   createProxyMiddleware({
     target: process.env.CATEGORY_SERVICE_URL,
     changeOrigin: true,
@@ -57,7 +57,7 @@ app.use(
 );
 
 app.use(
-  "/api/analytics",
+  '/api/analytics',
   createProxyMiddleware({
     target: process.env.ANALYTICS_SERVICE_URL,
     changeOrigin: true,
@@ -70,7 +70,7 @@ app.use(
 );
 
 app.use(
-  "/api/notifications",
+  '/api/notifications',
   createProxyMiddleware({
     target: process.env.NOTIFICATION_SERVICE_URL,
     changeOrigin: true,
@@ -83,7 +83,7 @@ app.use(
 );
 
 app.use(
-  "/api/auth",
+  '/api/auth',
   createProxyMiddleware({
     target: process.env.AUTH_SERVICE_URL,
     changeOrigin: true,
@@ -96,7 +96,7 @@ app.use(
 );
 
 app.use(
-  "/api/transactions",
+  '/api/transactions',
   createProxyMiddleware({
     target: process.env.TRANSACTION_SERVICE_URL,
     changeOrigin: true,
@@ -107,6 +107,7 @@ app.use(
     },
   })
 );
+
 app.use(
   "/api/budgets",
   createProxyMiddleware({
@@ -124,9 +125,27 @@ app.get("/api/health", (req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
+app.use(
+  '/api/ai',
+  createProxyMiddleware({
+    target: process.env.AI_SERVICE_URL || 'http://localhost:4005',
+    changeOrigin: true,
+    logLevel: 'debug',
+    pathRewrite: {
+      '^/api/ai': '',
+    },
+    onError: (err, req, res) => {
+      console.error('Proxy error (AI Service):', err);
+      res.status(500).send('AI Gateway error');
+    },
+  }),
+);
+
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
 app.listen(PORT, () => {
-  console.log(
-    "Transaction service is running on " + process.env.TRANSACTION_SERVICE_URL
-  );
+  console.log('Transaction service is running on ' + process.env.TRANSACTION_SERVICE_URL);
   console.log(`Gateway is running on port ${PORT}`);
 });

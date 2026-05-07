@@ -50,8 +50,9 @@ const pool = new Pool({
 
 // Cách để ép tất cả kết nối dùng đúng Schema
 pool.on('connect', (client) => {
-  client.query(`SET search_path TO ${SCHEMA_NAME}, public`)
-    .catch(err => console.error('❌ Lỗi khi set Search Path:', err));
+  client.query(
+    'SET search_path TO ai_service, transaction_service, category_service, budgets_service, public',
+  );
 });
 
 // Đoạn check kết nối của bạn
@@ -61,7 +62,7 @@ pool.connect((err, client, release) => {
     console.error('❌ Lỗi kết nối Postgres:', err.message);
   } else {
     console.log(`✅ CHÚC MỪNG BẢO! Đã thông suốt tới Schema: ${SCHEMA_NAME}`);
-    
+
     // Test thử xem có đọc được bảng trong schema đó không
     client.query('SELECT current_schema()', (err, res) => {
       release(); // Giải phóng client lại cho pool
@@ -131,8 +132,8 @@ const authenticateToken = (req, res, next) => {
 
   // 1. Nếu hoàn toàn không có token hoặc token là chữ "null"/"undefined"
   if (!token || token === 'null' || token === 'undefined') {
-    console.log('⚠️ Không có token, dùng User ID 1');
-    req.user = { user_id: 1 };
+    console.log('⚠️ Không có token, dùng User ID sẵn có');
+    req.user = { user_id: '4f4b144d-e3f8-4e6b-9e32-408030a85698' };
     return next();
   }
 
@@ -140,8 +141,8 @@ const authenticateToken = (req, res, next) => {
   jwt.verify(token, process.env.JWT_SECRET || 'secret_key', (err, user) => {
     if (err) {
       // ✅ SỬA TẠI ĐÂY: Thay vì báo lỗi 403, mình log ra rồi cho đi tiếp với ID 1
-      console.log('⚠️ Token hết hạn hoặc sai, tự động dùng User ID 1 để Demo');
-      req.user = { user_id: 1 };
+      console.log('⚠️ Token hết hạn hoặc sai, tự động dùng User ID sẵn có để Demo');
+      req.user = { user_id: '4f4b144d-e3f8-4e6b-9e32-408030a85698' };
       return next();
     }
 
@@ -154,7 +155,7 @@ const authenticateToken = (req, res, next) => {
 // --- API LẤY THỐNG KÊ CHO DASHBOARD ---
 app.get('/api/stats', async (req, res) => {
   try {
-    const userId = 1;
+    const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
     const now = new Date();
     const currentMonth = now.getMonth() + 1;
     const currentYear = now.getFullYear();
@@ -165,8 +166,8 @@ app.get('/api/stats', async (req, res) => {
         SELECT 
           SUM(CASE WHEN t.transaction_type = 'income' THEN t.amount ELSE 0 END) as total_income,
           SUM(CASE WHEN t.transaction_type = 'expense' THEN t.amount ELSE 0 END) as total_expense
-        FROM transactions t
-        JOIN accounts a ON t.account_id = a.account_id
+        FROM transaction_service.transactions t
+        JOIN account_service.accounts a ON t.account_id = a.account_id
         WHERE a.user_id = $1 
           AND EXTRACT(MONTH FROM t.date) = $2 
           AND EXTRACT(YEAR FROM t.date) = $3
@@ -181,9 +182,9 @@ app.get('/api/stats', async (req, res) => {
         COALESCE(c.category_name, 'Chưa phân loại') as category_name, 
         SUM(t.amount) as amount, 
         t.transaction_type
-      FROM transactions t
-      LEFT JOIN categories c ON t.category_id = c.category_id -- Dùng LEFT JOIN ở đây
-      JOIN accounts a ON t.account_id = a.account_id
+      FROM transaction_service.transactions t
+      LEFT JOIN category_service.categories c ON t.category_id = c.category_id -- Dùng LEFT JOIN ở đây
+      JOIN account_service.accounts a ON t.account_id = a.account_id
       WHERE a.user_id = $1 
         AND EXTRACT(MONTH FROM t.date) = $2 
         AND EXTRACT(YEAR FROM t.date) = $3
@@ -213,7 +214,7 @@ app.get('/api/stats', async (req, res) => {
 // API lấy danh sách ngân sách tháng hiện tại
 app.get('/api/budgets', async (req, res) => {
   try {
-    const userId = 1;
+    const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
     const now = new Date();
     const result = await pool.query(
       `
@@ -221,9 +222,9 @@ app.get('/api/budgets', async (req, res) => {
         c.category_name, 
         c.icon,
         COALESCE(SUM(t.amount), 0) as spent,
-        (SELECT amount_limit FROM budgets b WHERE b.category_id = c.category_id AND b.month = $2 AND b.year = $3) as amount_limit
-      FROM categories c
-      LEFT JOIN transactions t ON c.category_id = t.category_id 
+        (SELECT amount_limit FROM budgets_service.budgets b WHERE b.category_id = c.category_id AND b.month = $2 AND b.year = $3) as amount_limit
+      FROM category_service.categories c
+      LEFT JOIN transaction_service.transactions t ON c.category_id = t.category_id 
         AND EXTRACT(MONTH FROM t.date) = $2 
         AND EXTRACT(YEAR FROM t.date) = $3
       WHERE c.user_id = $1
@@ -241,21 +242,20 @@ app.get('/api/budgets', async (req, res) => {
 // api giao dịch gần đây
 app.get('/api/recent-transactions', async (req, res) => {
   try {
-    const userId = 1;
+    const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
 
     const result = await pool.query(
       `
         SELECT 
           t.trans_id, 
           t.amount, 
-          /* 👉 Dùng cú pháp này để chuyển UTC sang giờ Việt Nam (Asia/Ho_Chi_Minh) */
-          (t.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh') as created_at,
+          t.date as created_at, 
           t.transaction_type as type, 
           t.description,
           COALESCE(c.category_name, 'Khác') as category_name
-        FROM transactions t
-        JOIN accounts a ON t.account_id = a.account_id
-        LEFT JOIN categories c ON t.category_id = c.category_id
+        FROM transaction_service.transactions t
+        JOIN account_service.accounts a ON t.account_id = a.account_id
+        LEFT JOIN category_service.categories c ON t.category_id = c.category_id
         WHERE a.user_id = $1
         ORDER BY t.created_at DESC, t.trans_id DESC
         LIMIT 20
@@ -275,9 +275,9 @@ app.get('/chat-history', authenticateToken, async (req, res) => {
     const { message, model: requestedModel } = req.body;
 
     // const userId = req.user.user_id;
-    const userId = 1; // Tạm thời fix là Bảo
+    const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698'; // Tạm thời fix là Bảo
     const result = await pool.query(
-      'SELECT role, message FROM message_history WHERE user_id = $1 ORDER BY created_at ASC',
+      'SELECT role, message FROM ai_service.message_history WHERE user_id = $1 ORDER BY created_at ASC',
       [userId],
     );
     res.json(result.rows);
@@ -353,8 +353,8 @@ const sendPushNotification = (message) => {
 
 // Thay vì chỉ bắn socket, hãy lưu vào DB
 async function addNotification(message) {
-  const userId = 1; // ID của Bảo
-  await pool.query('INSERT INTO notifications (user_id, message) VALUES ($1, $2)', [
+  const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698'; // ID của Bảo
+  await pool.query('INSERT INTO ai_service.notifications (user_id, message) VALUES ($1, $2)', [
     userId,
     message,
   ]);
@@ -366,9 +366,9 @@ async function addNotification(message) {
 // API Lấy thông báo (Lấy hết, không lọc is_read để không bị mất tin khi load lại)
 app.get('/api/notifications', async (req, res) => {
   try {
-    const userId = 1;
+    const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
     const result = await pool.query(
-      "SELECT id, message, is_read, (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh') as created_at FROM notifications WHERE user_id = $1 ORDER BY created_at DESC ",
+      'SELECT id, message, is_read, created_at FROM ai_service.notifications WHERE user_id = $1 ORDER BY created_at DESC ',
       [userId],
     );
     res.json(result.rows);
@@ -381,11 +381,11 @@ app.get('/api/notifications', async (req, res) => {
 app.post('/api/notifications/read/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = 1;
-    await pool.query('UPDATE notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2', [
-      id,
-      userId,
-    ]);
+    const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+    await pool.query(
+      'UPDATE ai_service.notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2',
+      [id, userId],
+    );
     res.json({ success: true });
   } catch (err) {
     console.error('Lỗi update thông báo:', err);
@@ -394,8 +394,10 @@ app.post('/api/notifications/read/:id', async (req, res) => {
 });
 // Route 2: Đánh dấu đọc TẤT CẢ (Không cần ID)
 app.post('/api/notifications/read-all', async (req, res) => {
-  const userId = 1;
-  await pool.query('UPDATE notifications SET is_read = TRUE WHERE user_id = $1', [userId]);
+  const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+  await pool.query('UPDATE ai_service.notifications SET is_read = TRUE WHERE user_id = $1', [
+    userId,
+  ]);
   res.json({ success: true });
 });
 
@@ -404,8 +406,11 @@ app.post('/api/notifications/read-all', async (req, res) => {
 app.delete('/api/notifications/delete/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = 1;
-    await pool.query('DELETE FROM notifications WHERE id = $1 AND user_id = $2', [id, userId]);
+    const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+    await pool.query('DELETE FROM ai_service.notifications WHERE id = $1 AND user_id = $2', [
+      id,
+      userId,
+    ]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Lỗi server' });
@@ -415,8 +420,8 @@ app.delete('/api/notifications/delete/:id', async (req, res) => {
 // Xóa tất cả thông báo của người dùng
 app.delete('/api/notifications/delete-all', async (req, res) => {
   try {
-    const userId = 1;
-    await pool.query('DELETE FROM notifications WHERE user_id = $1', [userId]);
+    const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+    await pool.query('DELETE FROM ai_service.notifications WHERE user_id = $1', [userId]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Lỗi server' });
@@ -429,9 +434,9 @@ async function getAnomalyStatus(userId, categoryName, amount) {
     const res = await pool.query(
       `
       SELECT AVG(t.amount) as average 
-      FROM transactions t
-      JOIN categories c ON t.category_id = c.category_id
-      JOIN accounts a ON t.account_id = a.account_id
+      FROM transaction_service.transactions t
+      JOIN category_service.categories c ON t.category_id = c.category_id
+      JOIN account_service.accounts a ON t.account_id = a.account_id
       WHERE a.user_id = $1 AND c.category_name ILIKE $2
     `,
       [userId, categoryName],
@@ -458,7 +463,7 @@ async function getProactiveContext(userId) {
     SELECT 
       COALESCE(SUM(CASE WHEN transaction_type = 'income' THEN amount ELSE 0 END), 0) as total_inc,
       COALESCE(SUM(CASE WHEN transaction_type = 'expense' THEN amount ELSE 0 END), 0) as total_exp
-    FROM transactions t JOIN accounts a ON t.account_id = a.account_id
+    FROM transaction_service.transactions t JOIN account_service.accounts a ON t.account_id = a.account_id
     WHERE a.user_id = $1 AND EXTRACT(MONTH FROM t.date) = $2 AND EXTRACT(YEAR FROM t.date) = $3
   `,
     [userId, month, now.getFullYear()],
@@ -601,7 +606,7 @@ app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
     const finalAmount = parseFloat(
       transferAmount || transfer_amount || amount_out || amount_in || 0,
     );
-    const userId = 1;
+    const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
     // const userId = req.user.user_id;
 
     // 1. PHÂN BIỆT LOẠI GIAO DỊCH (VÀO hay RA)
@@ -668,7 +673,7 @@ app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
 
     // 3. LƯU DATABASE (Dùng đúng transactionType)
     let catRes = await pool.query(
-      `SELECT category_id FROM categories WHERE category_name ILIKE $1 AND user_id = $2 LIMIT 1`,
+      `SELECT category_id FROM category_service.categories WHERE category_name ILIKE $1 AND user_id = $2 LIMIT 1`,
       [aiData.category_name, userId],
     );
 
@@ -677,7 +682,7 @@ app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
       categoryId = catRes.rows[0].category_id;
     } else {
       const newCat = await pool.query(
-        "INSERT INTO categories (user_id, category_name, type, icon, color) VALUES ($1, $2, $3, '🏦', 'blue') RETURNING category_id",
+        "INSERT INTO category_service.categories (user_id, category_name, type, icon, color) VALUES ($1, $2, $3, '🏦', 'blue') RETURNING category_id",
         [userId, aiData.category_name, transactionType],
       );
       categoryId = newCat.rows[0].category_id;
@@ -686,10 +691,11 @@ app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
     const nowICT = new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' });
 
     await pool.query(
-      `INSERT INTO transactions (account_id, category_id, amount, transaction_type, description, date, note)
+      `INSERT INTO transaction_service.transactions (account_id, category_id, amount, transaction_type, description, date, note)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
-        1,
+        // 1,
+        'd4ffbef0-8bcc-445e-9ea3-7bc854e2ad76',
         // targetAccountId,
         categoryId,
         finalAmount,
@@ -736,12 +742,15 @@ app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
 
     // 5.MỚI: LƯU VÀO LỊCH SỬ CHAT (Để khi F5 web nó vẫn hiện ra)
     try {
-      await pool.query('INSERT INTO message_history (user_id, role, message) VALUES ($1, $2, $3)', [
-        // targetUserId,
-        userId,
-        'model',
-        finalMsg,
-      ]);
+      await pool.query(
+        'INSERT INTO ai_service.message_history (user_id, role, message) VALUES ($1, $2, $3)',
+        [
+          // targetUserId,
+          userId,
+          'model',
+          finalMsg,
+        ],
+      );
       console.log('💾 Đã lưu thông báo ngân hàng vào lịch sử chat');
     } catch (chatErr) {
       console.error('❌ Lỗi lưu lịch sử chat ngân hàng:', chatErr.message);
@@ -777,7 +786,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
 
     // const { message } = req.body;
     const imageFile = req.file; // Lấy file ảnh nếu có
-    const currentUserId = 1;
+    const currentUserId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
     // const currentUserId = req.user.user_id;
 
     // CHẶN NGAY TỪ ĐẦU NẾU LỖI
@@ -822,11 +831,10 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     // VỊ TRÍ 1: DÁN ĐOẠN LƯU TIN NHẮN USER TẠI ĐÂY
     // ==========================================
     try {
-      await pool.query('INSERT INTO message_history (user_id, role, message) VALUES ($1, $2, $3)', [
-        currentUserId,
-        'user',
-        message || '[Gửi ảnh]',
-      ]);
+      await pool.query(
+        'INSERT INTO ai_service.message_history (user_id, role, message) VALUES ($1, $2, $3)',
+        [currentUserId, 'user', message || '[Gửi ảnh]'],
+      );
       console.log('💾 Đã lưu tin nhắn của Bảo vào DB');
     } catch (err) {
       console.error('❌ Lỗi lưu tin nhắn user:', err.message);
@@ -855,9 +863,9 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
         SELECT 
             c.category_name, 
             COALESCE(SUM(t.amount), 0) as spent,
-            (SELECT amount_limit FROM budgets b WHERE b.category_id = c.category_id AND b.month = $2 AND b.year = $3 AND b.user_id = $1) as limit_amount
-        FROM categories c
-        LEFT JOIN transactions t ON c.category_id = t.category_id 
+            (SELECT amount_limit FROM budgets_service.budgets b WHERE b.category_id = c.category_id AND b.month = $2 AND b.year = $3 AND b.user_id = $1) as limit_amount
+        FROM category_service.categories c
+        LEFT JOIN transaction_service.transactions t ON c.category_id = t.category_id 
             AND EXTRACT(MONTH FROM t.date) = $2 
             AND EXTRACT(YEAR FROM t.date) = $3
             AND t.transaction_type = 'expense'
@@ -875,8 +883,8 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
           COUNT(CASE WHEN t.transaction_type = 'income' THEN 1 END) as income_count,
           COALESCE(SUM(CASE WHEN t.transaction_type = 'expense' THEN t.amount ELSE 0 END), 0) as total_expense,
           COALESCE(SUM(CASE WHEN t.transaction_type = 'income' THEN t.amount ELSE 0 END), 0) as total_income
-      FROM transactions t
-      JOIN accounts a ON t.account_id = a.account_id
+      FROM transaction_service.transactions t
+      JOIN account_service.accounts a ON t.account_id = a.account_id
       WHERE a.user_id = $1 
         AND EXTRACT(MONTH FROM t.date) = $2 
         AND EXTRACT(YEAR FROM t.date) = $3
@@ -888,7 +896,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     const budgetRes = await pool.query(
       `
         SELECT COALESCE(SUM(amount_limit), 0) as total_limit
-        FROM budgets
+        FROM budgets_service.budgets
         WHERE user_id = $1 AND month = $2 AND year = $3
       `,
       [currentUserId, currentMonth, currentYear],
@@ -944,9 +952,9 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     const recentTransactionsRes = await pool.query(
       `
           SELECT t.trans_id, t.description, t.amount, t.date, c.category_name
-          FROM transactions t
-          JOIN categories c ON t.category_id = c.category_id
-          JOIN accounts a ON t.account_id = a.account_id
+          FROM transaction_service.transactions t
+          JOIN category_service.categories c ON t.category_id = c.category_id
+          JOIN account_service.accounts a ON t.account_id = a.account_id
           WHERE a.user_id = $1
           ORDER BY t.created_at DESC LIMIT 10
       `,
@@ -1222,7 +1230,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
             if (queryData.time_range === 'last_week') {
               sql = `
                 SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count
-                FROM transactions t JOIN accounts a ON t.account_id = a.account_id
+                FROM transaction_service.transactions t JOIN account_service.accounts a ON t.account_id = a.account_id
                 WHERE a.user_id = $1 
                 AND t.date >= date_trunc('week', CURRENT_DATE - INTERVAL '1 week')
                 AND t.date < date_trunc('week', CURRENT_DATE)
@@ -1232,7 +1240,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
             else if (queryData.start_date && queryData.end_date) {
               sql = `
                 SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count
-                FROM transactions t JOIN accounts a ON t.account_id = a.account_id
+                FROM transaction_service.transactions t JOIN account_service.accounts a ON t.account_id = a.account_id
                 WHERE a.user_id = $1 
                 AND t.date >= $2 AND t.date <= $3
                 AND t.transaction_type = 'expense'`;
@@ -1243,7 +1251,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
             else if (queryData.type === 'total_spending') {
               sql = `
                 SELECT COALESCE(SUM(amount), 0) as total , COUNT(*) as count
-                FROM transactions t JOIN accounts a ON t.account_id = a.account_id
+                FROM transaction_service.transactions t JOIN account_service.accounts a ON t.account_id = a.account_id
                 WHERE a.user_id = $1 AND EXTRACT(MONTH FROM t.date) = $2 
                 AND t.transaction_type = 'expense'`;
               params.push(queryData.month || currentMonth);
@@ -1252,7 +1260,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
             else if (queryData.type === 'total_spending') {
               sql = `
                 SELECT COALESCE(SUM(amount), 0) as total , COUNT(*) as count
-                FROM transactions t JOIN accounts a ON t.account_id = a.account_id
+                FROM transaction_service.transactions t JOIN account_service.accounts a ON t.account_id = a.account_id
                 WHERE a.user_id = $1 AND EXTRACT(MONTH FROM t.date) = $2 
                 AND t.transaction_type = 'income'`;
               params.push(queryData.month || currentMonth);
@@ -1262,9 +1270,9 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
             else if (queryData.type === 'category_spending' && queryData.category) {
               sql = `
                 SELECT COALESCE(SUM(t.amount), 0) as total, COUNT(*) as count
-                FROM transactions t 
-                JOIN accounts a ON t.account_id = a.account_id
-                JOIN categories c ON t.category_id = c.category_id
+                FROM transaction_service.transactions t 
+                JOIN account_service.accounts a ON t.account_id = a.account_id
+                JOIN account_service.categories c ON t.category_id = c.category_id
                 WHERE a.user_id = $1 
                 AND (c.category_name ILIKE $2 OR $2 ILIKE '%' || c.category_name || '%')
                 AND EXTRACT(MONTH FROM t.date) = $3 
@@ -1287,8 +1295,8 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
                     END as "day_name",
                     SUM(t.amount) as "total_day",
                     COUNT(*) as "count"
-                  FROM transactions t 
-                  JOIN accounts a ON t.account_id = a.account_id
+                  FROM transaction_service.transactions t 
+                  JOIN account_service.accounts a ON t.account_id = a.account_id
                   WHERE a.user_id = $1 
                   AND EXTRACT(MONTH FROM t.date) = $2
                   AND t.transaction_type = 'expense'
@@ -1306,8 +1314,8 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
                     SUM(CASE WHEN t.date >= date_trunc('week', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') THEN t.amount ELSE 0 END)::bigint as this_week,
                     SUM(CASE WHEN t.date >= date_trunc('week', (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') - INTERVAL '1 week') 
                             AND t.date < date_trunc('week', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') THEN t.amount ELSE 0 END)::bigint as last_week
-                  FROM transactions t
-                  JOIN accounts a ON t.account_id = a.account_id
+                  FROM transaction_service.transactions t
+                  JOIN account_service.accounts a ON t.account_id = a.account_id
                   WHERE a.user_id = $1 AND t.transaction_type = 'expense'
                 `;
             }
@@ -1400,7 +1408,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
             .trim();
 
           await pool.query(
-            'INSERT INTO message_history (user_id, role, message) VALUES ($1, $2, $3)',
+            'INSERT INTO ai_service.message_history (user_id, role, message) VALUES ($1, $2, $3)',
             [currentUserId, 'model', cleanMessageForDB || 'Money Guard đã xử lý yêu cầu của bạn.'],
           );
           console.log('💾 Đã lưu phản hồi của Money Guard vào DB');
@@ -1419,22 +1427,63 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
           try {
             const catData = JSON.parse(createCatMatch[1].trim());
             const catName = catData.category_name;
-            const userId = 1;
+            const catType = catData.type || 'expense';
+            const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
 
             if (catName) {
               // Tìm theo cột category_name
               const checkCat = await pool.query(
-                'SELECT category_id FROM categories WHERE category_name ILIKE $1 AND user_id = $2',
+                'SELECT category_id FROM category_service.categories WHERE category_name ILIKE $1 AND user_id = $2',
                 [catName, userId],
               );
 
               if (checkCat.rows.length === 0) {
-                // Insert vào cột category_name
+                // dùng toán tử || để nối chuỗi tìm kiếm trong SQL
+                let iconLookup = await pool.query(
+                  `SELECT icon_id FROM category_service.icons 
+                   WHERE $1 ILIKE '%' || name || '%' OR $1 ILIKE '%' || icon_code || '%' 
+                   LIMIT 1`,
+                  [catName], // Đã sửa từ catNameFromAI thành catName
+                );
+
+                let finalIconId;
+
+                if (iconLookup.rows.length > 0) {
+                  // Nếu có sẵn icon trong kho thì dùng luôn
+                  finalIconId = iconLookup.rows[0].icon_id;
+                  console.log(`🎯 Dùng icon có sẵn cho: ${catName}`);
+                } else {
+                  const iconModel = genAI.getGenerativeModel({
+                    model: 'gemini-3.1-flash-lite-preview',
+                  });
+                  const iconPrompt = `Bạn là chuyên gia thiết kế icon. Hãy gợi ý đúng 1 emoji duy nhất đại diện cho danh mục: "${catName}". 
+                  Chỉ trả về đúng 1 ký tự emoji, không giải thích, không backticks, không thêm chữ.`;
+
+                  const aiIconRes = await iconModel.generateContent(iconPrompt);
+                  let suggestedEmoji = aiIconRes.response.text().trim();
+
+                  // Làm sạch emoji (phòng hờ AI nhả ra markdown hoặc text)
+                  suggestedEmoji = suggestedEmoji.match(/\p{Emoji}/u)?.[0] || '📁';
+
+                  // 4. LƯU ICON MỚI NÀY VÀO KHO ICONS ĐỂ DÙNG LẠI SAU NÀY
+                  const newIcon = await pool.query(
+                    `INSERT INTO category_service.icons (name, icon_code, category) 
+                     VALUES ($1, $2, $3) 
+                     RETURNING icon_id`,
+                    [catName + ' Icon', suggestedEmoji, catType], // Đã sửa transactionType thành catType
+                  );
+
+                  finalIconId = newIcon.rows[0].icon_id;
+                  console.log(`✅ Đã tự tạo Icon mới thành công: ${suggestedEmoji}`);
+                }
+
                 await pool.query(
-                  "INSERT INTO categories (user_id, category_name, type, icon, color) VALUES ($1, $2, 'expense', '📁', 'grey')",
-                  [userId, catName],
+                  "INSERT INTO category_service.categories (user_id, category_name, type, icon_id, color) VALUES ($1, $2, 'expense', $3, $4)",
+                  [userId, catName, finalIconId, 'blue'],
                 );
                 console.log(`✨ Đã tạo danh mục mới: ${catName}`);
+              } else {
+                console.log(`🟡 Danh mục "${catName}" đã tồn tại rồi Bảo ơi.`);
               }
             }
           } catch (e) {
@@ -1446,7 +1495,9 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
         const deleteMatch = reply.match(/<delete_transaction>(.*?)<\/delete_transaction>/s);
         if (deleteMatch) {
           const { id } = JSON.parse(deleteMatch[1]);
-          await pool.query('DELETE FROM transactions WHERE trans_id = $1', [id]);
+          await pool.query('DELETE FROM transaction_service.transactions WHERE trans_id = $1', [
+            id,
+          ]);
           console.log(`🗑️ Đã xóa giao dịch ID: ${id}`);
         }
 
@@ -1455,7 +1506,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
         if (updateMatch) {
           const { id, amount, description, category_name } = JSON.parse(updateMatch[1]);
           await pool.query(
-            'UPDATE transactions SET amount = COALESCE($1, amount), description = COALESCE($2, description) WHERE trans_id = $3',
+            'UPDATE transaction_service.transactions SET amount = COALESCE($1, amount), description = COALESCE($2, description) WHERE trans_id = $3',
             [amount, description, id],
           );
           console.log(`✏️ Đã cập nhật giao dịch ID: ${id} thành ${amount}đ`);
@@ -1469,7 +1520,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
           for (const match of matches) {
             try {
               const data = JSON.parse(match[1].trim());
-              const userId = 1;
+              const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
               let catNameFromAI = data.category_name;
 
               const transactionType = data.transaction_type || 'expense';
@@ -1507,7 +1558,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
               // Kiểm tra xem trong DB đã có danh mục nào "chứa" hoặc "giống" cái AI gửi về không
               // Ví dụ: AI gửi "Cơm gà" mà DB đã có "Cơm" -> dùng luôn "Cơm"
               let catRes = await pool.query(
-                `SELECT category_id, category_name FROM categories 
+                `SELECT category_id, category_name FROM category_service.categories 
                   WHERE (category_name ILIKE $1 OR $1 ILIKE '%' || category_name || '%') 
                   AND user_id = $2 LIMIT 1`,
                 [catNameFromAI, userId],
@@ -1520,10 +1571,26 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
                   `♻️  Gom nhóm: "${catNameFromAI}" vào danh mục sẵn có: "${catRes.rows[0].category_name}"`,
                 );
               } else {
+                // NẾU CHƯA CÓ -> TỰ ĐỘNG TÌM ICON PHÙ HỢP TRONG KHO ICONS
+                console.log(`🔍 Đang tìm icon tự động cho danh mục mới: ${catNameFromAI}...`);
+
+                const iconLookup = await pool.query(
+                  `SELECT icon_id FROM category_service.icons 
+                      WHERE $1 ILIKE '%' || name || '%' OR $1 ILIKE '%' || icon_code || '%' 
+                      LIMIT 1`,
+                  [catNameFromAI],
+                );
+
+                // Nếu thấy icon phù hợp thì lấy, không thì lấy icon mặc định (Bills)
+                const finalIconId =
+                  iconLookup.rows.length > 0
+                    ? iconLookup.rows[0].icon_id
+                    : 'f1995874-297d-460c-882d-136585918831'; // Mã UUID mặc định của Bảo
+
                 // Nếu tạo danh mục mới, phải tạo đúng loại (income/expense)
                 const newCat = await pool.query(
-                  "INSERT INTO categories (user_id, category_name, type, icon, color) VALUES ($1, $2, $3, '💰', 'green') RETURNING category_id",
-                  [userId, data.category_name, transactionType],
+                  'INSERT INTO category_service.categories (user_id, category_name, type, icon_id, color) VALUES ($1, $2, $3, $4, $5) RETURNING category_id',
+                  [userId, data.category_name, transactionType, finalIconId, 'blue'],
                 );
                 categoryId = newCat.rows[0].category_id;
                 console.log(`✨ Tạo danh mục mới: ${catNameFromAI}`);
@@ -1531,11 +1598,12 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
 
               // 2. LƯU GIAO DỊCH
               const insertQuery = `
-                INSERT INTO transactions (account_id, category_id, amount, transaction_type, description, date, note)
+                INSERT INTO transaction_service.transactions (account_id, category_id, amount, transaction_type, description, date, note)
                 VALUES ($1, $2, $3, $4, $5, $6, $7)
               `;
               const values = [
-                data.account_id || 1,
+                // data.account_id || 'd4ffbef0-8bcc-445e-9ea3-7bc854e2ad76',
+                'd4ffbef0-8bcc-445e-9ea3-7bc854e2ad76',
                 categoryId,
                 finalAmount,
                 transactionType,
@@ -1622,9 +1690,9 @@ app.get('/api/ai-deep-scan', authenticateToken, async (req, res) => {
     const result = await pool.query(
       `
       SELECT t.description, t.amount, t.date, c.category_name 
-      FROM transactions t 
-      JOIN categories c ON t.category_id = c.category_id
-      JOIN accounts a ON t.account_id = a.account_id
+      FROM transaction_service.transactions t 
+      JOIN category_service.categories c ON t.category_id = c.category_id
+      JOIN account_service.accounts a ON t.account_id = a.account_id
       WHERE a.user_id = $1 AND EXTRACT(MONTH FROM t.date) = EXTRACT(MONTH FROM CURRENT_DATE)
       AND t.transaction_type = 'expense'
     `,
@@ -1708,17 +1776,15 @@ app.post('/chat-stream', authenticateToken, async (req, res) => {
     res.end();
 
     // Lưu vào DB sau khi hoàn thành
-    await pool.query('INSERT INTO message_history (user_id, role, message) VALUES ($1, $2, $3)', [
-      currentUserId,
-      'user',
-      message,
-    ]);
+    await pool.query(
+      'INSERT INTO ai_service.message_history (user_id, role, message) VALUES ($1, $2, $3)',
+      [currentUserId, 'user', message],
+    );
 
-    await pool.query('INSERT INTO message_history (user_id, role, message) VALUES ($1, $2, $3)', [
-      currentUserId,
-      'model',
-      fullResponse,
-    ]);
+    await pool.query(
+      'INSERT INTO ai_service.message_history (user_id, role, message) VALUES ($1, $2, $3)',
+      [currentUserId, 'model', fullResponse],
+    );
   } catch (err) {
     res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
     res.end();
