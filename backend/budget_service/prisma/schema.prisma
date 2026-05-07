@@ -21,6 +21,8 @@ model Budget {
   date           DateTime @db.Date
   date_start     DateTime? @db.Date
   date_end       DateTime? @db.Date
+  month   Int?
+  year   Int?
 
   status         Status?   
   status_active  Boolean?

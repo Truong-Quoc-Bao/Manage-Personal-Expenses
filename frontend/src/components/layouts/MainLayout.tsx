@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
+import { ViewProfileModal } from "../modals/ViewProfileModal";
+import { EditProfileModal } from "../modals/EditProfileModal";
 import {
   LayoutDashboard,
   Receipt,
@@ -9,21 +11,64 @@ import {
   Menu,
   X,
   LogOut,
+  PiggyBank,
 } from "lucide-react";
+import { userApi } from "../../api/user.api";
+
+type UserProfile = {
+  user_id?: string;
+  user_name?: string;
+  email?: string;
+  birth?: string;
+};
 
 export function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showViewProfile, setShowViewProfile] = useState(false);
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [user, setUser] = useState<UserProfile | null>(null);
+
   const location = useLocation();
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const res = await userApi.getProfile();
+        console.log("USER API RESPONSE:", res.data);
+        setUser(res.data.data);
+      } catch (error) {
+        console.error("Get user profile failed:", error);
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
 
   const navigation = [
     { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
     { name: "Giao dịch", path: "/transactions", icon: Receipt },
     { name: "Tài khoản", path: "/accounts", icon: Wallet },
+    { name: "Ngân sách", path: "/budgets", icon: PiggyBank },
     { name: "Thống kê", path: "/statistics", icon: BarChart3 },
     { name: "Trợ lý AI", path: "/chatbox", icon: MessageCircle },
   ];
 
   const isActive = (path: string) => location.pathname === path;
+
+  const displayName = user?.user_name || "Người dùng";
+  const displayEmail = user?.email || "Chưa có email";
+
+  const avatarText = displayName
+    .split(" ")
+    .map((word) => word[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50">
@@ -58,7 +103,7 @@ export function MainLayout() {
                 </svg>
               </div>
 
-              <span className="text-2xl font-semibold text-gray-900">
+              <span className="text-2xl font-semibold !text-gray-900">
                 Tài chính
               </span>
             </div>
@@ -66,27 +111,33 @@ export function MainLayout() {
             <button
               type="button"
               onClick={() => setSidebarOpen(false)}
-              className="rounded-lg !bg-transparent p-2 text-gray-500 hover:!bg-gray-100 lg:hidden"
+              className="rounded-lg !bg-transparent p-2 !text-gray-500 hover:!bg-gray-100 lg:hidden"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
 
           <div className="border-b border-gray-200 px-7 py-7">
-            <div className="flex items-center gap-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-amber-300 to-orange-400 text-xl font-semibold text-white">
-                NV
-              </div>
+            <button
+              type="button"
+              onClick={() => setShowViewProfile(true)}
+              className="w-full rounded-2xl !bg-transparent p-2 text-left transition hover:!bg-orange-50"
+            >
+              <div className="flex items-center gap-4">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-amber-300 to-orange-400 text-xl font-semibold !text-white">
+                  {avatarText}
+                </div>
 
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xl font-medium text-gray-900">
-                  Nguyễn Văn A
-                </p>
-                <p className="truncate text-lg text-gray-500">
-                  user@example.com
-                </p>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xl font-medium !text-gray-900">
+                    {displayName}
+                  </p>
+                  <p className="truncate text-lg !text-gray-500">
+                    {displayEmail}
+                  </p>
+                </div>
               </div>
-            </div>
+            </button>
           </div>
 
           <nav className="flex-1 space-y-4 overflow-y-auto px-7 py-8">
@@ -101,8 +152,8 @@ export function MainLayout() {
                   onClick={() => setSidebarOpen(false)}
                   className={`flex items-center gap-5 rounded-2xl px-5 py-4 text-xl font-medium transition-all ${
                     active
-                      ? "bg-gradient-to-r from-orange-400 to-rose-400 text-white shadow-lg"
-                      : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                      ? "!bg-gradient-to-r !from-orange-400 !to-rose-400 !text-white shadow-lg"
+                      : "!bg-transparent !text-gray-700 hover:!bg-gray-100 hover:!text-gray-900"
                   }`}
                 >
                   <Icon className="h-7 w-7" />
@@ -115,7 +166,8 @@ export function MainLayout() {
           <div className="border-t border-gray-200 px-7 py-6">
             <Link
               to="/"
-              className="flex items-center gap-5 rounded-2xl px-5 py-4 text-xl font-medium text-gray-700 transition hover:bg-red-50 hover:text-red-600"
+              onClick={handleLogout}
+              className="flex items-center gap-5 rounded-2xl px-5 py-4 text-xl font-medium !text-gray-700 transition hover:!bg-red-50 hover:!text-red-600"
             >
               <LogOut className="h-7 w-7" />
               <span>Đăng xuất</span>
@@ -130,12 +182,12 @@ export function MainLayout() {
             <button
               type="button"
               onClick={() => setSidebarOpen(true)}
-              className="rounded-lg !bg-transparent p-2 text-gray-600 hover:!bg-gray-100"
+              className="rounded-lg !bg-transparent p-2 !text-gray-600 hover:!bg-gray-100"
             >
               <Menu className="h-6 w-6" />
             </button>
 
-            <span className="font-semibold text-gray-900">Tài chính</span>
+            <span className="font-semibold !text-gray-900">Tài chính</span>
 
             <div className="w-10" />
           </div>
@@ -145,6 +197,31 @@ export function MainLayout() {
           <Outlet />
         </main>
       </div>
+
+      {user && (
+        <ViewProfileModal
+          isOpen={showViewProfile}
+          onClose={() => setShowViewProfile(false)}
+          onEdit={() => {
+            setShowViewProfile(false);
+            setShowEditProfile(true);
+          }}
+          user={user}
+        />
+      )}
+
+      {user && (
+        <EditProfileModal
+          isOpen={showEditProfile}
+          onClose={() => setShowEditProfile(false)}
+          user={user}
+          onUpdated={(updatedUser) => {
+            setUser(updatedUser);
+            setShowEditProfile(false);
+            setShowViewProfile(true);
+          }}
+        />
+      )}
     </div>
   );
 }

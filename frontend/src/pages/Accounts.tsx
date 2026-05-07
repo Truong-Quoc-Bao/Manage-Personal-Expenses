@@ -4,50 +4,104 @@ import { toast } from "sonner";
 import { AddAccountModal } from "../components/modals/AddAccountModal";
 import { EditAccountModal } from "../components/modals/EditAccountModal";
 import { DeleteAccountModal } from "../components/modals/DeleteAccountModal";
-import { accountStore, type Account } from "../store/mockData";
+import { accountApi } from "../api/account.api";
+
+type Account = {
+  account_id: string;
+  account_name: string;
+  balance: number;
+  type: string;
+  currency?: string;
+};
 
 export function Accounts() {
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [deletingAccount, setDeletingAccount] = useState<Account | null>(null);
-  const [accounts, setAccounts] = useState<Account[]>(accountStore.getAll());
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchAccounts = async () => {
+    try {
+      setLoading(true);
+
+      const res = await accountApi.getAccounts();
+
+      console.log("GET ACCOUNTS:", res.data);
+
+      setAccounts(res.data.data || []);
+    } catch (error) {
+      console.error("Get accounts failed:", error);
+      toast.error("Không thể tải danh sách tài khoản");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const unsubscribe = accountStore.subscribe(setAccounts);
-    return () => {
-      if (typeof unsubscribe === "function") unsubscribe();
-    };
+    fetchAccounts();
   }, []);
 
-  const handleAddAccount = (accountData: any) => {
-    const newAccount: Account = {
-      id: Date.now(),
-      name: accountData.name,
-      balance: parseFloat(accountData.balance),
-      type: accountData.type,
-      icon: accountData.icon,
-      currency: accountData.currency,
-    };
+  const handleAddAccount = async (accountData: any) => {
+    try {
+      await accountApi.createAccount({
+        accountName: accountData.name,
+        type: accountData.type,
+        balance: Number(accountData.balance),
+        currency: accountData.currency,
+      });
 
-    accountStore.add(newAccount);
-    setShowAddAccount(false);
-    toast.success(`Đã tạo tài khoản "${accountData.name}" thành công!`);
+      toast.success(`Đã tạo tài khoản "${accountData.name}" thành công!`);
+
+      setShowAddAccount(false);
+
+      fetchAccounts();
+    } catch (error) {
+      console.error("Create account failed:", error);
+      toast.error("Tạo tài khoản thất bại!");
+    }
   };
 
-  const handleEditAccount = (accountData: any) => {
+  const handleEditAccount = async (accountData: any) => {
     if (!editingAccount) return;
 
-    accountStore.update(editingAccount.id, accountData);
-    setEditingAccount(null);
-    toast.success(`Đã cập nhật tài khoản "${accountData.name}" thành công!`);
+    try {
+      await accountApi.updateAccount({
+        accountId: editingAccount.account_id,
+        accountName: accountData.name,
+        type: accountData.type,
+      });
+
+      toast.success(`Đã cập nhật tài khoản "${accountData.name}" thành công!`);
+
+      setEditingAccount(null);
+
+      fetchAccounts();
+    } catch (error) {
+      console.error("Update account failed:", error);
+      toast.error("Cập nhật tài khoản thất bại!");
+    }
   };
 
-  const handleDeleteAccount = () => {
+  const handleDeleteAccount = async () => {
     if (!deletingAccount) return;
 
-    accountStore.remove(deletingAccount.id);
-    toast.success(`Đã xóa tài khoản "${deletingAccount.name}" thành công!`);
-    setDeletingAccount(null);
+    try {
+      await accountApi.deleteAccount({
+        accountId: deletingAccount.account_id,
+      });
+
+      toast.success(
+        `Đã xóa tài khoản "${deletingAccount.account_name}" thành công!`
+      );
+
+      setDeletingAccount(null);
+
+      fetchAccounts();
+    } catch (error) {
+      console.error("Delete account failed:", error);
+      toast.error("Xóa tài khoản thất bại!");
+    }
   };
 
   const formatCurrency = (amount: number) => {
@@ -58,7 +112,7 @@ export function Accounts() {
   };
 
   const totalBalance = accounts.reduce(
-    (sum, account) => sum + account.balance,
+    (sum, account) => sum + Number(account.balance),
     0
   );
 
@@ -85,6 +139,19 @@ export function Accounts() {
         return "bg-purple-100 text-purple-700";
       default:
         return "bg-gray-100 text-gray-700";
+    }
+  };
+
+  const getAccountIcon = (type: string) => {
+    switch (type) {
+      case "cash":
+        return "💵";
+      case "bank":
+        return "🏦";
+      case "ewallet":
+        return "📱";
+      default:
+        return "💰";
     }
   };
 
@@ -120,7 +187,11 @@ export function Accounts() {
           <p className="text-white/75">Từ {accounts.length} tài khoản</p>
         </div>
 
-        {accounts.length === 0 ? (
+        {loading ? (
+          <div className="rounded-2xl bg-white p-10 text-center shadow-lg">
+            Đang tải dữ liệu...
+          </div>
+        ) : accounts.length === 0 ? (
           <div className="rounded-2xl border border-gray-100 bg-white p-12 text-center shadow-lg">
             <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
               <Wallet className="h-8 w-8 text-gray-400" />
@@ -133,30 +204,23 @@ export function Accounts() {
             <p className="mb-6 text-gray-600">
               Thêm tài khoản đầu tiên để bắt đầu quản lý tài chính
             </p>
-
-            <button
-              type="button"
-              onClick={() => setShowAddAccount(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-xl !bg-gradient-to-r !from-orange-400 !to-rose-400 px-6 py-3 font-semibold text-white shadow-lg transition hover:!from-orange-500 hover:!to-rose-500"
-            >
-              <Plus className="h-5 w-5" />
-              Thêm tài khoản
-            </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {accounts.map((account) => (
               <div
-                key={account.id}
+                key={account.account_id}
                 className="rounded-2xl border border-gray-100 bg-white p-6 shadow-lg transition hover:shadow-xl"
               >
                 <div className="mb-5 flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="text-4xl">{account.icon}</div>
+                    <div className="text-4xl">
+                      {getAccountIcon(account.type)}
+                    </div>
 
                     <div>
                       <h3 className="mb-1 text-lg font-semibold text-gray-900">
-                        {account.name}
+                        {account.account_name}
                       </h3>
 
                       <span
@@ -172,8 +236,9 @@ export function Accounts() {
 
                 <div className="mb-5">
                   <p className="mb-1 text-sm text-gray-600">Số dư</p>
+
                   <p className="text-2xl font-semibold text-gray-900">
-                    {formatCurrency(account.balance)}
+                    {formatCurrency(Number(account.balance))}
                   </p>
                 </div>
 
@@ -205,7 +270,7 @@ export function Accounts() {
       {showAddAccount && (
         <AddAccountModal
           onClose={() => setShowAddAccount(false)}
-          onSubmit={handleAddAccount}
+          onSuccess={fetchAccounts}
         />
       )}
 
@@ -213,7 +278,7 @@ export function Accounts() {
         <EditAccountModal
           account={editingAccount}
           onClose={() => setEditingAccount(null)}
-          onSubmit={handleEditAccount}
+          onSuccess={fetchAccounts}
         />
       )}
 
@@ -221,7 +286,7 @@ export function Accounts() {
         <DeleteAccountModal
           account={deletingAccount}
           onClose={() => setDeletingAccount(null)}
-          onConfirm={handleDeleteAccount}
+          onSuccess={fetchAccounts}
         />
       )}
     </>

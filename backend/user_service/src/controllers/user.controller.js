@@ -5,7 +5,7 @@ const {
 
 const getProfile = async (req, res, next) => {
   try {
-    const userId = req.user?.userId || req.query.userId;
+    const userId = req.user?.userId || "7cb96e5d-3cd9-40dc-ad99-635f08456301";
 
     const user = await getUserProfile(userId);
 
@@ -22,7 +22,7 @@ const getProfile = async (req, res, next) => {
 const updateUser = async (req, res, next) => {
   try {
     const { userName, birth } = req.body;
-    const userId = req.user?.userId || req.query.userId;
+    const userId = req.user?.userId || "7cb96e5d-3cd9-40dc-ad99-635f08456301";
 
     console.log("userName =", userName);
     console.log("birth =", birth);

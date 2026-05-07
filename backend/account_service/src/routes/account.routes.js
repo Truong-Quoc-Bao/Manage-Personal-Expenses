@@ -9,9 +9,9 @@ const {
 const validate = require("../middlewares/validation.middleware");
 
 const router = express.Router();
-router.post("/accounts", validate(), CreateAccount);
-router.get("/accounts", getAccountsController);
-router.put("/accounts", validate(), updateAccountController);
-router.delete("/accounts", deleteAccountController);
-router.get("/accounts/total-balance", getTotalBalanceController);
+router.post("/", validate(), CreateAccount);
+router.get("/", getAccountsController);
+router.put("/", validate(), updateAccountController);
+router.delete("/", deleteAccountController);
+router.get("/total-balance", getTotalBalanceController);
 module.exports = router;
