@@ -32,7 +32,7 @@ const updateBudgetService = async ({
   budgetId,
   categoryId,
   amountLimit,
-  date,
+  dateStart,
 }) => {
   if (!userId) {
     const error = new Error("userId is required");
@@ -54,8 +54,8 @@ const updateBudgetService = async ({
     error.statusCode = 400;
     throw error;
   }
-  if (!date) {
-    const error = new Error("date is required");
+  if (!dateStart) {
+    const error = new Error("date_start is required");
     error.statusCode = 400;
     throw error;
   }
@@ -87,7 +87,7 @@ const updateBudgetService = async ({
     budgetId,
     categoryId,
     amountLimit,
-    date,
+    dateStart,
   });
   return budgets;
 };
@@ -96,7 +96,7 @@ const createBudgetService = async ({
   userId,
   categoryId,
   amountLimit,
-  date,
+  dateStart,
 }) => {
   if (!userId) {
     const error = new Error("userId is required");
@@ -113,21 +113,25 @@ const createBudgetService = async ({
     error.statusCode = 400;
     throw error;
   }
-  if (!date) {
-    const error = new Error("date is required");
+  if (!dateStart) {
+    const error = new Error("date start is required");
     error.statusCode = 400;
     throw error;
   }
 
-  const category = await findCategoryByIdAndUserId({ categoryId, userId });
+  // const category = await findCategoryByIdAndUserId({ categoryId, userId });
 
-  if (!category) {
-    const error = new Error("Category does not exist");
-    error.statusCode = 404;
-    throw error;
-  }
+  // if (!category) {
+  //   const error = new Error("Category does not exist");
+  //   error.statusCode = 404;
+  //   throw error;
+  // }
 
-  const checkDate = await findDateByCategory({ userId, categoryId, date });
+  const checkDate = await findDateByCategory({
+    userId,
+    categoryId,
+    dateStart,
+  });
 
   if (checkDate) {
     const error = new Error("this Budget is set today");
@@ -139,7 +143,7 @@ const createBudgetService = async ({
     userId,
     categoryId,
     amountLimit,
-    date,
+    dateStart,
   });
   return budget;
 };
@@ -154,7 +158,7 @@ const getBudgetByBudgetIdService = async ({ userId, budgetId }) => {
   return budgets;
 };
 
-const getBudgetByUserIdService = async ({ userId, categoryId, date }) => {
+const getBudgetByUserIdService = async ({ userId, categoryId, dateStart }) => {
   if (!userId) {
     const error = new Error("userId is required");
     error.statusCode = 400;
@@ -171,7 +175,7 @@ const getBudgetByUserIdService = async ({ userId, categoryId, date }) => {
     }
   }
 
-  const budgets = await findBudgets({ userId, categoryId, date });
+  const budgets = await findBudgets({ userId, categoryId, dateStart });
 
   return budgets;
 };

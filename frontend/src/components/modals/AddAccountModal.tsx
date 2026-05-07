@@ -1,14 +1,14 @@
-import React from "react";
-import { useState } from "react";
+import React, { useState } from "react";
 import { X } from "lucide-react";
 import { toast } from "sonner";
+import { accountApi } from "../../api/account.api";
 
 interface AddAccountModalProps {
   onClose: () => void;
-  onSubmit: (data: any) => void;
+  onSuccess: () => void;
 }
 
-export function AddAccountModal({ onClose, onSubmit }: AddAccountModalProps) {
+export function AddAccountModal({ onClose, onSuccess }: AddAccountModalProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -25,59 +25,59 @@ export function AddAccountModal({ onClose, onSubmit }: AddAccountModalProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (formData.name.trim().length < 2) {
+      toast.error("Tên tài khoản phải có ít nhất 2 ký tự");
+      return;
+    }
+
+    const balance = Number(formData.balance);
+    if (isNaN(balance) || balance < 0) {
+      toast.error("Số dư không hợp lệ");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // Validate name
-      if (formData.name.trim().length < 2) {
-        toast.error("Tên tài khoản phải có ít nhất 2 ký tự");
-        setLoading(false);
-        return;
-      }
-
-      // Validate balance
-      const balance = parseFloat(formData.balance);
-      if (isNaN(balance) || balance < 0) {
-        toast.error("Số dư không hợp lệ");
-        setLoading(false);
-        return;
-      }
-
-      // Mock API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Get icon based on type
-      const selectedType = accountTypes.find((t) => t.value === formData.type);
-
-      onSubmit({
-        ...formData,
-        icon: selectedType?.icon || "💰",
-        balance: balance.toString(),
+      await accountApi.createAccount({
+        accountName: formData.name,
+        type: formData.type,
+        balance,
+        currency: formData.currency,
       });
+
+      toast.success(`Đã tạo tài khoản "${formData.name}" thành công!`);
+      onSuccess();
+      onClose();
     } catch (error) {
-      toast.error("Có lỗi xảy ra. Vui lòng thử lại!");
+      console.error("Create account failed:", error);
+      toast.error("Tạo tài khoản thất bại!");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full animate-in zoom-in-95 duration-200">
-        <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <h2 className="text-xl text-gray-800">Thêm tài khoản mới</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+          <h2 className="text-xl font-semibold text-gray-900">
+            Thêm tài khoản mới
+          </h2>
+
           <button
+            type="button"
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            className="rounded-lg !bg-transparent p-2 text-gray-600 hover:!bg-gray-100"
           >
-            <X className="w-5 h-5 text-gray-600" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          {/* Account Name */}
+        <form onSubmit={handleSubmit} className="space-y-5 p-6">
           <div>
-            <label className="block text-sm text-gray-700 mb-2">
+            <label className="mb-2 block text-sm text-gray-700">
               Tên tài khoản <span className="text-red-500">*</span>
             </label>
             <input
@@ -86,16 +86,15 @@ export function AddAccountModal({ onClose, onSubmit }: AddAccountModalProps) {
               onChange={(e) =>
                 setFormData({ ...formData, name: e.target.value })
               }
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-              placeholder="VD: Techcombank, MoMo, Ví tiền mặt"
+              className="h-12 w-full rounded-xl border border-gray-300 bg-white px-4 text-gray-900 outline-none focus:ring-2 focus:ring-orange-400"
+              placeholder="VD: Techcombank, MoMo"
               required
             />
           </div>
 
-          {/* Account Type */}
           <div>
-            <label className="block text-sm text-gray-700 mb-2">
-              Loại tài khoản <span className="text-red-500">*</span>
+            <label className="mb-2 block text-sm text-gray-700">
+              Loại tài khoản
             </label>
             <div className="grid grid-cols-3 gap-3">
               {accountTypes.map((type) => (
@@ -103,23 +102,22 @@ export function AddAccountModal({ onClose, onSubmit }: AddAccountModalProps) {
                   key={type.value}
                   type="button"
                   onClick={() => setFormData({ ...formData, type: type.value })}
-                  className={`p-4 rounded-xl border-2 transition-all ${
+                  className={`rounded-xl border-2 p-4 transition ${
                     formData.type === type.value
-                      ? "border-orange-400 bg-orange-50"
-                      : "border-gray-200 hover:border-gray-300"
+                      ? "!bg-orange-50 border-orange-400"
+                      : "!bg-white border-gray-200 hover:border-gray-300"
                   }`}
                 >
-                  <div className="text-2xl mb-2">{type.icon}</div>
+                  <div className="mb-2 text-2xl">{type.icon}</div>
                   <div className="text-sm text-gray-800">{type.label}</div>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Initial Balance */}
           <div>
-            <label className="block text-sm text-gray-700 mb-2">
-              Số dư ban đầu <span className="text-red-500">*</span>
+            <label className="mb-2 block text-sm text-gray-700">
+              Số dư ban đầu
             </label>
             <input
               type="number"
@@ -127,20 +125,15 @@ export function AddAccountModal({ onClose, onSubmit }: AddAccountModalProps) {
               onChange={(e) =>
                 setFormData({ ...formData, balance: e.target.value })
               }
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              className="h-12 w-full rounded-xl border border-gray-300 bg-white px-4 text-gray-900 outline-none focus:ring-2 focus:ring-orange-400"
               placeholder="0"
               required
               min="0"
-              step="1000"
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Nhập số dư hiện tại của tài khoản
-            </p>
           </div>
 
-          {/* Currency */}
           <div>
-            <label className="block text-sm text-gray-700 mb-2">
+            <label className="mb-2 block text-sm text-gray-700">
               Đơn vị tiền tệ
             </label>
             <select
@@ -148,28 +141,27 @@ export function AddAccountModal({ onClose, onSubmit }: AddAccountModalProps) {
               onChange={(e) =>
                 setFormData({ ...formData, currency: e.target.value })
               }
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              className="h-12 w-full rounded-xl border border-gray-300 bg-white px-4 text-gray-900 outline-none focus:ring-2 focus:ring-orange-400"
             >
-              <option value="VND">VND (Việt Nam Đồng)</option>
-              <option value="USD">USD (Đô la Mỹ)</option>
-              <option value="EUR">EUR (Euro)</option>
+              <option value="VND">VND</option>
+              <option value="USD">USD</option>
             </select>
           </div>
 
-          {/* Actions */}
           <div className="flex gap-3 pt-4">
             <button
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="flex-1 px-6 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              className="flex-1 rounded-xl !bg-gray-100 px-6 py-3 font-semibold text-gray-700 hover:!bg-gray-200"
             >
               Hủy
             </button>
+
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-orange-400 to-rose-400 text-white hover:from-orange-500 hover:to-rose-500 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 rounded-xl !bg-gradient-to-r !from-orange-400 !to-rose-400 px-6 py-3 font-semibold text-white shadow-lg disabled:opacity-50"
             >
               {loading ? "Đang tạo..." : "Tạo tài khoản"}
             </button>

@@ -39,7 +39,6 @@ const findAccountByAccountId = async ({ accountId }) => {
   });
 };
 
-
 const findAccountForTransactionCheck = async ({ userId, accountId }) => {
   return prisma.account.findMany({
     where: {
@@ -52,7 +51,6 @@ const findAccountForTransactionCheck = async ({ userId, accountId }) => {
     },
   });
 };
-
 
 const updateAccountBalance = async ({ accountId, balance }) => {
   return prisma.account.update({
@@ -74,7 +72,6 @@ const updateAccountBalance = async ({ accountId, balance }) => {
       updated_at: true,
     },
   });
-
 };
 
 const updateAccountRepo = async ({ accountId, accountName, type }) => {
@@ -103,6 +100,7 @@ const findAccountByUserId = async ({ userId }) => {
       user_id: userId,
     },
     select: {
+      account_id: true,
       account_name: true,
       type: true,
       balance: true,
@@ -164,5 +162,5 @@ module.exports = {
   deleteAccountRepo,
   findTotalByUserId,
   updateAccountBalance,
-  findAccountForTransactionCheck
+  findAccountForTransactionCheck,
 };

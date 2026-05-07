@@ -41,7 +41,12 @@ const deleteBudget = async ({ budgetId }) => {
     },
   });
 };
-const updateBudget = async ({ budgetId, categoryId, amountLimit, date }) => {
+const updateBudget = async ({
+  budgetId,
+  categoryId,
+  amountLimit,
+  dateStart,
+}) => {
   return prisma.budget.update({
     where: {
       budget_id: budgetId,
@@ -49,21 +54,21 @@ const updateBudget = async ({ budgetId, categoryId, amountLimit, date }) => {
     data: {
       category_id: categoryId,
       amount_limit: amountLimit,
-      date: date,
+      date_start: dateStart,
     },
     select: {
       category_id: true,
       amount_limit: true,
-      date: true,
+      date_start: true,
     },
   });
 };
-const findDateByCategory = async ({ userId, categoryId, date }) => {
+const findDateByCategory = async ({ userId, categoryId, dateStart }) => {
   return prisma.budget.findFirst({
     where: {
       user_id: userId,
       category_id: categoryId,
-      date: date,
+      date_start: dateStart,
     },
   });
 };
@@ -76,31 +81,47 @@ const findBudgetByBudgetId = async ({ userId, budgetId }) => {
     },
   });
 };
-const createBudgetId = async ({ userId, categoryId, amountLimit, date }) => {
+const createBudgetId = async ({
+  userId,
+  categoryId,
+  amountLimit,
+  dateStart,
+}) => {
+  const startDate = new Date(dateStart);
+
+  const dateEnd = new Date(
+    startDate.getFullYear(),
+    startDate.getMonth() + 1,
+    0
+  );
+
   return prisma.budget.create({
     data: {
       user_id: userId,
       category_id: categoryId,
       amount_limit: amountLimit,
-      date: date,
+      date: new Date(),
+      date_start: startDate,
+      date_end: dateEnd,
     },
     select: {
       budget_id: true,
       amount_limit: true,
-      date: true,
+      date_start: true,
+      date_end: true,
     },
   });
 };
-const findBudgets = async ({ userId, categoryId, date }) => {
+const findBudgets = async ({ userId, categoryId, dateStart }) => {
   const where = {
     user_id: userId,
     ...(categoryId ? { category_id: categoryId } : {}),
   };
 
-  if (date) {
-    const dateFilter = buildDateFilter(date);
+  if (dateStart) {
+    const dateFilter = buildDateFilter(dateStart);
     if (dateFilter) {
-      where.date = dateFilter;
+      where.dateStart = dateFilter;
     }
   }
 
