@@ -21,7 +21,7 @@ namespace TransactionService.Core.DTOs
         public string? Description { get; set; }
 
         [Required(ErrorMessage = "Ngày giao dịch là bắt buộc.")]
-        public DateOnly Date { get; set; }
+        public DateTime Date { get; set; }
 
         [MaxLength(255)]
         public string? Note { get; set; }
