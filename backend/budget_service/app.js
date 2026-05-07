@@ -3,6 +3,7 @@ require("dotenv").config({ path: path.resolve(__dirname, ".env") });
 const express = require("express");
 const app = express();
 const PORT = process.env.PORT;
+const { startGrpcServer } = require("./src/gRPC/budget.grpc");
 
 const accountRouter = require("./src/routes/budget.routes");
 
@@ -25,5 +26,6 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, async () => {
-  console.log(`Account service is running on port ${PORT}`);
+  console.log(`Budget service is running on port ${PORT}`);
+  startGrpcServer();
 });

@@ -4,6 +4,7 @@ option csharp_namespace = "Auth.Infrastructure.Protos";
 
 service UserProtoService {
   rpc GetUserStatus (GetUserRequest) returns (UserResponse);
+  rpc GetUserInfo (GetUserInfoRequest) returns (UserInfoResponse);
 }
 
 message GetUserRequest {
@@ -13,4 +14,17 @@ message GetUserRequest {
 message UserResponse {
   bool exists = 1;
   string message = 2;
+}
+
+// --- Analytics support ---
+
+message GetUserInfoRequest {
+  string user_id = 1;
+}
+
+message UserInfoResponse {
+  string user_id   = 1;
+  string user_name = 2;
+  bool   valid     = 3;
+  string message   = 4;
 }
