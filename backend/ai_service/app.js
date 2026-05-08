@@ -152,10 +152,22 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
+function requireUserId(req, res) {
+  const userId = req.headers['x-user-id'];
+  if (userId == null || userId === "") {
+    res.status(401).json({ success: false, message: "Unauthorized" });
+    return null;
+  }
+  return String(userId);
+}
+
 // --- API LẤY THỐNG KÊ CHO DASHBOARD ---
 app.get('/api/stats', async (req, res) => {
   try {
-    const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+    const userId = requireUserId(req, res);
+    if (!userId) {
+      return;
+    }
     const now = new Date();
     const currentMonth = now.getMonth() + 1;
     const currentYear = now.getFullYear();
@@ -214,7 +226,11 @@ app.get('/api/stats', async (req, res) => {
 // API lấy danh sách ngân sách tháng hiện tại
 app.get('/api/budgets', async (req, res) => {
   try {
-    const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+    // const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+    const userId = requireUserId(req, res)
+    if (!userId) {
+      return;
+    }
     const now = new Date();
     const result = await pool.query(
       `
@@ -242,8 +258,11 @@ app.get('/api/budgets', async (req, res) => {
 // api giao dịch gần đây
 app.get('/api/recent-transactions', async (req, res) => {
   try {
-    const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
-
+    // const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+    const userId = requireUserId(req, res)
+    if (!userId) {
+      return;
+    }
     const result = await pool.query(
       `
         SELECT 
@@ -275,7 +294,11 @@ app.get('/chat-history', authenticateToken, async (req, res) => {
     const { message, model: requestedModel } = req.body;
 
     // const userId = req.user.user_id;
-    const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698'; // Tạm thời fix là Bảo
+    // const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698'; // Tạm thời fix là Bảo
+    const userId = requireUserId(req, res)
+    if (!userId) {
+      return;
+    }
     const result = await pool.query(
       'SELECT role, message FROM ai_service.message_history WHERE user_id = $1 ORDER BY created_at ASC',
       [userId],
@@ -353,7 +376,11 @@ const sendPushNotification = (message) => {
 
 // Thay vì chỉ bắn socket, hãy lưu vào DB
 async function addNotification(message) {
-  const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698'; // ID của Bảo
+  // const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698'; // ID của Bảo
+  const userId = requireUserId(req, res)
+  if (!userId) {
+    return;
+  }
   await pool.query('INSERT INTO ai_service.notifications (user_id, message) VALUES ($1, $2)', [
     userId,
     message,
@@ -366,7 +393,11 @@ async function addNotification(message) {
 // API Lấy thông báo (Lấy hết, không lọc is_read để không bị mất tin khi load lại)
 app.get('/api/notifications', async (req, res) => {
   try {
-    const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+    // const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+    const userId = requireUserId(req, res);
+    if (!userId) {
+      return;
+    }
     const result = await pool.query(
       'SELECT id, message, is_read, created_at FROM ai_service.notifications WHERE user_id = $1 ORDER BY created_at DESC ',
       [userId],
@@ -381,7 +412,11 @@ app.get('/api/notifications', async (req, res) => {
 app.post('/api/notifications/read/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+    // const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+    const userId = requireUserId(req, res);
+    if (!userId) {
+      return;
+    }
     await pool.query(
       'UPDATE ai_service.notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2',
       [id, userId],
@@ -394,7 +429,11 @@ app.post('/api/notifications/read/:id', async (req, res) => {
 });
 // Route 2: Đánh dấu đọc TẤT CẢ (Không cần ID)
 app.post('/api/notifications/read-all', async (req, res) => {
-  const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+  // const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+  const userId = requireUserId(req, res);
+  if (!userId) {
+    return;
+  }
   await pool.query('UPDATE ai_service.notifications SET is_read = TRUE WHERE user_id = $1', [
     userId,
   ]);
@@ -406,7 +445,11 @@ app.post('/api/notifications/read-all', async (req, res) => {
 app.delete('/api/notifications/delete/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+    // const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+    const userId = requireUserId(req, res);
+    if (!userId) {
+      return;
+    }
     await pool.query('DELETE FROM ai_service.notifications WHERE id = $1 AND user_id = $2', [
       id,
       userId,
@@ -420,7 +463,11 @@ app.delete('/api/notifications/delete/:id', async (req, res) => {
 // Xóa tất cả thông báo của người dùng
 app.delete('/api/notifications/delete-all', async (req, res) => {
   try {
-    const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+    // const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+    const userId = requireUserId(req, res);
+    if (!userId) {
+      return;
+    }
     await pool.query('DELETE FROM ai_service.notifications WHERE user_id = $1', [userId]);
     res.json({ success: true });
   } catch (err) {
@@ -606,7 +653,11 @@ app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
     const finalAmount = parseFloat(
       transferAmount || transfer_amount || amount_out || amount_in || 0,
     );
-    const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+    // const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+    const userId = requireUserId(req, res);
+    if (!userId) {
+      return;
+    }
     // const userId = req.user.user_id;
 
     // 1. PHÂN BIỆT LOẠI GIAO DỊCH (VÀO hay RA)
@@ -1428,7 +1479,11 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
             const catData = JSON.parse(createCatMatch[1].trim());
             const catName = catData.category_name;
             const catType = catData.type || 'expense';
-            const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+            // const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+            const userId = requireUserId(req, res);
+            if (!userId) {
+              return;
+            }
 
             if (catName) {
               // Tìm theo cột category_name
@@ -1520,7 +1575,11 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
           for (const match of matches) {
             try {
               const data = JSON.parse(match[1].trim());
-              const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+              // const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+              const userId = requireUserId(req, res);
+              if (!userId) {
+                return;
+              }
               let catNameFromAI = data.category_name;
 
               const transactionType = data.transaction_type || 'expense';
