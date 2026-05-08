@@ -1054,9 +1054,17 @@ export function FloatingChat() {
 
       // 9. CẬP NHẬT DASHBOARD (Quan trọng nhất để nhảy số tiền)
       // Chúng ta gọi hàm refresh đã fix ở các bước trước
+      console.log('📢 AI vừa ghi sổ! Đang yêu cầu các trang cập nhật...');
+      window.dispatchEvent(new Event('money-guard-sync'));
+
+      // Vẫn gọi hàm refresh dashboard tại chỗ cho chắc ăn
       if (typeof (window as any).refreshDashboard === 'function') {
-        await (window as any).refreshDashboard();
-      } else {
+        (window as any).refreshDashboard();
+      }
+      // if (typeof (window as any).refreshDashboard === 'function') {
+      //   await (window as any).refreshDashboard();
+      // }
+      else {
         // Fallback: nếu không thấy hàm trên window, thử gọi hàm load nội bộ nếu có
         console.log('🔄 Đang cập nhật dữ liệu...');
       }

@@ -257,7 +257,7 @@ app.get('/api/recent-transactions', async (req, res) => {
         JOIN account_service.accounts a ON t.account_id = a.account_id
         LEFT JOIN category_service.categories c ON t.category_id = c.category_id
         WHERE a.user_id = $1
-        ORDER BY t.created_at DESC, t.trans_id DESC
+        ORDER BY t.date DESC, t.trans_id DESC
         LIMIT 20
       `,
       [userId],

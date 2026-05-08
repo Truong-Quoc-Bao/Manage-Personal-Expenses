@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from "react";
-import { Plus, Wallet, Edit2, Trash2 } from "lucide-react";
-import { toast } from "sonner";
-import { AddAccountModal } from "../components/modals/AddAccountModal";
-import { EditAccountModal } from "../components/modals/EditAccountModal";
-import { DeleteAccountModal } from "../components/modals/DeleteAccountModal";
-import { accountApi } from "../api/account.api";
+import React, { useEffect, useState, useCallback } from 'react';
+import { Plus, Wallet, Edit2, Trash2, Link, ShieldCheck, Loader2, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
+import { AddAccountModal } from '../components/modals/AddAccountModal';
+import { EditAccountModal } from '../components/modals/EditAccountModal';
+import { DeleteAccountModal } from '../components/modals/DeleteAccountModal';
+import { accountApi } from '../api/account.api';
 
 type Account = {
   account_id: string;
@@ -20,246 +20,200 @@ export function Accounts() {
   const [deletingAccount, setDeletingAccount] = useState<Account | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isLinkingBank, setIsLinkingBank] = useState(false); // Trạng thái đang tạo link Bank
 
-  const fetchAccounts = async () => {
+  // ✅ HÀM LẤY DỮ LIỆU TÀI KHOẢN
+  const fetchAccounts = useCallback(async () => {
     try {
       setLoading(true);
-
       const res = await accountApi.getAccounts();
-
-      console.log("GET ACCOUNTS:", res.data);
-
       setAccounts(res.data.data || []);
     } catch (error) {
-      console.error("Get accounts failed:", error);
-      toast.error("Không thể tải danh sách tài khoản");
+      console.error('Get accounts failed:', error);
+      toast.error('Không thể tải danh sách tài khoản');
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchAccounts();
   }, []);
 
-  const handleAddAccount = async (accountData: any) => {
+  // ✅ "ĂNG-TEN" ĐỒNG BỘ VỚI AI
+  useEffect(() => {
+    fetchAccounts(); // Load lần đầu
+
+    const handleSync = () => {
+      console.log('🏦 Accounts: Nhận lệnh đồng bộ từ AI!');
+      fetchAccounts();
+    };
+
+    window.addEventListener('money-guard-sync', handleSync);
+    return () => window.removeEventListener('money-guard-sync', handleSync);
+  }, [fetchAccounts]);
+
+  // ✅ LOGIC TẠO LIÊN KẾT NGÂN HÀNG (CREATE BANK LINK)
+  const handleConnectBank = async () => {
     try {
-      await accountApi.createAccount({
-        accountName: accountData.name,
-        type: accountData.type,
-        balance: Number(accountData.balance),
-        currency: accountData.currency,
+      setIsLinkingBank(true);
+      toast.info('Đang tạo liên kết bảo mật tới Ngân hàng...');
+
+      const response = await fetch('/api/create-bank', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token') || 'demo'}`,
+          'Content-Type': 'application/json',
+        },
       });
 
-      toast.success(`Đã tạo tài khoản "${accountData.name}" thành công!`);
+      if (!response.ok) throw new Error('Không thể tạo link liên kết');
 
-      setShowAddAccount(false);
+      const data = await response.json();
 
-      fetchAccounts();
-    } catch (error) {
-      console.error("Create account failed:", error);
-      toast.error("Tạo tài khoản thất bại!");
-    }
-  };
-
-  const handleEditAccount = async (accountData: any) => {
-    if (!editingAccount) return;
-
-    try {
-      await accountApi.updateAccount({
-        accountId: editingAccount.account_id,
-        accountName: accountData.name,
-        type: accountData.type,
-      });
-
-      toast.success(`Đã cập nhật tài khoản "${accountData.name}" thành công!`);
-
-      setEditingAccount(null);
-
-      fetchAccounts();
-    } catch (error) {
-      console.error("Update account failed:", error);
-      toast.error("Cập nhật tài khoản thất bại!");
-    }
-  };
-
-  const handleDeleteAccount = async () => {
-    if (!deletingAccount) return;
-
-    try {
-      await accountApi.deleteAccount({
-        accountId: deletingAccount.account_id,
-      });
-
-      toast.success(
-        `Đã xóa tài khoản "${deletingAccount.account_name}" thành công!`
-      );
-
-      setDeletingAccount(null);
-
-      fetchAccounts();
-    } catch (error) {
-      console.error("Delete account failed:", error);
-      toast.error("Xóa tài khoản thất bại!");
+      // Chuyển hướng sang trang liên kết của ngân hàng
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (error: any) {
+      toast.error('Lỗi: ' + error.message);
+    } finally {
+      setIsLinkingBank(false);
     }
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency: "VND",
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
     }).format(amount);
   };
 
-  const totalBalance = accounts.reduce(
-    (sum, account) => sum + Number(account.balance),
-    0
-  );
-
-  const getTypeLabel = (type: string) => {
-    switch (type) {
-      case "cash":
-        return "Tiền mặt";
-      case "bank":
-        return "Ngân hàng";
-      case "ewallet":
-        return "Ví điện tử";
-      default:
-        return type;
-    }
-  };
-
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case "cash":
-        return "bg-amber-100 text-amber-700";
-      case "bank":
-        return "bg-blue-100 text-blue-700";
-      case "ewallet":
-        return "bg-purple-100 text-purple-700";
-      default:
-        return "bg-gray-100 text-gray-700";
-    }
-  };
-
-  const getAccountIcon = (type: string) => {
-    switch (type) {
-      case "cash":
-        return "💵";
-      case "bank":
-        return "🏦";
-      case "ewallet":
-        return "📱";
-      default:
-        return "💰";
-    }
-  };
+  const totalBalance = accounts.reduce((sum, account) => sum + Number(account.balance), 0);
 
   return (
     <>
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <h1 className="mb-1 text-4xl font-bold text-gray-900">Tài khoản</h1>
+            <h1 className="mb-1 text-4xl font-bold text-gray-900 flex items-center gap-3">
+              Tài khoản
+              {loading && <RefreshCw className="h-6 w-6 text-orange-500 animate-spin" />}
+            </h1>
             <p className="text-gray-600">Quản lý các tài khoản và ví của bạn</p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setShowAddAccount(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-xl !bg-gradient-to-r !from-orange-400 !to-rose-400 px-6 py-3 font-semibold text-white shadow-lg transition hover:!from-orange-500 hover:!to-rose-500"
-          >
-            <Plus className="h-5 w-5" />
-            Thêm tài khoản
-          </button>
+          <div className="flex gap-3">
+            {/* 🔥 NÚT LIÊN KẾT NGÂN HÀNG MỚI */}
+            <button
+              onClick={handleConnectBank}
+              disabled={isLinkingBank}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white shadow-lg transition hover:bg-blue-700 disabled:bg-blue-400"
+            >
+              {isLinkingBank ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Link className="h-5 w-5" />
+              )}
+              Liên kết Ngân hàng
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowAddAccount(true)}
+              className="inline-flex items-center justify-center gap-2 rounded-xl !bg-gradient-to-r !from-orange-400 !to-rose-400 px-6 py-3 font-semibold text-white shadow-lg transition hover:!from-orange-500 hover:!to-rose-500"
+            >
+              <Plus className="h-5 w-5" />
+              Thêm thủ công
+            </button>
+          </div>
         </div>
 
-        <div className="mb-8 rounded-3xl !bg-gradient-to-br !from-orange-400 !to-rose-400 p-8 shadow-xl">
-          <div className="mb-4 flex items-center gap-3">
-            <Wallet className="h-8 w-8 text-white" />
-            <p className="text-white/90">Tổng số dư</p>
-          </div>
-
-          <p className="mb-2 text-4xl font-semibold text-white">
-            {formatCurrency(totalBalance)}
-          </p>
-
-          <p className="text-white/75">Từ {accounts.length} tài khoản</p>
-        </div>
-
-        {loading ? (
-          <div className="rounded-2xl bg-white p-10 text-center shadow-lg">
-            Đang tải dữ liệu...
-          </div>
-        ) : accounts.length === 0 ? (
-          <div className="rounded-2xl border border-gray-100 bg-white p-12 text-center shadow-lg">
-            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
-              <Wallet className="h-8 w-8 text-gray-400" />
+        {/* Tổng số dư Banner */}
+        <div className="mb-8 rounded-3xl !bg-gradient-to-br !from-gray-900 !to-slate-800 p-8 shadow-xl relative overflow-hidden text-white">
+          <div className="relative z-10">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md">
+                <Wallet className="h-8 w-8 text-orange-400" />
+              </div>
+              <p className="text-white/70 font-medium uppercase tracking-widest text-xs">
+                Tổng tài sản khả dụng
+              </p>
             </div>
+            <p className="mb-2 text-5xl font-black">{formatCurrency(totalBalance)}</p>
+            <div className="flex items-center gap-2 text-green-400 text-sm font-bold">
+              <ShieldCheck className="h-4 w-4" />
+              Đã bảo mật bởi Money Guard AI
+            </div>
+          </div>
+          {/* Trang trí nền */}
+          <div className="absolute top-[-20%] right-[-10%] w-64 h-64 bg-orange-500/10 rounded-full blur-3xl"></div>
+        </div>
 
-            <h3 className="mb-2 text-xl font-semibold text-gray-800">
-              Chưa có tài khoản nào
-            </h3>
-
-            <p className="mb-6 text-gray-600">
-              Thêm tài khoản đầu tiên để bắt đầu quản lý tài chính
-            </p>
+        {/* List danh sách tài khoản */}
+        {loading && accounts.length === 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-48 bg-gray-100 rounded-2xl animate-pulse"></div>
+            ))}
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {/* CARD GỢI Ý LIÊN KẾT BANK (Nếu chưa có bank nào) */}
+            <div
+              onClick={handleConnectBank}
+              className="rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50/50 p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-blue-50 transition-all group"
+            >
+              <div className="mb-4 p-4 bg-blue-100 text-blue-600 rounded-full group-hover:scale-110 transition-transform">
+                <Link className="h-8 w-8" />
+              </div>
+              <h3 className="font-bold text-blue-900">Kết nối ngân hàng tự động</h3>
+              <p className="text-xs text-blue-600 mt-1">AI tự động cập nhật số dư & giao dịch</p>
+            </div>
+
             {accounts.map((account) => (
               <div
                 key={account.account_id}
-                className="rounded-2xl border border-gray-100 bg-white p-6 shadow-lg transition hover:shadow-xl"
+                className="rounded-2xl border border-gray-100 bg-white p-6 shadow-lg transition hover:shadow-xl relative group"
               >
                 <div className="mb-5 flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="text-4xl">
-                      {getAccountIcon(account.type)}
+                  <div className="flex items-center gap-4">
+                    <div className="text-4xl filter grayscale group-hover:grayscale-0 transition-all">
+                      {account.type === 'bank' ? '🏦' : account.type === 'cash' ? '💵' : '📱'}
                     </div>
-
                     <div>
-                      <h3 className="mb-1 text-lg font-semibold text-gray-900">
+                      <h3 className="text-lg font-bold text-gray-900 uppercase tracking-tight">
                         {account.account_name}
                       </h3>
-
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-medium ${getTypeColor(
-                          account.type
-                        )}`}
-                      >
-                        {getTypeLabel(account.type)}
+                      <span className="text-[10px] font-black bg-slate-100 text-slate-500 px-2 py-0.5 rounded uppercase">
+                        {account.type}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                <div className="mb-5">
-                  <p className="mb-1 text-sm text-gray-600">Số dư</p>
-
-                  <p className="text-2xl font-semibold text-gray-900">
+                <div className="mb-6">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                    Số dư hiện tại
+                  </p>
+                  <p className="text-3xl font-black text-slate-800">
                     {formatCurrency(Number(account.balance))}
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2 border-t border-gray-200 pt-4">
+                <div className="flex items-center gap-2 pt-4 border-t border-slate-50">
                   <button
-                    type="button"
                     onClick={() => setEditingAccount(account)}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl !bg-gray-100 px-4 py-3 text-gray-600 transition hover:!bg-orange-100 hover:text-orange-600"
+                    className="p-2 hover:bg-orange-50 text-slate-400 hover:text-orange-500 rounded-lg transition-colors"
                   >
                     <Edit2 className="h-4 w-4" />
-                    <span className="text-sm font-medium">Sửa</span>
                   </button>
-
                   <button
-                    type="button"
                     onClick={() => setDeletingAccount(account)}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl !bg-gray-100 px-4 py-3 text-gray-600 transition hover:!bg-red-100 hover:text-red-600"
+                    className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-lg transition-colors"
                   >
                     <Trash2 className="h-4 w-4" />
-                    <span className="text-sm font-medium">Xóa</span>
                   </button>
+                  <div className="ml-auto flex items-center gap-1 text-[10px] font-bold text-green-500">
+                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                    LIVE
+                  </div>
                 </div>
               </div>
             ))}
@@ -267,13 +221,10 @@ export function Accounts() {
         )}
       </div>
 
+      {/* Modals... */}
       {showAddAccount && (
-        <AddAccountModal
-          onClose={() => setShowAddAccount(false)}
-          onSuccess={fetchAccounts}
-        />
+        <AddAccountModal onClose={() => setShowAddAccount(false)} onSuccess={fetchAccounts} />
       )}
-
       {editingAccount && (
         <EditAccountModal
           account={editingAccount}
@@ -281,7 +232,6 @@ export function Accounts() {
           onSuccess={fetchAccounts}
         />
       )}
-
       {deletingAccount && (
         <DeleteAccountModal
           account={deletingAccount}
