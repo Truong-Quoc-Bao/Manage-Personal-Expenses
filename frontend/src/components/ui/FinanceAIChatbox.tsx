@@ -1,302 +1,443 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Send,
   Bot,
   User,
   Sparkles,
-  AlertCircle,
+  Brain,
+  Loader2,
+  Zap,
   Camera,
   Mic,
+  Volume2,
   X,
-  Brain,
-  SendHorizontal,
-  Trophy,
-  Calendar,
-  PieChart,
+  Trash2,
+  Image as ImageIcon,
 } from 'lucide-react';
-import * as React from 'react';
+import { marked } from 'marked';
 // IMPORT API CỦA BẢO
-import { chatApi } from '../../api/ai.api';
+import { chatApi, statsApi } from '../../api/ai.api';
 
+// --- Interfaces ---
 interface Message {
   id: string | number;
   role: 'user' | 'model';
   content: string;
+  image?: string;
   timestamp: Date;
+  aiInfo?: {
+    modelUsed: string;
+    tokens: number;
+    cost: number;
+    usage?: any;
+  };
 }
 
-// Interface cho Model AI
 interface AIModel {
   name: string;
   status: 'online' | 'offline';
 }
 
 export function FinanceAIChatbox() {
+  // --- States ---
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // ────────────────────────────────────────────────────────
-  // BIẾN QUẢN LÝ MODEL AI
-  // ────────────────────────────────────────────────────────
-  const [availableModels, setAvailableModels] = useState<AIModel[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState('auto');
+  const [aiModels, setAiModels] = useState<AIModel[]>([]);
+  const [stats, setStats] = useState<any>(null);
 
+  // --- Voice & Image States ---
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [showVoicePreview, setShowVoicePreview] = useState(false);
+
+  // --- Refs ---
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const hasInteractedRef = useRef(false);
 
-  // 1. LOAD LỊCH SỬ CHAT & DANH SÁCH MODEL (AI HEALTH)
+  // --- 1. KHỞI TẠO ÂM THANH & TƯƠNG TÁC ---
   useEffect(() => {
-    const initData = async () => {
-      try {
-        // Gọi song song cả lịch sử và sức khỏe AI
-        const [historyRes, healthRes] = await Promise.all([
-          chatApi.getChatHistory(),
-          chatApi.getAiHealth(),
-        ]);
+    audioRef.current = new Audio(
+      'https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3',
+    );
+    audioRef.current.volume = 0.5;
 
-        // Xử lý lịch sử
-        const history = historyRes.data.map((item: any, index: number) => ({
-          id: `hist-${index}`,
-          role: item.role === 'user' ? 'user' : 'model',
-          content: item.message,
-          timestamp: new Date(),
-        }));
-        if (history.length > 0) setMessages(history);
-        else
-          setMessages([
-            {
-              id: 'welcome',
-              role: 'model',
-              content: 'Chào Bảo! Money Guard đây...',
-              timestamp: new Date(),
-            },
-          ]);
-
-        // Xử lý danh sách Model từ server
-        setAvailableModels(healthRes.data || []);
-      } catch (err) {
-        console.error('Lỗi khởi tạo dữ liệu:', err);
-      }
+    const handler = () => {
+      hasInteractedRef.current = true;
     };
+    window.addEventListener('click', handler);
+    return () => window.removeEventListener('click', handler);
+  }, []);
 
-    initData();
-
-    // Thiết lập interval quét sức khỏe AI 30s một lần giống code mẫu của Bảo
-    const interval = setInterval(async () => {
-      try {
-        const healthRes = await chatApi.getAiHealth();
-        setAvailableModels(healthRes.data || []);
-      } catch (e) {
-        console.log('Lỗi đồng bộ AI');
-      }
-    }, 30000);
-
+  // --- 2. ĐỒNG BỘ DATA & AI HEALTH (30s/lần) ---
+  useEffect(() => {
+    initChatData();
+    const interval = setInterval(syncAIModels, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isTyping]);
-
-  // 2. HÀM GỬI TIN NHẮN (Gửi kèm model đã chọn)
-  const handleSendMessage = async (textOverride?: string) => {
-    const textToSend = textOverride || inputValue;
-    if (!textToSend.trim() || isTyping) return;
-
-    const userMessage: Message = {
-      id: Date.now(),
-      role: 'user',
-      content: textToSend,
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
-    setInputValue('');
-    setIsTyping(true);
-    setError(null);
-
+  const initChatData = async () => {
     try {
-      // GỬI KÈM MODEL TRONG DATA (Theo đúng interface sendMessage trong file api của Bảo)
-      const res = await chatApi.sendMessage({
-        message: textToSend,
-        model: selectedModel, // <--- Lấy giá trị từ select dropdown
-      });
+      const [histRes, statsRes] = await Promise.all([
+        chatApi.getChatHistory(),
+        statsApi.getStats(),
+      ]);
 
-      const aiResponse: Message = {
-        id: Date.now() + 1,
-        role: 'model',
-        content: res.data.reply,
+      const history = histRes.data.map((m: any, idx: number) => ({
+        id: `hist-${idx}`,
+        role: m.role === 'user' ? 'user' : 'model',
+        content: m.message.replace(/<.*?>[\s\S]*?<\/.*?>/gs, '').trim(),
         timestamp: new Date(),
-      };
+      }));
 
-      setMessages((prev) => [...prev, aiResponse]);
-    } catch (err: any) {
-      setError('AI đang bận một chút, Bảo thử lại sau nhé!');
-    } finally {
-      setIsTyping(false);
+      setMessages(
+        history.length > 0
+          ? history
+          : [
+              {
+                id: 'welcome',
+                role: 'model',
+                content: 'Chào Bảo! Tôi là Money Guard. Bạn cần soi ví hay ghi sổ món gì không?',
+                timestamp: new Date(),
+              },
+            ],
+      );
+
+      setStats(statsRes.data);
+      syncAIModels();
+    } catch (e) {
+      console.error('Lỗi khởi tạo:', e);
     }
   };
 
-  // Hàm rút gọn tên model cho đẹp UI (Ví dụ: gemini-1.5-flash-latest -> FLASH)
-  const formatModelName = (name: string) => {
-    return name
-      .replace('gemini-', '')
-      .replace('-latest', '')
-      .replace('-preview', '')
-      .replace('1.5-', '')
-      .toUpperCase();
+  const syncAIModels = async () => {
+    try {
+      const res = await chatApi.getAiHealth();
+      setAiModels(res.data);
+    } catch (e) {
+      console.log('Lỗi đồng bộ AI');
+    }
   };
 
-  const suggestions = [
-    {
-      text: 'Thử thách 7 ngày không trà sữa',
-      icon: <Trophy size={14} className="text-blue-500" />,
-    },
-    {
-      text: 'Thứ mấy tôi tiêu nhiều nhất?',
-      icon: <Calendar size={14} className="text-blue-500" />,
-    },
-  ];
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isLoading, showVoicePreview]);
+
+  // --- 3. SPEECH RECOGNITION (Chuẩn JS) ---
+  useEffect(() => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const rec = new SpeechRecognition();
+      rec.lang = 'vi-VN';
+      rec.interimResults = true;
+      rec.onstart = () => {
+        setIsRecording(true);
+        setShowVoicePreview(true);
+        setVoiceTranscript('Đang nghe...');
+      };
+      rec.onresult = (e: any) => {
+        setVoiceTranscript(
+          Array.from(e.results)
+            .map((r: any) => r[0].transcript)
+            .join(''),
+        );
+      };
+      rec.onend = () => setIsRecording(false);
+      recognitionRef.current = rec;
+    }
+  }, []);
+
+  // --- 4. GỬI TIN NHẮN & XỬ LÝ TEXT-TO-SPEECH ---
+  const handleSend = async (textOverride?: string) => {
+    const text = textOverride || (showVoicePreview ? voiceTranscript : inputValue).trim();
+    if ((!text && !selectedImage) || isLoading) return;
+
+    const userMsg: Message = {
+      id: Date.now(),
+      role: 'user',
+      content: text,
+      image: imagePreview || undefined,
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, userMsg]);
+
+    setInputValue('');
+    setSelectedImage(null);
+    setImagePreview(null);
+    setShowVoicePreview(false);
+    setIsLoading(true);
+
+    try {
+      const res = await chatApi.sendMessage({
+        message: text,
+        model: selectedModel,
+        image: selectedImage || undefined,
+      });
+      const cleanReply = res.data.reply.replace(/<.*?>[\s\S]*?<\/.*?>/gs, '').trim();
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          role: 'model',
+          content: cleanReply,
+          timestamp: new Date(),
+          aiInfo: {
+            modelUsed: res.data.modelUsed,
+            tokens: res.data.usage?.totalTokenCount || 0,
+            cost: res.data.cost,
+          },
+        },
+      ]);
+
+      // Speak & Sound
+      if (hasInteractedRef.current) audioRef.current?.play().catch(() => {});
+      const utterance = new SpeechSynthesisUtterance(
+        cleanReply.replace(/<.*?>/g, '').substring(0, 300),
+      );
+      utterance.lang = 'vi-VN';
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          role: 'model',
+          content: 'AI đang bận, Bảo thử lại sau nhé!',
+          timestamp: new Date(),
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --- 5. SMART SUGGESTIONS ---
+  const suggestions = useMemo(() => {
+    if (!stats) return ['Ăn sáng 30k', 'Hôm nay tiêu gì?', 'Ví còn bao nhiêu?'];
+    const sug = [];
+    const balance = stats.income - stats.expense;
+    if (balance < 0) sug.push('☠️ Kế hoạch trả nợ', '⚠️ Cắt giảm chi tiêu');
+    else sug.push('💰 Tôi còn bao nhiêu?', '💸 Ghi sổ cafe 25k');
+    sug.push('📊 So sánh tuần trước');
+    return sug.slice(0, 4);
+  }, [stats]);
 
   return (
-    <div className="bg-white rounded-[2rem] shadow-2xl border border-gray-100 overflow-hidden flex flex-col h-[700px] w-full max-w-[450px] relative font-sans mx-auto">
-      {/* Header */}
-      <div className="bg-[#0084ff] p-4 flex items-center justify-between shadow-lg shrink-0">
+    <div className="flex flex-col h-[650px] bg-white rounded-2xl overflow-hidden font-sans border border-gray-100">
+      {/* Header - Industrial & Pro */}
+      <div className="bg-gradient-to-r from-gray-900 via-blue-700 to-indigo-800 p-4 flex justify-between items-center shadow-lg">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30">
-            <Bot className="w-6 h-6 text-white" />
+          <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/20 backdrop-blur-md">
+            <Brain className="w-6 h-6 text-white animate-pulse" />
           </div>
           <div>
-            <h3 className="text-white font-bold text-base leading-tight">Money Guard AI</h3>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              <span className="text-white/80 text-[10px] font-medium uppercase tracking-wider">
-                AI Active
-              </span>
+            <h3 className="text-white font-black text-sm uppercase tracking-widest">
+              Money Guard Engine
+            </h3>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-400" />
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                className="bg-transparent text-[10px] text-white/90 font-bold outline-none cursor-pointer uppercase appearance-none"
+              >
+                <option value="auto" className="text-black">
+                  🤖 Auto Brain
+                </option>
+                {aiModels.map((m) => (
+                  <option
+                    key={m.name}
+                    value={m.name}
+                    className="text-black"
+                    disabled={m.status !== 'online'}
+                  >
+                    {m.status === 'online' ? '●' : '○'} {m.name.split('-').pop()?.toUpperCase()}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
-
-        <div className="flex items-center gap-2">
-          {/* ──────────────────────────────────────────────────────── */}
-          {/* MODEL SELECTOR - ĐÃ NHÉT LOGIC API VÀO ĐÂY */}
-          {/* ──────────────────────────────────────────────────────── */}
-          <div className="flex items-center bg-white/10 hover:bg-white/20 px-3 py-1 rounded-full border border-white/20 transition-all cursor-pointer">
-            <Brain size={12} className="text-white mr-1.5" />
-            <select
-              id="model-selector"
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
-              className="bg-transparent text-white text-[11px] font-bold outline-none cursor-pointer appearance-none uppercase max-w-[80px] text-center"
-            >
-              <option value="auto" className="text-gray-900">
-                🤖 AUTO
-              </option>
-              {availableModels.map((m) => (
-                <option
-                  key={m.name}
-                  value={m.name}
-                  disabled={m.status !== 'online'}
-                  className="text-gray-900"
-                >
-                  {m.status === 'online' ? '●' : '○'} {formatModelName(m.name)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <button className="p-1.5 text-white/80 hover:text-white">
-            <X size={20} />
-          </button>
-        </div>
+        <Zap className="w-5 h-5 text-yellow-400" />
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#f9fafb]">
-        {messages.map((message) => (
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50 scrollbar-hide">
+        {messages.map((msg) => (
           <div
-            key={message.id}
-            className={`flex gap-2.5 ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
+            key={msg.id}
+            className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
           >
-            {message.role === 'model' && (
-              <div className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center flex-shrink-0 shadow-sm mt-auto">
-                <Bot className="w-5 h-5 text-[#0084ff]" />
-              </div>
-            )}
+            <div
+              className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm border ${
+                msg.role === 'user' ? 'bg-blue-600 border-blue-500' : 'bg-white border-gray-200'
+              }`}
+            >
+              {msg.role === 'user' ? (
+                <User className="w-5 h-5 text-white" />
+              ) : (
+                <Bot className="w-5 h-5 text-indigo-600" />
+              )}
+            </div>
             <div
               className={`flex flex-col ${
-                message.role === 'user' ? 'items-end' : 'items-start'
-              } max-w-[85%]`}
+                msg.role === 'user' ? 'items-end' : 'items-start'
+              } max-w-[80%]`}
             >
               <div
-                className={`px-4 py-2.5 shadow-sm text-sm ${
-                  message.role === 'user'
-                    ? 'bg-[#0084ff] text-white rounded-[1.2rem] rounded-tr-none'
-                    : 'bg-white text-gray-800 border border-gray-100 rounded-[1.2rem] rounded-tl-none font-medium'
+                className={`rounded-2xl px-4 py-3 shadow-sm ${
+                  msg.role === 'user'
+                    ? 'bg-blue-600 text-white rounded-tr-none'
+                    : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none'
                 }`}
               >
-                {message.content}
+                {msg.image && (
+                  <img
+                    src={msg.image}
+                    className="mb-2 rounded-lg max-h-60 w-full object-cover"
+                    alt="upload"
+                  />
+                )}
+                <div
+                  className="prose prose-sm prose-slate max-w-none break-words"
+                  dangerouslySetInnerHTML={{ __html: marked.parse(msg.content) }}
+                />
               </div>
+
+              {/* Token Usage Log (Black Panel) */}
+              {msg.role === 'model' && msg.aiInfo && (
+                <div className="mt-2 bg-slate-900 text-[9px] font-mono text-white p-2 rounded-lg w-48 border border-slate-700">
+                  <div className="flex justify-between border-b border-slate-700 pb-1 mb-1 opacity-70">
+                    <span>LOG_STATUS</span>
+                    <span className="text-blue-400 font-bold uppercase">
+                      {msg.aiInfo.modelUsed.split('-').pop()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Input Tokens:</span> <span>{msg.aiInfo.tokens}</span>
+                  </div>
+                  <div className="border-t border-slate-700 mt-1 pt-1 flex justify-between font-bold text-rose-400 uppercase">
+                    <span>Est. Cost:</span> <span>${Number(msg.aiInfo.cost).toFixed(6)}</span>
+                  </div>
+                </div>
+              )}
+              <span className="text-[9px] text-gray-400 mt-1 uppercase tracking-tighter">
+                {msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+              </span>
             </div>
           </div>
         ))}
-        {isTyping && (
-          <div className="flex gap-2.5 items-end">
-            <div className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center shadow-sm">
-              <Bot className="w-4 h-4 text-[#0084ff]" />
-            </div>
-            <div className="bg-white border border-gray-100 rounded-2xl rounded-tl-none px-4 py-3 shadow-sm">
-              <div className="flex gap-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce [animation-delay:-0.3s]" />
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce [animation-delay:-0.15s]" />
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce" />
-              </div>
-            </div>
+        {isLoading && (
+          <div className="flex space-x-1.5 ml-14">
+            <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
+            <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+            <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Suggestion Chips */}
-      <div className="px-3 py-2 bg-[#f9fafb] border-t border-gray-50 flex gap-2 overflow-x-auto no-scrollbar">
-        {suggestions.map((item, idx) => (
-          <button
-            key={idx}
-            onClick={() => handleSendMessage(item.text)}
-            className="flex items-center gap-2 whitespace-nowrap px-4 py-2 bg-white border border-gray-200 rounded-full text-xs font-bold text-gray-700 hover:bg-blue-50 transition-all shadow-sm shrink-0"
-          >
-            {item.icon} {item.text}
-          </button>
-        ))}
-      </div>
+      {/* Voice Preview Panel (Yellow) */}
+      {showVoicePreview && (
+        <div className="mx-6 my-2 p-3 bg-[#fffbeb] border-l-4 border-[#f59e0b] rounded-lg shadow-sm animate-in slide-in-from-left-2">
+          <div className="flex flex-col text-sm italic text-gray-700">
+            <div className="flex items-start gap-2 text-blue-900 font-medium">
+              <Volume2 size={16} className="mt-1 text-orange-400" />
+              <span>"{voiceTranscript}"</span>
+            </div>
+            <div className="flex justify-end gap-3 mt-3 not-italic">
+              <button
+                onClick={() => setShowVoicePreview(false)}
+                className="text-[10px] font-bold text-gray-400 uppercase hover:text-red-500"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={() => handleSend()}
+                className="text-[10px] font-bold text-blue-600 uppercase underline decoration-2"
+              >
+                Xác nhận & Gửi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-      {/* Input Area */}
-      <div className="p-3 bg-white border-t border-gray-100">
-        <div className="flex items-center gap-2">
-          <button className="p-2 text-gray-400 hover:text-blue-500">
+      {/* Footer Area */}
+      <div className="p-4 bg-white border-t border-gray-100">
+        {/* Suggestion Chips */}
+        <div className="mb-4 flex gap-2 overflow-x-auto scrollbar-hide">
+          {suggestions.map((txt) => (
+            <button
+              key={txt}
+              onClick={() =>
+                handleSend(
+                  txt.replace(
+                    /[^\w\sàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/gi,
+                    '',
+                  ),
+                )
+              }
+              className="whitespace-nowrap px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-full text-[11px] font-bold text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-all"
+            >
+              {txt}
+            </button>
+          ))}
+        </div>
+
+        {/* Input Bar */}
+        <div className="flex items-center gap-2 p-1.5 bg-gray-100 rounded-2xl border border-gray-200 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                setSelectedImage(file);
+                setImagePreview(URL.createObjectURL(file));
+              }
+            }}
+            className="hidden"
+            accept="image/*"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="p-2 text-gray-400 hover:text-blue-600"
+          >
             <Camera size={22} />
           </button>
-          <button className="p-2 text-gray-400 hover:text-red-500">
+          <button
+            onClick={() =>
+              isRecording ? recognitionRef.current?.stop() : recognitionRef.current?.start()
+            }
+            className={`p-2 transition-all ${
+              isRecording ? 'text-red-500 animate-pulse scale-110' : 'text-gray-400'
+            }`}
+          >
             <Mic size={22} />
           </button>
           <input
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-            placeholder="Nói hoặc nhập ..."
-            className="flex-1 bg-gray-100 border-none rounded-full px-5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 font-medium"
-            disabled={isTyping}
+            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+            placeholder="Nói hoặc nhập chi tiêu..."
+            className="flex-1 bg-transparent px-2 text-sm outline-none"
+            disabled={isLoading}
           />
           <button
-            onClick={() => handleSendMessage()}
-            disabled={!inputValue.trim() || isTyping}
-            className={`p-2.5 bg-[#0084ff] text-white rounded-full transition-all shadow-md ${
-              !inputValue.trim() || isTyping ? 'opacity-40' : 'hover:bg-blue-600'
-            }`}
+            onClick={() => handleSend()}
+            className="p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-md transition-all active:scale-95 disabled:opacity-20"
           >
-            <SendHorizontal size={20} />
+            <Send size={18} />
           </button>
         </div>
       </div>
