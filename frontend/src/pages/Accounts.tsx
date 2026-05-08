@@ -5,7 +5,7 @@ import { AddAccountModal } from '../components/modals/AddAccountModal';
 import { EditAccountModal } from '../components/modals/EditAccountModal';
 import { DeleteAccountModal } from '../components/modals/DeleteAccountModal';
 import { accountApi } from '../api/account.api';
-
+import { bankApi } from '../api/ai.api';
 type Account = {
   account_id: string;
   account_name: string;
@@ -50,29 +50,30 @@ export function Accounts() {
   }, [fetchAccounts]);
 
   // ✅ LOGIC TẠO LIÊN KẾT NGÂN HÀNG (CREATE BANK LINK)
+  // ✅ LOGIC TẠO LIÊN KẾT NGÂN HÀNG (Sửa lỗi cú pháp)
   const handleConnectBank = async () => {
     try {
       setIsLinkingBank(true);
       toast.info('Đang tạo liên kết bảo mật tới Ngân hàng...');
 
-      const response = await fetch('/api/create-bank', {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token') || 'demo'}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      // Gọi qua bankApi đã import, wrapper này thường đã xử lý Header/Token rồi
+      const res = await bankApi.createBankLink();
 
-      if (!response.ok) throw new Error('Không thể tạo link liên kết');
-
-      const data = await response.json();
+      // Dữ liệu từ API wrapper thường nằm trong res.data
+      const data = res.data;
 
       // Chuyển hướng sang trang liên kết của ngân hàng
-      if (data.url) {
+      if (data && data.url) {
+        console.log('✅ Nhận được link ngân hàng:', data.url);
         window.location.href = data.url;
+      } else {
+        throw new Error('Hệ thống không trả về đường dẫn liên kết');
       }
     } catch (error: any) {
-      toast.error('Lỗi: ' + error.message);
+      console.error('Lỗi Connect Bank:', error);
+      // Hiển thị lỗi chi tiết từ server nếu có
+      const errMsg = error.response?.data?.message || error.message || 'Lỗi không xác định';
+      toast.error('Lỗi: ' + errMsg);
     } finally {
       setIsLinkingBank(false);
     }
