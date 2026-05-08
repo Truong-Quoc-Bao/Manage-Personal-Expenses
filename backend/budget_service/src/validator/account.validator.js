@@ -2,6 +2,13 @@ const Joi = require("joi");
 
 const budgetValidation = {
   query: Joi.object({
+    title: Joi.string().trim().min(2).max(100).optional().messages({
+      "string.base": "title must be a string",
+      "string.empty": "title is not allowed to be empty",
+      "string.min": "title must be at least 2 characters",
+      "string.max": "title must not exceed 100 characters",
+    }),
+
     userId: Joi.string().trim().optional().messages({
       "string.base": "userId must be a string",
     }),
