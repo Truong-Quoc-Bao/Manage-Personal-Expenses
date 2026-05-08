@@ -13,6 +13,7 @@ type Category = {
 
 type Budget = {
   budget_id: string;
+  title?: string | null;
   category_id?: string | null;
   amount_limit: number | string;
   current_amount?: number | string | null;
@@ -34,6 +35,7 @@ export function EditBudgetModal({
   const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
+    title: budget.title || "",
     categoryId: budget.category_id || "",
     amount: String(budget.amount_limit || ""),
     dateStart: budget.date_start ? budget.date_start.split("T")[0] : "",
@@ -89,6 +91,7 @@ export function EditBudgetModal({
       setLoading(true);
 
       await budgetApi.updateBudget(budget.budget_id, {
+        title: formData.title,
         categoryId: formData.categoryId,
         amountLimit: amount,
         dateStart: `${formData.dateStart}T00:00:00.000Z`,
@@ -134,6 +137,30 @@ export function EditBudgetModal({
           onSubmit={handleSubmit}
           className="max-h-[calc(90vh-140px)] space-y-5 overflow-y-auto p-6"
         >
+          {/* TITLE */}
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <div className="flex h-5 w-5 items-center justify-center rounded bg-blue-100">
+                <Tag className="h-3 w-3 text-blue-600" />
+              </div>
+              Tên ngân sách
+            </label>
+
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  title: e.target.value,
+                })
+              }
+              placeholder="VD: Ngân sách ăn uống tháng 5"
+              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-400"
+            />
+          </div>
+
+          {/* CATEGORY */}
           <div className="space-y-2">
             <label className="block text-sm text-gray-700">
               Danh mục <span className="text-red-500">*</span>
@@ -164,6 +191,7 @@ export function EditBudgetModal({
             </div>
           </div>
 
+          {/* AMOUNT */}
           <div className="space-y-2">
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <div className="flex h-5 w-5 items-center justify-center rounded bg-green-100">
@@ -176,7 +204,10 @@ export function EditBudgetModal({
               type="number"
               value={formData.amount}
               onChange={(e) =>
-                setFormData({ ...formData, amount: e.target.value })
+                setFormData({
+                  ...formData,
+                  amount: e.target.value,
+                })
               }
               placeholder="0"
               className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-400"
@@ -186,6 +217,7 @@ export function EditBudgetModal({
             />
           </div>
 
+          {/* DATE */}
           <div className="space-y-2">
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <div className="flex h-5 w-5 items-center justify-center rounded bg-purple-100">
@@ -198,13 +230,17 @@ export function EditBudgetModal({
               type="date"
               value={formData.dateStart}
               onChange={(e) =>
-                setFormData({ ...formData, dateStart: e.target.value })
+                setFormData({
+                  ...formData,
+                  dateStart: e.target.value,
+                })
               }
               className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-400"
               required
             />
           </div>
 
+          {/* SPENT */}
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
             <p className="text-sm text-blue-800">
               <strong>Đã chi:</strong>{" "}
@@ -215,6 +251,7 @@ export function EditBudgetModal({
             </p>
           </div>
 
+          {/* ACTION */}
           <div className="flex gap-3 border-t border-gray-100 pt-4">
             <button
               type="button"

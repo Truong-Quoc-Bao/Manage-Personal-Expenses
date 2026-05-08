@@ -4,6 +4,7 @@ export const budgetApi = {
   getBudgets: () => axiosInstance.get("/api/budgets"),
 
   createBudget: (data: {
+    title: string;
     categoryId: string;
     amountLimit: number;
     dateStart: string;

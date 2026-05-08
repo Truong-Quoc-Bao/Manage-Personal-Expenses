@@ -73,6 +73,7 @@ export function AddBudgetModal({ onClose, onCreated }: AddBudgetModalProps) {
       setLoading(true);
 
       await budgetApi.createBudget({
+        title: formData.name,
         categoryId: formData.categoryId,
         amountLimit: amount,
         dateStart: `${formData.startDate}T00:00:00.000Z`,

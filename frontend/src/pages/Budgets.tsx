@@ -8,6 +8,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { budgetApi } from "../api/budget.api";
+import { categoryApi } from "../api/category.api";
 import { AddBudgetModal } from "../components/modals/AddBudgetModal";
 import { EditBudgetModal } from "../components/modals/EditBudgetModal";
 import { DeleteBudgetModal } from "../components/modals/DeleteBudgetModal";
@@ -26,8 +27,16 @@ type Budget = {
   category_id?: string | null;
 };
 
+type Category = {
+  category_id: string;
+  category_name: string;
+  type: "income" | "expense";
+  color?: string | null;
+};
+
 export function Budgets() {
   const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
@@ -39,11 +48,14 @@ export function Budgets() {
   const fetchBudgets = async () => {
     try {
       setLoading(true);
-      const res = await budgetApi.getBudgets();
 
-      console.log("GET BUDGETS:", res.data);
+      const [budgetRes, categoryRes] = await Promise.all([
+        budgetApi.getBudgets(),
+        categoryApi.getCategories(),
+      ]);
 
-      setBudgets(res.data?.data || []);
+      setBudgets(budgetRes.data?.data || []);
+      setCategories(categoryRes.data?.data || []);
     } catch (error) {
       console.error("Get budgets failed:", error);
     } finally {
@@ -54,6 +66,19 @@ export function Budgets() {
   useEffect(() => {
     fetchBudgets();
   }, []);
+
+  const getCategoryName = (categoryId?: string | null) => {
+    if (!categoryId) return "Chưa có danh mục";
+
+    const category = categories.find((cat) => cat.category_id === categoryId);
+
+    return category?.category_name || "Không tìm thấy danh mục";
+  };
+
+  const getBudgetTitle = (budget: Budget) => {
+    if (budget.title && budget.title.trim()) return budget.title;
+    return `Ngân sách ${getCategoryName(budget.category_id)}`;
+  };
 
   const getBudgetPeriod = (budget: Budget): "daily" | "monthly" => {
     if (!budget.date_start || !budget.date_end) return "monthly";
@@ -203,12 +228,11 @@ export function Budgets() {
 
                       <div className="min-w-0 flex-1">
                         <h3 className="truncate font-semibold text-gray-900">
-                          {budget.title || "Ngân sách"}
+                          {getBudgetTitle(budget)}
                         </h3>
+
                         <p className="text-xs text-gray-500">
-                          {budget.note ||
-                            budget.category_id ||
-                            "Chưa có danh mục"}
+                          {getCategoryName(budget.category_id)}
                         </p>
                       </div>
                     </div>
