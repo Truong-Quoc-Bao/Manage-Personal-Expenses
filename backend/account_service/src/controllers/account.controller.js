@@ -6,9 +6,19 @@ const {
   getTotalBalanceService,
 } = require("../services/account.service");
 
+function requireUserId(req, res) {
+  const userId = req.headers['x-user-id'];
+  if (userId == null || userId === "") {
+    res.status(401).json({ success: false, message: "Unauthorized" });
+    return null;
+  }
+  return String(userId);
+}
+
 const getTotalBalanceController = async (req, res, next) => {
   try {
-    const userId = req.user?.userId || "7cb96e5d-3cd9-40dc-ad99-635f08456301";
+    const userId = requireUserId(req, res);
+    if (!userId) return;
 
     const result = await getTotalBalanceService({ userId });
 
@@ -41,7 +51,8 @@ const updateAccountController = async (req, res, next) => {
   try {
     const accountId = req.query.accountId;
 
-    const userId = req.user?.userId || "7cb96e5d-3cd9-40dc-ad99-635f08456301";
+    const userId = requireUserId(req, res);
+    if (!userId) return;
 
     const { accountName, type } = req.body;
 
@@ -64,7 +75,8 @@ const updateAccountController = async (req, res, next) => {
 
 const getAccountsController = async (req, res, next) => {
   try {
-    const userId = req.user?.userId || "7cb96e5d-3cd9-40dc-ad99-635f08456301";
+    const userId = requireUserId(req, res);
+    if (!userId) return;
 
     const getAccount = await getAccountsServices({ userId });
 
@@ -80,7 +92,8 @@ const getAccountsController = async (req, res, next) => {
 
 const CreateAccount = async (req, res, next) => {
   try {
-    const userId = req.user?.userId || "7cb96e5d-3cd9-40dc-ad99-635f08456301";
+    const userId = requireUserId(req, res);
+    if (!userId) return;
 
     const { accountName, type, balance, currency } = req.body;
 

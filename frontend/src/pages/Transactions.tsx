@@ -52,9 +52,14 @@ export function Transactions() {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
+  /** Bộ lọc đang áp dụng lên API */
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [filterAccountId, setFilterAccountId] = useState("");
+  /** Nháp trong form; chỉ gửi API khi bấm Áp dụng */
+  const [pendingDateFrom, setPendingDateFrom] = useState("");
+  const [pendingDateTo, setPendingDateTo] = useState("");
+  const [pendingAccountId, setPendingAccountId] = useState("");
   const [accounts, setAccounts] = useState<AccountOption[]>([]);
 
   useEffect(() => {
@@ -139,11 +144,11 @@ export function Transactions() {
 
   const totalIncome = displayedTransactions
     .filter((t) => t.transactionType === "Income")
-    .reduce((sum, t) => sum + t.amount, 0);
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
   const totalExpense = displayedTransactions
     .filter((t) => t.transactionType === "Expense")
-    .reduce((sum, t) => sum + t.amount, 0);
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
   const filterButtonClass = (
     active: boolean,
@@ -163,9 +168,24 @@ export function Transactions() {
     setDateFrom("");
     setDateTo("");
     setFilterAccountId("");
+    setPendingDateFrom("");
+    setPendingDateTo("");
+    setPendingAccountId("");
     setSearchQuery("");
     setCurrentPage(1);
   };
+
+  const applyDateAccountFilters = () => {
+    setDateFrom(pendingDateFrom);
+    setDateTo(pendingDateTo);
+    setFilterAccountId(pendingAccountId);
+    setCurrentPage(1);
+  };
+
+  const filtersDirty =
+    pendingDateFrom !== dateFrom ||
+    pendingDateTo !== dateTo ||
+    pendingAccountId !== filterAccountId;
 
   const hasActiveFilters =
     filterType !== "all" || dateFrom || dateTo || filterAccountId;
@@ -338,26 +358,26 @@ export function Transactions() {
                 <Calendar className="h-5 w-5 text-gray-400" />
                 <input
                   type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
+                  value={pendingDateFrom}
+                  onChange={(e) => setPendingDateFrom(e.target.value)}
                   className="h-10 rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                   placeholder="Từ ngày"
                 />
                 <span className="text-gray-400">—</span>
                 <input
                   type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
+                  value={pendingDateTo}
+                  onChange={(e) => setPendingDateTo(e.target.value)}
                   className="h-10 rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                   placeholder="Đến ngày"
                 />
               </div>
 
-              <div className="flex items-center gap-2">
-                <Filter className="h-5 w-5 text-gray-400" />
+              <div className="flex flex-wrap items-center gap-2">
+                <Filter className="h-5 w-5 shrink-0 text-gray-400" />
                 <select
-                  value={filterAccountId}
-                  onChange={(e) => setFilterAccountId(e.target.value)}
+                  value={pendingAccountId}
+                  onChange={(e) => setPendingAccountId(e.target.value)}
                   className="h-10 min-w-[180px] rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                 >
                   <option value="">Tất cả tài khoản</option>
@@ -367,6 +387,15 @@ export function Transactions() {
                     </option>
                   ))}
                 </select>
+
+                <button
+                  type="button"
+                  onClick={applyDateAccountFilters}
+                  disabled={!filtersDirty}
+                  className="inline-flex items-center gap-1.5 rounded-xl !bg-gradient-to-r !from-orange-400 !to-rose-400 px-4 py-2 text-sm font-semibold text-white shadow transition hover:!from-orange-500 hover:!to-rose-500 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  Áp dụng
+                </button>
               </div>
 
               {hasActiveFilters && (
@@ -422,7 +451,7 @@ export function Transactions() {
                     <th className="px-6 py-4 text-right text-xs uppercase tracking-wider text-gray-600">
                       Số tiền
                     </th>
-                    <th className="px-6 py-4 text-center text-xs uppercase tracking-wider text-gray-600">
+                    <th className="min-w-[148px] px-6 py-4 text-center text-xs uppercase tracking-wider text-gray-600">
                       Thao tác
                     </th>
                   </tr>
@@ -489,12 +518,12 @@ export function Transactions() {
                           {transaction.transactionType === "Income"
                             ? "+"
                             : "-"}
-                          {formatCurrency(transaction.amount)}
+                          {formatCurrency(Math.abs(transaction.amount))}
                         </span>
                       </td>
 
-                      <td className="whitespace-nowrap px-6 py-4 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
+                      <td className="min-w-[148px] whitespace-nowrap px-6 py-4 text-center">
+                        <div className="flex shrink-0 items-center justify-center gap-1.5">
                           <button
                             type="button"
                             onClick={() =>

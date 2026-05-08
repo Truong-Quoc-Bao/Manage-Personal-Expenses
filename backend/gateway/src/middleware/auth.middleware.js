@@ -28,7 +28,15 @@ function authenticationMiddleware(req, res, next) {
 
     try {
         const decoded = jwt.verify(token, secretKey, verifyOptions);
+        // Auth service (TokenService) emits `user_id`; align with downstream e.g. X-User-Id on transaction proxy.
+        const resolvedId =
+            decoded.user_id ?? decoded.userId ?? decoded.sub;
+        if (resolvedId != null && resolvedId !== "") {
+            decoded.userId = String(resolvedId);
+        }
+        console.log(decoded);
         req.user = decoded;
+        req.headers['x-user-id'] = String(resolvedId);
         next();
     } catch {
         return res.status(401).json({ message: "Invalid or expired token" });

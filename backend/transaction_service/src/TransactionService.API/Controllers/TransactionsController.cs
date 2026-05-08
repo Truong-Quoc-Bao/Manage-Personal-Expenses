@@ -17,6 +17,7 @@ namespace TransactionService.API.Controllers
         private Guid GetUserId()
         {
             var userIdHeader = Request.Headers["X-User-Id"].FirstOrDefault();
+            Console.WriteLine(userIdHeader);
             if (string.IsNullOrEmpty(userIdHeader) || !Guid.TryParse(userIdHeader, out var userId))
             {
                 throw new UnauthorizedAccessException("User ID not found in request headers");

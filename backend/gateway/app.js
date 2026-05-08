@@ -46,6 +46,13 @@ app.use('/api/categories', authenticate, createProxyMiddleware({
     onError: proxyOnError('categories'),
 }));
 
+app.use('/api/budgets', authenticate, createProxyMiddleware({
+    target: process.env.BUDGET_SERVICE_URL || 'http://localhost:3008',
+    changeOrigin: true,
+    logLevel: 'debug',
+    onError: proxyOnError('budgets'),
+}));
+
 app.use('/api/analytics', authenticate, createProxyMiddleware({
     target: process.env.ANALYTICS_SERVICE_URL,
     changeOrigin: true,

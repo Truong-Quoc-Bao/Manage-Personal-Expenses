@@ -22,7 +22,7 @@ namespace TransactionService.Application.Services
             _mapper = mapper;
         }
 
-        public async Task<PaginatedResultDto<TransactionResponseDto>> GetAllTransactionsAsync(Guid userId, TransactionFilterParams filters, bool includeDetails = false)
+        public async Task<PaginatedResultDto<TransactionResponseDto>> GetAllTransactionsAsync(Guid userId, TransactionFilterParams filters, bool includeDetails = true)
         {
             var (transactions, totalCount) = await _transactionRepository.GetAllTransactionsAsync(userId, filters);
             var transactionDtos = _mapper.Map<List<TransactionResponseDto>>(transactions);
