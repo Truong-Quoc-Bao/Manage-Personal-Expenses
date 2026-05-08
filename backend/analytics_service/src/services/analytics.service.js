@@ -1131,7 +1131,8 @@ const service = {
       } else {
         topCategories.push({
           category_id: transaction.category_id,
-          category_name: transaction.category_name || '',
+          category_name: 'test',
+          // category_name: transaction.category_name || '',
           total_amount: amt
         });
       }
@@ -1388,7 +1389,8 @@ const service = {
         const categoryInfo = await repo.findCategoryById(category_id).catch(() => null);
         catArray.push({
           category_id,
-          category_name: categoryInfo?.category_name || transaction.category_name || '',
+          category_name: 'test',
+          // category_name: categoryInfo?.category_name || transaction.category_name || '',
           amount: amt
         });
       }

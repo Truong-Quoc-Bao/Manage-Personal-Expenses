@@ -7,7 +7,7 @@ const service = require('../services/analytics.service.js');
 // ================================================================
 
 function requireUserId(req, res) {
-  const userId = req.user?.userId ?? req.user?.user_id;
+  const userId = req.headers['x-user-id'];
   if (userId == null || userId === "") {
     res.status(401).json({ success: false, message: "Unauthorized" });
     return null;
