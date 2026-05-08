@@ -257,7 +257,7 @@ app.get('/api/recent-transactions', async (req, res) => {
         JOIN account_service.accounts a ON t.account_id = a.account_id
         LEFT JOIN category_service.categories c ON t.category_id = c.category_id
         WHERE a.user_id = $1
-        ORDER BY t.created_at DESC, t.trans_id DESC
+        ORDER BY t.date DESC, t.trans_id DESC
         LIMIT 20
       `,
       [userId],
@@ -1791,18 +1791,6 @@ app.post('/chat-stream', authenticateToken, async (req, res) => {
   }
 });
 
-// Health check đơn giản
-// app.get('/health', (req, res) => {
-//   res.json({ status: 'ok', message: 'AI service đang chạy' });
-// });
-
-app.get('/ping-mo-quan', (req, res) => {
-  console.log('🚀 [BACKEND 4005] DA NHAN DUOC LENH PING!');
-  res.json(getStatusData());
-  console.log('🚀 [BACKEND 4005] DA NHAN DUOC LENH PING 5!');
-  // res.json({ message: 'Backend 4005 dang song nhe Bao!' });
-});
-
 // Middleware xử lý lỗi toàn cục
 app.use((err, req, res, next) => {
   console.error('❌ Uncaught Error:', err);
@@ -1836,12 +1824,10 @@ app.use((err, req, res, next) => {
   });
 });
 
-// app.get('/api/ai-health', (req, res) => {
-//   res.json(getStatusData());
-// });
+app.get('/ai-health', (req, res) => {
+  res.json(getStatusData());
+});
 
-// File Backend (4005) - Đặt ngay dưới route chat-history
-
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server và Socket đang chạy tại cổng: ${PORT}`);
 });

@@ -40,14 +40,12 @@ export const chatApi = {
     if (data.image) form.append('image', data.image);
     return axiosInstance.post('/api/ai/chat', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000,
     });
   },
 
   getDeepScan: () => axiosInstance.get('/api/ai/api/ai-deep-scan'),
-
-  // getAiHealth: () => axiosInstance.get('/api/ai/api/ai-health'),
-  // Sửa lại cho đúng cấu trúc Gateway + Route của Backend
-  getAiHealth: () => axiosInstance.get('/api/ai/ping-mo-quan'),
+  getAiHealth: () => axiosInstance.get('/api/ai/ai-health'),
 };
 
 // ─────────────────────────────────────────

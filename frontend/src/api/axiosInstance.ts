@@ -45,7 +45,8 @@ const getBaseURL = () => {
 
 const axiosInstance = axios.create({
   baseURL: getBaseURL(),
-  timeout: 10000,
+  // timeout: 10000,
+  timeout: 300000, 
   headers: {
     'Content-Type': 'application/json',
   },
