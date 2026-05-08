@@ -62,6 +62,50 @@ export function Transactions() {
   const [pendingAccountId, setPendingAccountId] = useState("");
   const [accounts, setAccounts] = useState<AccountOption[]>([]);
 
+  // ==========================================
+  // 1. LOGIC ĐỒNG BỘ DỮ LIỆU TỪ SERVER (AI)
+  // ==========================================
+  const fetchTransactionsFromServer = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      console.log('📜 Transactions: Đang nạp dữ liệu mới từ Server...');
+      const res = await statsApi.getRecentTransactions();
+
+      if (res.data && res.data.length > 0) {
+        // Map lại dữ liệu Server cho khớp với giao diện Transactions
+        const mappedData: Transaction[] = res.data.map((t: any) => ({
+          id: t.id || t.trans_id,
+          type: t.type,
+          category: t.category_name || t.category || 'Khác',
+          amount: Math.abs(parseFloat(t.amount)),
+          date: new Date(t.created_at || t.date).toLocaleDateString('vi-VN'),
+          description: t.description || 'Giao dịch từ AI',
+          account: t.account_name || 'Tiền mặt',
+          note: t.note || '',
+        }));
+        setTransactions(mappedData);
+      }
+    } catch (error) {
+      console.error('Lỗi tải giao dịch:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // 📡 "Ăng-ten" đón sóng từ AI Chat (money-guard-sync)
+  useEffect(() => {
+    fetchTransactionsFromServer(); // Load lần đầu
+
+    const handleSync = () => {
+      console.log('📜 Transactions: Nhận lệnh cập nhật danh sách!');
+      fetchTransactionsFromServer();
+    };
+
+    window.addEventListener('money-guard-sync', handleSync);
+    return () => window.removeEventListener('money-guard-sync', handleSync);
+  }, [fetchTransactionsFromServer]);
+
+  // Vẫn giữ subscribe store để dùng cho thêm thủ công (Manual)
   useEffect(() => {
     accountApi.getAccounts().then((res) => {
       const data = res.data?.data ?? res.data ?? [];
@@ -121,9 +165,9 @@ export function Transactions() {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency: "VND",
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
     }).format(amount);
   };
 
@@ -227,7 +271,11 @@ export function Transactions() {
 
   return (
     <>
-      <div className="mx-auto max-w-7xl">
+      <div
+        className={`mx-auto max-w-7xl transition-opacity duration-300 ${
+          isLoading ? 'opacity-50' : 'opacity-100'
+        }`}
+      >
         <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <h1 className="mb-1 text-4xl font-bold text-gray-900">
@@ -272,6 +320,7 @@ export function Transactions() {
             <p className="text-2xl font-semibold text-green-600">
               {formatCurrency(totalIncome)}
             </p>
+            <p className="text-2xl font-black text-green-600">{formatCurrency(totalIncome)}</p>
           </div>
 
           <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-lg">
@@ -282,6 +331,7 @@ export function Transactions() {
             <p className="text-2xl font-semibold text-red-600">
               {formatCurrency(totalExpense)}
             </p>
+            <p className="text-2xl font-black text-red-600">{formatCurrency(totalExpense)}</p>
           </div>
 
           <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-lg">
@@ -290,10 +340,8 @@ export function Transactions() {
               <p className="text-sm text-gray-600">Số dư ròng</p>
             </div>
             <p
-              className={`text-2xl font-semibold ${
-                totalIncome - totalExpense >= 0
-                  ? "text-green-600"
-                  : "text-red-600"
+              className={`text-2xl font-black ${
+                totalIncome - totalExpense >= 0 ? 'text-green-600' : 'text-red-600'
               }`}
             >
               {formatCurrency(totalIncome - totalExpense)}
@@ -487,7 +535,7 @@ export function Transactions() {
                             {transaction.transactionType === "Income" ? (
                               <TrendingUp className="h-4 w-4" />
                             ) : (
-                              <TrendingDown className="h-4 w-4" />
+                              <TrendingDown size={16} />
                             )}
                           </div>
                           <span className="text-sm text-gray-800">
@@ -536,7 +584,6 @@ export function Transactions() {
                           >
                             <Eye className="h-4 w-4" />
                           </button>
-
                           <button
                             type="button"
                             onClick={() =>
@@ -556,7 +603,7 @@ export function Transactions() {
                             className="flex h-9 w-9 items-center justify-center rounded-xl !bg-red-50 text-red-400 transition hover:!bg-red-100 hover:text-red-600"
                             title="Xóa"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 size={16} />
                           </button>
                         </div>
                       </td>
@@ -652,7 +699,7 @@ export function Transactions() {
         />
       )}
 
-      {editingTransaction && (
+      {/* {editingTransaction && (
         <EditTransactionModal
           transaction={editingTransaction}
           onClose={() => setEditingTransaction(null)}
@@ -666,7 +713,7 @@ export function Transactions() {
           onClose={() => setDeletingTransaction(null)}
           onDeleted={handleTransactionDeleted}
         />
-      )}
+      )} */}
     </>
   );
 }

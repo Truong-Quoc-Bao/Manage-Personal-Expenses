@@ -104,9 +104,27 @@ app.get("/api/health", (req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
+app.use(
+  '/api/ai',
+  createProxyMiddleware({
+    target: process.env.AI_SERVICE_URL || 'http://localhost:4005',
+    changeOrigin: true,
+    logLevel: 'debug',
+    pathRewrite: {
+      '^/api/ai': '',
+    },
+    onError: (err, req, res) => {
+      console.error('Proxy error (AI Service):', err);
+      res.status(500).send('AI Gateway error');
+    },
+  }),
+);
+
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
 app.listen(PORT, () => {
-  console.log(
-    "Transaction service is running on " + process.env.TRANSACTION_SERVICE_URL
-  );
+  console.log('Transaction service is running on ' + process.env.TRANSACTION_SERVICE_URL);
   console.log(`Gateway is running on port ${PORT}`);
 });

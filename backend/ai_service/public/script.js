@@ -75,7 +75,7 @@ function animateValue(element, start, end, duration) {
 // --- 2.1 CẬP NHẬT SỨC KHỎE NÃO BỘ AI ---
 async function updateAIHealth() {
   try {
-    const res = await fetch('/api/ai-health');
+    const res = await fetch('/ai-health');
     const models = await res.json();
     const selector = document.getElementById('model-selector');
     if (!selector) return;
@@ -1281,7 +1281,7 @@ if (recognition) {
 // --- HÀM PHÁT ÂM THANH PHẢN HỒI ---
 function speakResponse(text) {
   // Lọc sạch nội dung trước khi nói (Xóa thẻ HTML, Markdown)
-  const cleanText = text.replace(/<.*?>/g, '').replace(/[#*]/g, '').substring(0, 250);
+  const cleanText = text.replace(/<.*?>/g, '').replace(/[#*]/g, '').substring(0, 25000);
   const msg = new SpeechSynthesisUtterance(cleanText);
   msg.lang = 'vi-VN';
   msg.rate = 1.0;

@@ -13,6 +13,7 @@ services:
       - WEBHOOK_URL=https://unnibbed-unthrilled-averi.ngrok-free.dev
       - GENERIC_TIMEZONE=Asia/Ho_Chi_Minh
       - N8N_PAYLOAD_SIZE_MAX=10
+      - N8N_RUNNERS_ENABLED=false
     ports:
       - '${N8N_PORT}:5678'
     volumes:

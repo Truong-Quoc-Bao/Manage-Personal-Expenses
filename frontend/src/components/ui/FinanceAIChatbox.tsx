@@ -1,270 +1,443 @@
-import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Sparkles } from "lucide-react";
-import * as React from "react";
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import {
+  Send,
+  Bot,
+  User,
+  Sparkles,
+  Brain,
+  Loader2,
+  Zap,
+  Camera,
+  Mic,
+  Volume2,
+  X,
+  Trash2,
+  Image as ImageIcon,
+} from 'lucide-react';
+import { marked } from 'marked';
+// IMPORT API CỦA BẢO
+import { chatApi, statsApi } from '../../api/ai.api';
 
+// --- Interfaces ---
 interface Message {
-  id: number;
-  role: "user" | "assistant";
+  id: string | number;
+  role: 'user' | 'model';
   content: string;
+  image?: string;
   timestamp: Date;
+  aiInfo?: {
+    modelUsed: string;
+    tokens: number;
+    cost: number;
+    usage?: any;
+  };
+}
+
+interface AIModel {
+  name: string;
+  status: 'online' | 'offline';
 }
 
 export function FinanceAIChatbox() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      role: "assistant",
-      content:
-        "Xin chào! Tôi là trợ lý tài chính AI. Tôi có thể giúp bạn phân tích chi tiêu, đưa ra lời khuyên tiết kiệm và trả lời các câu hỏi về tài chính cá nhân. Bạn muốn tôi giúp gì?",
-      timestamp: new Date(),
-    },
-  ]);
-  const [inputValue, setInputValue] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  // --- States ---
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedModel, setSelectedModel] = useState('auto');
+  const [aiModels, setAiModels] = useState<AIModel[]>([]);
+  const [stats, setStats] = useState<any>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  // --- Voice & Image States ---
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [showVoicePreview, setShowVoicePreview] = useState(false);
+
+  // --- Refs ---
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const hasInteractedRef = useRef(false);
+
+  // --- 1. KHỞI TẠO ÂM THANH & TƯƠNG TÁC ---
+  useEffect(() => {
+    audioRef.current = new Audio(
+      'https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3',
+    );
+    audioRef.current.volume = 0.5;
+
+    const handler = () => {
+      hasInteractedRef.current = true;
+    };
+    window.addEventListener('click', handler);
+    return () => window.removeEventListener('click', handler);
+  }, []);
+
+  // --- 2. ĐỒNG BỘ DATA & AI HEALTH (30s/lần) ---
+  useEffect(() => {
+    initChatData();
+    const interval = setInterval(syncAIModels, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const initChatData = async () => {
+    try {
+      const [histRes, statsRes] = await Promise.all([
+        chatApi.getChatHistory(),
+        statsApi.getStats(),
+      ]);
+
+      const history = histRes.data.map((m: any, idx: number) => ({
+        id: `hist-${idx}`,
+        role: m.role === 'user' ? 'user' : 'model',
+        content: m.message.replace(/<.*?>[\s\S]*?<\/.*?>/gs, '').trim(),
+        timestamp: new Date(),
+      }));
+
+      setMessages(
+        history.length > 0
+          ? history
+          : [
+              {
+                id: 'welcome',
+                role: 'model',
+                content: 'Chào Bảo! Tôi là Money Guard. Bạn cần soi ví hay ghi sổ món gì không?',
+                timestamp: new Date(),
+              },
+            ],
+      );
+
+      setStats(statsRes.data);
+      syncAIModels();
+    } catch (e) {
+      console.error('Lỗi khởi tạo:', e);
+    }
+  };
+
+  const syncAIModels = async () => {
+    try {
+      const res = await chatApi.getAiHealth();
+      setAiModels(res.data);
+    } catch (e) {
+      console.log('Lỗi đồng bộ AI');
+    }
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isLoading, showVoicePreview]);
 
-  const generateAIResponse = (userMessage: string): string => {
-    const lowerMessage = userMessage.toLowerCase();
-
-    // Phân tích chi tiêu
-    if (
-      lowerMessage.includes("chi tiêu") ||
-      lowerMessage.includes("tiêu") ||
-      lowerMessage.includes("phân tích")
-    ) {
-      return "Dựa trên dữ liệu của bạn, tôi thấy chi tiêu tháng này là 8.5 triệu đồng. Danh mục chi tiêu lớn nhất là Ăn uống (3.5 triệu - 41%). Tôi khuyên bạn nên:\n\n• Giảm chi tiêu ăn uống 10-15% bằng cách nấu ăn tại nhà nhiều hơn\n• Đặt ngân sách cố định cho mỗi danh mục\n• Theo dõi chi tiêu hàng ngày để kiểm soát tốt hơn";
+  // --- 3. SPEECH RECOGNITION (Chuẩn JS) ---
+  useEffect(() => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const rec = new SpeechRecognition();
+      rec.lang = 'vi-VN';
+      rec.interimResults = true;
+      rec.onstart = () => {
+        setIsRecording(true);
+        setShowVoicePreview(true);
+        setVoiceTranscript('Đang nghe...');
+      };
+      rec.onresult = (e: any) => {
+        setVoiceTranscript(
+          Array.from(e.results)
+            .map((r: any) => r[0].transcript)
+            .join(''),
+        );
+      };
+      rec.onend = () => setIsRecording(false);
+      recognitionRef.current = rec;
     }
+  }, []);
 
-    // Tiết kiệm
-    if (lowerMessage.includes("tiết kiệm") || lowerMessage.includes("tiền")) {
-      return "Để tăng khả năng tiết kiệm, tôi đề xuất:\n\n• Áp dụng quy tắc 50/30/20: 50% cho nhu cầu thiết yếu, 30% cho mong muốn, 20% cho tiết kiệm\n• Thiết lập tài khoản tiết kiệm riêng\n• Tự động chuyển 15-20% thu nhập vào tiết kiệm ngay khi nhận lương\n• Giảm chi tiêu không cần thiết như cafe, giải trí";
-    }
+  // --- 4. GỬI TIN NHẮN & XỬ LÝ TEXT-TO-SPEECH ---
+  const handleSend = async (textOverride?: string) => {
+    const text = textOverride || (showVoicePreview ? voiceTranscript : inputValue).trim();
+    if ((!text && !selectedImage) || isLoading) return;
 
-    // Thu nhập
-    if (lowerMessage.includes("thu nhập") || lowerMessage.includes("lương")) {
-      return "Thu nhập của bạn tháng này là 15 triệu đồng, với tỷ lệ tiết kiệm là 43.3% - rất tốt! Để tối ưu hóa thu nhập:\n\n• Tìm kiếm nguồn thu nhập phụ (freelance, đầu tư)\n• Nâng cao kỹ năng để tăng thu nhập chính\n• Đầu tư vào tài sản sinh lời như cổ phiếu, quỹ đầu tư";
-    }
-
-    // Mục tiêu tài chính
-    if (
-      lowerMessage.includes("mục tiêu") ||
-      lowerMessage.includes("kế hoạch")
-    ) {
-      return "Để đạt được mục tiêu tài chính:\n\n• Xác định rõ mục tiêu ngắn hạn và dài hạn\n• Tính toán số tiền cần tiết kiệm mỗi tháng\n• Tạo quỹ khẩn cấp bằng 3-6 tháng chi tiêu\n• Đầu tư có kế hoạch cho tương lai\n• Xem xét bảo hiểm để bảo vệ tài chính";
-    }
-
-    // Danh mục chi tiêu
-    if (lowerMessage.includes("ăn uống") || lowerMessage.includes("đồ ăn")) {
-      return "Chi tiêu ăn uống của bạn là 3.5 triệu/tháng (41% tổng chi). Đây hơi cao so với mức khuyến nghị (25-30%). Gợi ý:\n\n• Nấu ăn tại nhà 4-5 bữa/tuần\n• Đặt giới hạn 100-150k cho mỗi bữa ăn ngoài\n• Mua sắm thực phẩm theo danh sách\n• Tận dụng ưu đãi và combo";
-    }
-
-    if (lowerMessage.includes("di chuyển") || lowerMessage.includes("xăng")) {
-      return "Chi phí di chuyển của bạn là 1.2 triệu/tháng (14% tổng chi). Mức này khá hợp lý. Để tiết kiệm thêm:\n\n• Sử dụng phương tiện công cộng khi có thể\n• Gộp các chuyến đi để tiết kiệm xăng\n• Cân nhắc dịch vụ xe công nghệ thay vì xe cá nhân cho một số chuyến";
-    }
-
-    // Lời khuyên chung
-    if (lowerMessage.includes("lời khuyên") || lowerMessage.includes("gợi ý")) {
-      return "Dựa trên tình hình tài chính của bạn, tôi có một số lời khuyên:\n\n• Tình hình tài chính của bạn khá tốt với tỷ lệ tiết kiệm cao\n• Tập trung vào việc duy trì thói quen chi tiêu hiện tại\n• Tìm hiểu về đầu tư để tăng giá trị tài sản\n• Xây dựng quỹ dự phòng ít nhất 6 tháng chi tiêu\n• Đa dạng hóa nguồn thu nhập";
-    }
-
-    // Câu hỏi về app
-    if (
-      lowerMessage.includes("sử dụng") ||
-      lowerMessage.includes("app") ||
-      lowerMessage.includes("ứng dụng")
-    ) {
-      return "Để sử dụng ứng dụng hiệu quả:\n\n• Cập nhật giao dịch đều đặn mỗi ngày\n• Phân loại chi tiêu đúng danh mục\n• Xem báo cáo thống kê hàng tuần\n• Đặt ngân sách cho từng danh mục\n• Theo dõi xu hướng chi tiêu theo tháng";
-    }
-
-    // Default response
-    const defaultResponses = [
-      "Đó là một câu hỏi hay! Dựa trên dữ liệu của bạn, tôi khuyên bạn nên theo dõi chi tiêu thường xuyên và đặt mục tiêu tiết kiệm rõ ràng.",
-      "Tôi hiểu mối quan tâm của bạn. Hãy xem phần thống kê chi tiết để có cái nhìn tổng quan về tài chính của bạn.",
-      "Câu hỏi thú vị! Tôi có thể giúp bạn phân tích chi tiêu theo danh mục hoặc đưa ra lời khuyên về tiết kiệm. Bạn muốn biết điều gì cụ thể?",
-    ];
-
-    return defaultResponses[
-      Math.floor(Math.random() * defaultResponses.length)
-    ];
-  };
-
-  const handleSendMessage = async () => {
-    if (!inputValue.trim()) return;
-
-    const userMessage: Message = {
+    const userMsg: Message = {
       id: Date.now(),
-      role: "user",
-      content: inputValue,
+      role: 'user',
+      content: text,
+      image: imagePreview || undefined,
       timestamp: new Date(),
     };
+    setMessages((prev) => [...prev, userMsg]);
 
-    setMessages((prev) => [...prev, userMessage]);
-    setInputValue("");
-    setIsTyping(true);
+    setInputValue('');
+    setSelectedImage(null);
+    setImagePreview(null);
+    setShowVoicePreview(false);
+    setIsLoading(true);
 
-    // Simulate AI thinking delay
-    setTimeout(() => {
-      const aiResponse: Message = {
-        id: Date.now() + 1,
-        role: "assistant",
-        content: generateAIResponse(inputValue),
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, aiResponse]);
-      setIsTyping(false);
-    }, 1000 + Math.random() * 1000);
-  };
+    try {
+      const res = await chatApi.sendMessage({
+        message: text,
+        model: selectedModel,
+        image: selectedImage || undefined,
+      });
+      const cleanReply = res.data.reply.replace(/<.*?>[\s\S]*?<\/.*?>/gs, '').trim();
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          role: 'model',
+          content: cleanReply,
+          timestamp: new Date(),
+          aiInfo: {
+            modelUsed: res.data.modelUsed,
+            tokens: res.data.usage?.totalTokenCount || 0,
+            cost: res.data.cost,
+          },
+        },
+      ]);
+
+      // Speak & Sound
+      if (hasInteractedRef.current) audioRef.current?.play().catch(() => {});
+      const utterance = new SpeechSynthesisUtterance(
+        cleanReply.replace(/<.*?>/g, '').substring(0, 300),
+      );
+      utterance.lang = 'vi-VN';
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          role: 'model',
+          content: 'AI đang bận, Bảo thử lại sau nhé!',
+          timestamp: new Date(),
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString("vi-VN", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
+  // --- 5. SMART SUGGESTIONS ---
+  const suggestions = useMemo(() => {
+    if (!stats) return ['Ăn sáng 30k', 'Hôm nay tiêu gì?', 'Ví còn bao nhiêu?'];
+    const sug = [];
+    const balance = stats.income - stats.expense;
+    if (balance < 0) sug.push('☠️ Kế hoạch trả nợ', '⚠️ Cắt giảm chi tiêu');
+    else sug.push('💰 Tôi còn bao nhiêu?', '💸 Ghi sổ cafe 25k');
+    sug.push('📊 So sánh tuần trước');
+    return sug.slice(0, 4);
+  }, [stats]);
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden flex flex-col h-[600px]">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-orange-400 to-rose-400 p-4 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-          <Sparkles className="w-5 h-5 text-white" />
+    <div className="flex flex-col h-[650px] bg-white rounded-2xl overflow-hidden font-sans border border-gray-100">
+      {/* Header - Industrial & Pro */}
+      <div className="bg-gradient-to-r from-gray-900 via-blue-700 to-indigo-800 p-4 flex justify-between items-center shadow-lg">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/20 backdrop-blur-md">
+            <Brain className="w-6 h-6 text-white animate-pulse" />
+          </div>
+          <div>
+            <h3 className="text-white font-black text-sm uppercase tracking-widest">
+              Money Guard Engine
+            </h3>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-400" />
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                className="bg-transparent text-[10px] text-white/90 font-bold outline-none cursor-pointer uppercase appearance-none"
+              >
+                <option value="auto" className="text-black">
+                  🤖 Auto Brain
+                </option>
+                {aiModels.map((m) => (
+                  <option
+                    key={m.name}
+                    value={m.name}
+                    className="text-black"
+                    disabled={m.status !== 'online'}
+                  >
+                    {m.status === 'online' ? '●' : '○'} {m.name.split('-').pop()?.toUpperCase()}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
-        <div className="flex-1">
-          <h3 className="text-white text-lg">Trợ lý tài chính AI</h3>
-          <p className="text-white/80 text-sm">Luôn sẵn sàng hỗ trợ bạn</p>
-        </div>
-        <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+        <Zap className="w-5 h-5 text-yellow-400" />
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message) => (
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50 scrollbar-hide">
+        {messages.map((msg) => (
           <div
-            key={message.id}
-            className={`flex gap-3 ${
-              message.role === "user" ? "flex-row-reverse" : ""
-            }`}
+            key={msg.id}
+            className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
           >
             <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                message.role === "user"
-                  ? "bg-gradient-to-br from-orange-400 to-rose-400"
-                  : "bg-gradient-to-br from-purple-400 to-pink-400"
+              className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm border ${
+                msg.role === 'user' ? 'bg-blue-600 border-blue-500' : 'bg-white border-gray-200'
               }`}
             >
-              {message.role === "user" ? (
-                <User className="w-4 h-4 text-white" />
+              {msg.role === 'user' ? (
+                <User className="w-5 h-5 text-white" />
               ) : (
-                <Bot className="w-4 h-4 text-white" />
+                <Bot className="w-5 h-5 text-indigo-600" />
               )}
             </div>
             <div
-              className={`flex-1 ${
-                message.role === "user" ? "flex flex-col items-end" : ""
-              }`}
+              className={`flex flex-col ${
+                msg.role === 'user' ? 'items-end' : 'items-start'
+              } max-w-[80%]`}
             >
               <div
-                className={`inline-block max-w-[80%] rounded-2xl px-4 py-3 ${
-                  message.role === "user"
-                    ? "bg-gradient-to-r from-orange-400 to-rose-400 text-white"
-                    : "bg-gray-100 text-gray-800"
+                className={`rounded-2xl px-4 py-3 shadow-sm ${
+                  msg.role === 'user'
+                    ? 'bg-blue-600 text-white rounded-tr-none'
+                    : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none'
                 }`}
               >
-                <p className="text-sm whitespace-pre-line">{message.content}</p>
+                {msg.image && (
+                  <img
+                    src={msg.image}
+                    className="mb-2 rounded-lg max-h-60 w-full object-cover"
+                    alt="upload"
+                  />
+                )}
+                <div
+                  className="prose prose-sm prose-slate max-w-none break-words"
+                  dangerouslySetInnerHTML={{ __html: marked.parse(msg.content) }}
+                />
               </div>
-              <span className="text-xs text-gray-500 mt-1 px-2">
-                {formatTime(message.timestamp)}
+
+              {/* Token Usage Log (Black Panel) */}
+              {msg.role === 'model' && msg.aiInfo && (
+                <div className="mt-2 bg-slate-900 text-[9px] font-mono text-white p-2 rounded-lg w-48 border border-slate-700">
+                  <div className="flex justify-between border-b border-slate-700 pb-1 mb-1 opacity-70">
+                    <span>LOG_STATUS</span>
+                    <span className="text-blue-400 font-bold uppercase">
+                      {msg.aiInfo.modelUsed.split('-').pop()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Input Tokens:</span> <span>{msg.aiInfo.tokens}</span>
+                  </div>
+                  <div className="border-t border-slate-700 mt-1 pt-1 flex justify-between font-bold text-rose-400 uppercase">
+                    <span>Est. Cost:</span> <span>${Number(msg.aiInfo.cost).toFixed(6)}</span>
+                  </div>
+                </div>
+              )}
+              <span className="text-[9px] text-gray-400 mt-1 uppercase tracking-tighter">
+                {msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
           </div>
         ))}
-
-        {isTyping && (
-          <div className="flex gap-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center flex-shrink-0">
-              <Bot className="w-4 h-4 text-white" />
-            </div>
-            <div className="bg-gray-100 rounded-2xl px-4 py-3">
-              <div className="flex gap-1">
-                <div
-                  className="w-2 h-2 rounded-full bg-gray-400 animate-bounce"
-                  style={{ animationDelay: "0ms" }}
-                />
-                <div
-                  className="w-2 h-2 rounded-full bg-gray-400 animate-bounce"
-                  style={{ animationDelay: "150ms" }}
-                />
-                <div
-                  className="w-2 h-2 rounded-full bg-gray-400 animate-bounce"
-                  style={{ animationDelay: "300ms" }}
-                />
-              </div>
-            </div>
+        {isLoading && (
+          <div className="flex space-x-1.5 ml-14">
+            <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
+            <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+            <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
           </div>
         )}
-
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div className="border-t border-gray-200 p-4">
-        <div className="flex gap-2">
+      {/* Voice Preview Panel (Yellow) */}
+      {showVoicePreview && (
+        <div className="mx-6 my-2 p-3 bg-[#fffbeb] border-l-4 border-[#f59e0b] rounded-lg shadow-sm animate-in slide-in-from-left-2">
+          <div className="flex flex-col text-sm italic text-gray-700">
+            <div className="flex items-start gap-2 text-blue-900 font-medium">
+              <Volume2 size={16} className="mt-1 text-orange-400" />
+              <span>"{voiceTranscript}"</span>
+            </div>
+            <div className="flex justify-end gap-3 mt-3 not-italic">
+              <button
+                onClick={() => setShowVoicePreview(false)}
+                className="text-[10px] font-bold text-gray-400 uppercase hover:text-red-500"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={() => handleSend()}
+                className="text-[10px] font-bold text-blue-600 uppercase underline decoration-2"
+              >
+                Xác nhận & Gửi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Footer Area */}
+      <div className="p-4 bg-white border-t border-gray-100">
+        {/* Suggestion Chips */}
+        <div className="mb-4 flex gap-2 overflow-x-auto scrollbar-hide">
+          {suggestions.map((txt) => (
+            <button
+              key={txt}
+              onClick={() =>
+                handleSend(
+                  txt.replace(
+                    /[^\w\sàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/gi,
+                    '',
+                  ),
+                )
+              }
+              className="whitespace-nowrap px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-full text-[11px] font-bold text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-all"
+            >
+              {txt}
+            </button>
+          ))}
+        </div>
+
+        {/* Input Bar */}
+        <div className="flex items-center gap-2 p-1.5 bg-gray-100 rounded-2xl border border-gray-200 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                setSelectedImage(file);
+                setImagePreview(URL.createObjectURL(file));
+              }
+            }}
+            className="hidden"
+            accept="image/*"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="p-2 text-gray-400 hover:text-blue-600"
+          >
+            <Camera size={22} />
+          </button>
+          <button
+            onClick={() =>
+              isRecording ? recognitionRef.current?.stop() : recognitionRef.current?.start()
+            }
+            className={`p-2 transition-all ${
+              isRecording ? 'text-red-500 animate-pulse scale-110' : 'text-gray-400'
+            }`}
+          >
+            <Mic size={22} />
+          </button>
           <input
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Hỏi tôi về tài chính của bạn..."
-            className="flex-1 px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-            disabled={isTyping}
+            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+            placeholder="Nói hoặc nhập chi tiêu..."
+            className="flex-1 bg-transparent px-2 text-sm outline-none"
+            disabled={isLoading}
           />
           <button
-            onClick={handleSendMessage}
-            disabled={!inputValue.trim() || isTyping}
-            className="px-6 py-3 bg-gradient-to-r from-orange-400 to-rose-400 text-white rounded-xl hover:from-orange-500 hover:to-rose-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            onClick={() => handleSend()}
+            className="p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-md transition-all active:scale-95 disabled:opacity-20"
           >
-            <Send className="w-4 h-4" />
-            <span className="hidden sm:inline">Gửi</span>
-          </button>
-        </div>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setInputValue("Phân tích chi tiêu của tôi")}
-            className="rounded-full !bg-gray-100 px-3 py-1 text-xs text-gray-700 transition hover:!bg-gray-200"
-          >
-            💡 Phân tích chi tiêu
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setInputValue("Làm sao để tiết kiệm hơn?")}
-            className="rounded-full !bg-gray-100 px-3 py-1 text-xs text-gray-700 transition hover:!bg-gray-200"
-          >
-            💰 Lời khuyên tiết kiệm
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setInputValue("Đưa ra mục tiêu tài chính")}
-            className="rounded-full !bg-gray-100 px-3 py-1 text-xs text-gray-700 transition hover:!bg-gray-200"
-          >
-            🎯 Mục tiêu tài chính
+            <Send size={18} />
           </button>
         </div>
       </div>
