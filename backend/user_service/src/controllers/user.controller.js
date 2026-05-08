@@ -3,9 +3,19 @@ const {
   updateUserProfile,
 } = require("../services/user.service");
 
+function requireUserId(req, res) {
+  const userId = req.headers['x-user-id'];
+  if (userId == null || userId === "") {
+    res.status(401).json({ success: false, message: "Unauthorized" });
+    return null;
+  }
+  return String(userId);
+}
+
 const getProfile = async (req, res, next) => {
   try {
-    const userId = req.user?.userId || "7cb96e5d-3cd9-40dc-ad99-635f08456301";
+    const userId = requireUserId(req, res);
+    if (!userId) return;
 
     const user = await getUserProfile(userId);
 
@@ -22,7 +32,8 @@ const getProfile = async (req, res, next) => {
 const updateUser = async (req, res, next) => {
   try {
     const { userName, birth } = req.body;
-    const userId = req.user?.userId || "7cb96e5d-3cd9-40dc-ad99-635f08456301";
+    const userId = requireUserId(req, res);
+    if (!userId) return;
 
     console.log("userName =", userName);
     console.log("birth =", birth);

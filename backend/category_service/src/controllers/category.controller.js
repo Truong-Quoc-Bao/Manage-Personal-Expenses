@@ -3,10 +3,19 @@ const { creaCategories } = require("../services/category.service");
 const { updCategories } = require("../services/category.service");
 const { delCategoryService } = require("../services/category.service");
 
+function requireUserId(req, res) {
+  const userId = req.headers['x-user-id'];
+  if (userId == null || userId === "") {
+    res.status(401).json({ success: false, message: "Unauthorized" });
+    return null;
+  }
+  return String(userId);
+}
+
 const getCategoryList = async (req, res, next) => {
   try {
-    // const type = req.query;
-    const userId = "7cb96e5d-3cd9-40dc-ad99-635f08456301";
+    const userId = requireUserId(req, res);
+    if (!userId) return;
 
     const categories = await getCategories({ userId });
 
@@ -23,17 +32,16 @@ const getCategoryList = async (req, res, next) => {
 
 const createCategory = async (req, res, next) => {
   try {
-    // const type = req.query;
-    const userId = "7cb96e5d-3cd9-40dc-ad99-635f08456301";
+    const userId = requireUserId(req, res);
+    if (!userId) return;
     const category = req.body;
     console.log("Creating controller category with data:", {
       userId,
       cat: category,
-    }); // Debug log to check input data
+    });
 
     const categories = await creaCategories({ userId, cat: category });
 
-    // console.log("QUERY:", req.query);
     return res.status(200).json({
       success: true,
       message: "POST categories successfully",
@@ -46,7 +54,8 @@ const createCategory = async (req, res, next) => {
 
 const updateCategory = async (req, res, next) => {
   try {
-    const userId = "7cb96e5d-3cd9-40dc-ad99-635f08456301";
+    const userId = requireUserId(req, res);
+    if (!userId) return;
     const category = req.body;
     const catid = req.params.id;
     const categories = await updCategories({ userId, catid, cat: category });
@@ -63,10 +72,10 @@ const updateCategory = async (req, res, next) => {
 
 const deleteCategory = async (req, res, next) => {
   try {
-    const userId = "7cb96e5d-3cd9-40dc-ad99-635f08456301";
-    // const category = req.body;
+    const userId = requireUserId(req, res);
+    if (!userId) return;
     const catid = req.params.id;
-    const categories = await delCategoryService({ categoryId: catid });
+    const categories = await delCategoryService({ categoryId: catid, userId });
 
     return res.status(200).json({
       success: true,

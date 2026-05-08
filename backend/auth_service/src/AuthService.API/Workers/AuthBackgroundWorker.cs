@@ -18,34 +18,29 @@ namespace AuthService.API.Workers
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            await _rabbitMQClient.ConsumeAsync<UserRegistrationConsumeEvent>("user.user_create.queue", new[] { "user.user_created_status" }, async (message) =>
+            // Một queue + một consumer: tránh hai BasicConsume trên cùng queue (round-robin, handler sai).
+            await _rabbitMQClient.ConsumeAsync<UserRegistrationConsumeEvent>(
+                "user.user_create.queue",
+                new[] { "user.user_created_status", "user.user_create_fail" },
+                async (message) =>
             {
-                using (var scope = _serviceProvider.CreateScope())
-                {
-                    var _authService = scope.ServiceProvider.GetRequiredService<IAuthService>();
-                    switch (message.Status)
+                using var scope = _serviceProvider.CreateScope();
+                var authService = scope.ServiceProvider.GetRequiredService<IAuthService>();
+
+                // user.user_create_fail: có thể chỉ có UserId — coi là Fail (Rejected).
+                var consumeEvent = string.IsNullOrEmpty(message.Status) && !string.IsNullOrEmpty(message.UserId)
+                    ? new UserRegistrationConsumeEvent
                     {
-                        case "Success":
-                            await _authService.UpdateStatusUserAsync(message);
-                            break;
-                        case "Fail":
-                            await _authService.UpdateStatusUserAsync(message);
-                            break;
+                        UserId = message.UserId,
+                        Email = message.Email,
+                        Reason = message.Reason,
+                        Status = "Fail",
                     }
-                }
-            });
+                    : message;
 
-            await _rabbitMQClient.ConsumeAsync<UserRegistrationConsumeEvent>("user.user_create.queue", new[] { "user.user_create_fail" }, async (message) =>
-            {
-                var userRejected = new UserRegistrationConsumeEvent
+                if (consumeEvent.Status is "Success" or "Fail")
                 {
-                    UserId = message.UserId,
-                };
-
-                using (var scope = _serviceProvider.CreateScope())
-                {
-                    var _authService = scope.ServiceProvider.GetRequiredService<IAuthService>();
-                    await _authService.UpdateStatusUserAsync(userRejected);
+                    await authService.UpdateStatusUserAsync(consumeEvent);
                 }
             });
         }

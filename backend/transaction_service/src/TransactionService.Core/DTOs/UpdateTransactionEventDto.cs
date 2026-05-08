@@ -13,6 +13,8 @@ namespace TransactionService.Core.DTOs
         [Required]
         public Guid AccountId { get; set; }
 
+        public Guid? AccountIdUpdate { get; set; }
+
         [Required]
         public Guid? CategoryId { get; set; }
 

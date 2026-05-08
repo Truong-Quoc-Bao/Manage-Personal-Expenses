@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Eye, EyeOff, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import React from "react";
+import { authApi, getAuthErrorMessage } from "../api/auth.api";
 
 export function ResetPassword() {
-  const navigate = useNavigate();
-  const { token } = useParams();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token") ?? "";
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);

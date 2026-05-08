@@ -1,131 +1,115 @@
-import React from "react";
-import { useState } from "react";
+import React, { useState } from "react";
 import { X } from "lucide-react";
 import { toast } from "sonner";
-import { accountStore } from "../../store/mockData";
+import { transactionsApi } from "@/api/transaction.api";
+import type {
+  TransactionResponse,
+  TransactionType,
+  UpdateTransactionRequest,
+} from "@/types/transaction";
 
 interface EditTransactionModalProps {
-  transaction: {
-    id: number;
-    type: "income" | "expense";
-    category: string;
-    amount: number;
-    date: string;
-    description: string;
-    account: string;
-    note?: string;
-  };
+  transaction: TransactionResponse;
   onClose: () => void;
-  onSubmit: (data: any) => void;
+  onUpdated: () => void;
 }
 
 export function EditTransactionModal({
   transaction,
   onClose,
-  onSubmit,
+  onUpdated,
 }: EditTransactionModalProps) {
   const [loading, setLoading] = useState(false);
-  const [transactionType, setTransactionType] = useState<"income" | "expense">(
-    transaction.type
+  const [transactionType, setTransactionType] = useState<TransactionType>(
+    transaction.transactionType
   );
+
   const [formData, setFormData] = useState({
-    account: transaction.account,
-    category: transaction.category,
+    accountId: transaction.accountId,
+    categoryId: transaction.categoryId ?? "",
     amount: transaction.amount.toString(),
     date: transaction.date,
-    description: transaction.description,
-    note: transaction.note || "",
+    description: transaction.description ?? "",
+    note: transaction.note ?? "",
   });
 
-  // Get accounts from store
-  const accounts = accountStore.getAll().map((acc) => ({
-    value: acc.name,
-    label: acc.name,
-  }));
-
-  const expenseCategories = [
-    { value: "Ăn uống", label: "Ăn uống" },
-    { value: "Di chuyển", label: "Di chuyển" },
-    { value: "Giải trí", label: "Giải trí" },
-    { value: "Mua sắm", label: "Mua sắm" },
-    { value: "Hóa đơn", label: "Hóa đơn" },
-    { value: "Sức khỏe", label: "Sức khỏe" },
-    { value: "Giáo dục", label: "Giáo dục" },
-    { value: "Khác", label: "Khác" },
-  ];
-
-  const incomeCategories = [
-    { value: "Lương", label: "Lương" },
-    { value: "Thưởng", label: "Thưởng" },
-    { value: "Đầu tư", label: "Đầu tư" },
-    { value: "Quà tặng", label: "Quà tặng" },
-    { value: "Khác", label: "Khác" },
-  ];
-
-  const categories =
-    transactionType === "expense" ? expenseCategories : incomeCategories;
+  const fieldClass =
+    "w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!formData.accountId.trim()) {
+      toast.error("Vui lòng nhập Account ID");
+      return;
+    }
+
+    const amount = parseFloat(formData.amount);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error("Vui lòng nhập số tiền hợp lệ");
+      return;
+    }
+
+    if (!formData.date) {
+      toast.error("Vui lòng chọn ngày giao dịch");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // Simple validation
-      const amount = parseFloat(formData.amount);
-      if (isNaN(amount) || amount <= 0) {
-        toast.error("Vui lòng nhập số tiền hợp lệ");
-        setLoading(false);
-        return;
-      }
+      const request: UpdateTransactionRequest = {
+        accountId: formData.accountId.trim(),
+        categoryId: formData.categoryId.trim() || null,
+        amount,
+        transactionType,
+        description: formData.description.trim() || undefined,
+        date: formData.date,
+        note: formData.note.trim() || undefined,
+      };
 
-      if (!formData.description.trim()) {
-        toast.error("Vui lòng nhập mô tả");
-        setLoading(false);
-        return;
-      }
-
-      // Mock API call
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      onSubmit({
-        ...formData,
-        type: transactionType,
-        amount: amount,
-      });
-    } catch (error) {
-      toast.error("Có lỗi xảy ra. Vui lòng thử lại!");
+      await transactionsApi.updateTransaction(transaction.transId, request);
+      toast.success("Đã cập nhật giao dịch thành công!");
+      onUpdated();
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.message ||
+        err?.response?.data ||
+        "Có lỗi xảy ra. Vui lòng thử lại!";
+      toast.error(
+        typeof message === "string" ? message : "Cập nhật giao dịch thất bại"
+      );
+    } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl">
+        <div className="sticky top-0 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
           <h2 className="text-xl text-gray-800">Chỉnh sửa giao dịch</h2>
           <button
+            type="button"
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            className="rounded-lg p-2 transition-colors hover:bg-gray-100"
           >
-            <X className="w-5 h-5 text-gray-600" />
+            <X className="h-5 w-5 text-gray-600" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5 p-6">
           {/* Transaction Type */}
           <div>
-            <label className="block text-sm text-gray-700 mb-2">
+            <label className="mb-2 block text-sm text-gray-700">
               Loại giao dịch <span className="text-red-500">*</span>
             </label>
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setTransactionType("expense");
-                  setFormData({ ...formData, category: "" });
-                }}
-                className={`flex-1 py-3 rounded-xl transition-all ${
-                  transactionType === "expense"
+                onClick={() => setTransactionType("Expense")}
+                className={`flex-1 rounded-xl py-3 transition-all ${
+                  transactionType === "Expense"
                     ? "bg-red-500 text-white shadow-md"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
@@ -134,12 +118,9 @@ export function EditTransactionModal({
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setTransactionType("income");
-                  setFormData({ ...formData, category: "" });
-                }}
-                className={`flex-1 py-3 rounded-xl transition-all ${
-                  transactionType === "income"
+                onClick={() => setTransactionType("Income")}
+                className={`flex-1 rounded-xl py-3 transition-all ${
+                  transactionType === "Income"
                     ? "bg-green-500 text-white shadow-md"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
@@ -149,55 +130,47 @@ export function EditTransactionModal({
             </div>
           </div>
 
-          {/* Account */}
+          {/* Account ID */}
           <div>
-            <label className="block text-sm text-gray-700 mb-2">
-              Tài khoản{" "}
-              {transactionType === "expense" ? "trừ tiền" : "nhận tiền"}{" "}
-              <span className="text-red-500">*</span>
+            <label className="mb-2 block text-sm text-gray-700">
+              Tài khoản (Account ID) <span className="text-red-500">*</span>
             </label>
-            <select
-              value={formData.account}
+            <input
+              type="text"
+              value={formData.accountId}
               onChange={(e) =>
-                setFormData({ ...formData, account: e.target.value })
+                setFormData({ ...formData, accountId: e.target.value })
               }
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              className={fieldClass}
+              placeholder="VD: 550e8400-e29b-41d4-a716-446655440000"
               required
-            >
-              <option value="">Chọn tài khoản</option>
-              {accounts.map((account) => (
-                <option key={account.value} value={account.value}>
-                  {account.label}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
-          {/* Category */}
+          {/* Category ID */}
           <div>
-            <label className="block text-sm text-gray-700 mb-2">
-              Danh mục <span className="text-red-500">*</span>
+            <label className="mb-2 block text-sm text-gray-700">
+              Danh mục (Category ID)
             </label>
-            <select
-              value={formData.category}
+            <input
+              type="text"
+              value={formData.categoryId}
               onChange={(e) =>
-                setFormData({ ...formData, category: e.target.value })
+                setFormData({ ...formData, categoryId: e.target.value })
               }
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-              required
-            >
-              <option value="">Chọn danh mục</option>
-              {categories.map((category) => (
-                <option key={category.value} value={category.value}>
-                  {category.label}
-                </option>
-              ))}
-            </select>
+              className={fieldClass}
+              placeholder="Để trống nếu không có danh mục"
+            />
+            {transaction.categoryName && (
+              <p className="mt-1 text-xs text-gray-500">
+                Danh mục hiện tại: {transaction.categoryName}
+              </p>
+            )}
           </div>
 
           {/* Amount */}
           <div>
-            <label className="block text-sm text-gray-700 mb-2">
+            <label className="mb-2 block text-sm text-gray-700">
               Số tiền <span className="text-red-500">*</span>
             </label>
             <input
@@ -206,15 +179,17 @@ export function EditTransactionModal({
               onChange={(e) =>
                 setFormData({ ...formData, amount: e.target.value })
               }
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              className={fieldClass}
               placeholder="Nhập số tiền (VD: 50000)"
+              min="0.01"
+              step="0.01"
               required
             />
           </div>
 
           {/* Date */}
           <div>
-            <label className="block text-sm text-gray-700 mb-2">
+            <label className="mb-2 block text-sm text-gray-700">
               Ngày giao dịch <span className="text-red-500">*</span>
             </label>
             <input
@@ -223,15 +198,15 @@ export function EditTransactionModal({
               onChange={(e) =>
                 setFormData({ ...formData, date: e.target.value })
               }
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              className={fieldClass}
               required
             />
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-sm text-gray-700 mb-2">
-              Mô tả <span className="text-red-500">*</span>
+            <label className="mb-2 block text-sm text-gray-700">
+              Mô tả
             </label>
             <input
               type="text"
@@ -239,15 +214,14 @@ export function EditTransactionModal({
               onChange={(e) =>
                 setFormData({ ...formData, description: e.target.value })
               }
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              className={fieldClass}
               placeholder="VD: Ăn trưa với bạn"
-              required
             />
           </div>
 
           {/* Note */}
           <div>
-            <label className="block text-sm text-gray-700 mb-2">
+            <label className="mb-2 block text-sm text-gray-700">
               Ghi chú (tùy chọn)
             </label>
             <textarea
@@ -255,7 +229,7 @@ export function EditTransactionModal({
               onChange={(e) =>
                 setFormData({ ...formData, note: e.target.value })
               }
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent resize-none"
+              className={`${fieldClass} resize-none`}
               rows={3}
               placeholder="Thêm ghi chú..."
             />
@@ -267,14 +241,14 @@ export function EditTransactionModal({
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="flex-1 px-6 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              className="flex-1 rounded-xl border border-gray-300 px-6 py-3 text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
             >
               Hủy
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-orange-400 to-rose-400 text-white hover:from-orange-500 hover:to-rose-500 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 rounded-xl bg-gradient-to-r from-orange-400 to-rose-400 px-6 py-3 text-white shadow-lg transition-all hover:from-orange-500 hover:to-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? "Đang lưu..." : "Lưu thay đổi"}
             </button>

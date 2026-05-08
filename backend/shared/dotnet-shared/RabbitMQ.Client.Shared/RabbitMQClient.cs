@@ -86,9 +86,12 @@ namespace RabbitMQ.Client.Shared
 
                 try
                 {
-                    var message = JsonSerializer.Deserialize<T>(messageJson, new JsonSerializerOptions 
-                    { 
-                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase 
+                    // User Service (Node) gửi PascalCase (UserId, Email, Status); Auth publish dùng snake_case.
+                    // Case-insensitive để không mất field khi deserialize.
+                    var message = JsonSerializer.Deserialize<T>(messageJson, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true,
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
                     });
                     if (message != null)
                     {

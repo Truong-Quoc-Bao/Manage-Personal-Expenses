@@ -7,7 +7,7 @@ const {
   createUser,
 } = require("../repositories/user.repository");
 
-const UserPublishEvent = require("../dtos/user.publish.event");
+const { UserPublishStatusEvent } = require("../dtos/user.publish.event");
 const { USER_STATUS } = require("../types/user.types");
 const rabbitMQ = require("../../../shared/rabbitmq-client");
 
@@ -90,28 +90,22 @@ const updateUserProfile = async ({ userId, userName, birth }) => {
 };
 
 const createUserService = async (user) => {
-  const existingUser = await checkExistingUser(user);
+  const duplicates = await checkExistingUser(user);
 
-  if (existingUser) {
-    const userPublishStatusEvent = new UserPublishEvent.UserPublishStatusEvent(
-      existingUser,
+  if (duplicates.length > 0) {
+    const existing = duplicates[0];
+    const statusEvent = new UserPublishStatusEvent(
+      existing,
       USER_STATUS.FAILED
     );
-    await rabbitMQ.publish(
-      "user.user_created_status",
-      new UserPublishEvent(userPublishStatusEvent)
-    );
-  } else {
-    const userPublishStatusEvent = new UserPublishEvent.UserPublishStatusEvent(
-      existingUser,
-      USER_STATUS.SUCCESS
-    );
-    await rabbitMQ.publish(
-      "user.user_created_status",
-      new UserPublishEvent(userPublishStatusEvent)
-    );
-    return newUser;
+    await rabbitMQ.publish("user.user_created_status", statusEvent);
+    return null;
   }
+
+  const newUser = await createUser(user);
+  const statusEvent = new UserPublishStatusEvent(newUser, USER_STATUS.SUCCESS);
+  await rabbitMQ.publish("user.user_created_status", statusEvent);
+  return newUser;
 };
 
 module.exports = {

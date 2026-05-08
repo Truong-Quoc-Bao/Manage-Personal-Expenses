@@ -9,6 +9,7 @@ import { ResetPassword } from "./pages/ResetPassword";
 import { Dashboard } from "./pages/Dashboard";
 import { Accounts } from "./pages/Accounts";
 import { Transactions } from "./pages/Transactions";
+import { TransactionDetail } from "./pages/TransactionDetail";
 import { Budgets } from "./pages/Budgets";
 import { Statistics } from "./pages/Statistics";
 import { ChatBox } from "./pages/ChatBox";
@@ -29,6 +30,7 @@ export default function AppRoutes() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/accounts" element={<Accounts />} />
           <Route path="/transactions" element={<Transactions />} />
+          <Route path="/transactions/:id" element={<TransactionDetail />} />
           <Route path="/budgets" element={<Budgets />} />
           <Route path="/statistics" element={<Statistics />} />
           <Route path="/chatbox" element={<ChatBox />} />

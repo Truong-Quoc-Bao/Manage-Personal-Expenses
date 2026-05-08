@@ -6,11 +6,19 @@ const {
   deleteBudgetService,
 } = require("../services/budget.service");
 
-const DEFAULT_USER_ID = "7cb96e5d-3cd9-40dc-ad99-635f08456301";
+function requireUserId(req, res) {
+  const userId = req.headers['x-user-id'];
+  if (userId == null || userId === "") {
+    res.status(401).json({ success: false, message: "Unauthorized" });
+    return null;
+  }
+  return String(userId);
+}
 
 const deleteBudgetController = async (req, res, next) => {
   try {
-    const userId = req.user?.userId || DEFAULT_USER_ID;
+    const userId = requireUserId(req, res);
+    if (!userId) return;
     const budgetId = req.params.id;
 
     await deleteBudgetService({
@@ -29,7 +37,8 @@ const deleteBudgetController = async (req, res, next) => {
 
 const updateBudgetController = async (req, res, next) => {
   try {
-    const userId = req.user?.userId || DEFAULT_USER_ID;
+    const userId = requireUserId(req, res);
+    if (!userId) return;
     const budgetId = req.params.id;
 
     const { title, categoryId, amountLimit, dateStart } = req.body;
@@ -55,7 +64,8 @@ const updateBudgetController = async (req, res, next) => {
 
 const createBudgetController = async (req, res, next) => {
   try {
-    const userId = req.user?.userId || DEFAULT_USER_ID;
+    const userId = requireUserId(req, res);
+    if (!userId) return;
 
     const { title, categoryId, amountLimit, dateStart } = req.body;
 
@@ -79,7 +89,8 @@ const createBudgetController = async (req, res, next) => {
 
 const getBudgetByUserIdController = async (req, res, next) => {
   try {
-    const userId = req.user?.userId || DEFAULT_USER_ID;
+    const userId = requireUserId(req, res);
+    if (!userId) return;
 
     const { categoryId, dateStart } = req.query;
 
@@ -101,7 +112,8 @@ const getBudgetByUserIdController = async (req, res, next) => {
 
 const getBudgetByBudgetIdController = async (req, res, next) => {
   try {
-    const userId = req.user?.userId || DEFAULT_USER_ID;
+    const userId = requireUserId(req, res);
+    if (!userId) return;
     const budgetId = req.params.id;
 
     const budgets = await getBudgetByBudgetIdService({

@@ -10,4 +10,12 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    proxy: {
+      "/api": {
+        target: process.env.VITE_GATEWAY_PROXY_TARGET || "http://localhost:3000",
+        changeOrigin: true,
+      },
+    },
+  },
 });

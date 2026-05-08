@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import React from "react";
+import { authApi, getAuthErrorMessage } from "../api/auth.api";
 
 export function Register() {
   const navigate = useNavigate();
@@ -63,13 +64,18 @@ export function Register() {
         return;
       }
 
-      // Mock registration - in real app, this would call an API
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await authApi.register({
+        email: formData.email.trim(),
+        user_name: formData.username.trim(),
+        password: formData.password,
+      });
 
-      toast.success("Đăng ký thành công! Chào mừng bạn đến với ứng dụng.");
-      navigate("/app");
+      toast.success(
+        "Đăng ký thành công! Tài khoản có thể đang chờ xác nhận — vui lòng đăng nhập."
+      );
+      navigate("/");
     } catch (error) {
-      toast.error("Đăng ký thất bại. Vui lòng thử lại!");
+      toast.error(getAuthErrorMessage(error, "Đăng ký thất bại. Vui lòng thử lại!"));
     } finally {
       setLoading(false);
     }

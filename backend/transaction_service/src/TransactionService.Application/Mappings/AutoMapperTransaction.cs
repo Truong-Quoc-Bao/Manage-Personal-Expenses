@@ -16,6 +16,7 @@ namespace TransactionService.Application.Mappings
             CreateMap<UpdateTransactionRequestDto, Transaction>().ReverseMap();
                 // .ForMember(dest => dest.TransactionType, opt => opt.MapFrom(src => Enum.Parse<TransactionType>(src.TransactionType, true)))
             CreateMap<UpdateTransactionEventDto, Transaction>().ReverseMap();
+            CreateMap<DeleteTransactionEventDto, Transaction>().ReverseMap();
 
         }
     }

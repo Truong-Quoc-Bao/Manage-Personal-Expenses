@@ -210,6 +210,14 @@ const checkExistAccount = async (accountId, userId) => {
   return !!account;
 };
 
+const getAccountDisplayService = async (accountId, userId) => {
+  const account = await accountRepository.findAccountByAccountId({ accountId });
+  if (!account || account.user_id !== userId) {
+    return { found: false, account_name: "" };
+  }
+  return { found: true, account_name: account.account_name || "" };
+};
+
 module.exports = {
   createNewAccount,
   getAccountsServices,
@@ -217,4 +225,5 @@ module.exports = {
   deleteAccountServices,
   getTotalBalanceService,
   checkExistAccount,
+  getAccountDisplayService,
 };

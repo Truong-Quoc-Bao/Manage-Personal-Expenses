@@ -1,18 +1,27 @@
 import axiosInstance from "./axiosInstance";
 
-const USER_ID = "4f4b144d-e3f8-4e6b-9e32-408030a85698";
+/** Analytics routes accept `me` as :userId; server resolves from JWT. */
+const ANALYTICS_USER_SEGMENT = "me";
 
 export const analyticsApi = {
   getMonthlyReports: () =>
-    axiosInstance.get(`/api/analytics/monthly_reports/${USER_ID}`),
+    axiosInstance.get(
+      `/api/analytics/monthly_reports/${ANALYTICS_USER_SEGMENT}`
+    ),
 
   getMonthlyReportByMonth: (year: number, month: number) =>
-    axiosInstance.get(`/api/analytics/monthly_reports/${USER_ID}/by_month`, {
-      params: { year, month },
-    }),
+    axiosInstance.get(
+      `/api/analytics/monthly_reports/${ANALYTICS_USER_SEGMENT}/by_month`,
+      {
+        params: { year, month },
+      }
+    ),
 
   getRecentMonthlyReports: (limit = 6) =>
-    axiosInstance.get(`/api/analytics/monthly_reports/${USER_ID}/recent`, {
-      params: { limit },
-    }),
+    axiosInstance.get(
+      `/api/analytics/monthly_reports/${ANALYTICS_USER_SEGMENT}/recent`,
+      {
+        params: { limit },
+      }
+    ),
 };
