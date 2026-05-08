@@ -113,3 +113,10 @@ TestResults/
 # MISC
 # =========================
 *.dbmdl
+
+.claude/
+.agents/
+_bmad/
+_bmad_output/
+AGENTS.md
+CLAUDE.md
