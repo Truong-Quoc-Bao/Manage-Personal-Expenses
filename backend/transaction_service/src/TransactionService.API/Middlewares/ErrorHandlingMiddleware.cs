@@ -17,6 +17,12 @@ namespace TransactionService.API.Middlewares
             {
                 await _next(context);
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                context.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
+                context.Response.ContentType = "application/json";
+                await context.Response.WriteAsJsonAsync(new { Message = ex.Message });
+            }
             catch (Exception ex)
             {
                 var errorId = Guid.NewGuid();

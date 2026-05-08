@@ -1,3 +1,4 @@
+using TransactionService.Core.DTOs;
 using TransactionService.Core.Entities;
 using TransactionService.Core.Interfaces;
 using TransactionService.Infrastructure.Data;
@@ -14,15 +15,36 @@ namespace TransactionService.Infrastructure.Repositories
             _context = context;
         }
 
-        public async Task<List<Transaction>> GetAllTransactionsAsync(Guid userId, Guid? categoryId = null)
+        public async Task<(List<Transaction> Items, int TotalCount)> GetAllTransactionsAsync(Guid userId, TransactionFilterParams filters)
         {
             var query = _context.Transactions.Where(t => t.UserId == userId);
-            if (categoryId.HasValue)
-            {
-                query = query.Where(t => t.CategoryId == categoryId.Value);
-            }
 
-            return await query.ToListAsync();
+            if (filters.CategoryId.HasValue)
+                query = query.Where(t => t.CategoryId == filters.CategoryId.Value);
+
+            if (filters.AccountId.HasValue)
+                query = query.Where(t => t.AccountId == filters.AccountId.Value);
+
+            if (!string.IsNullOrEmpty(filters.TransactionType)
+                && Enum.TryParse<TransactionType>(filters.TransactionType, true, out var txType))
+                query = query.Where(t => t.TransactionType == txType);
+
+            if (filters.DateFrom.HasValue)
+                query = query.Where(t => t.Date >= filters.DateFrom.Value);
+
+            if (filters.DateTo.HasValue)
+                query = query.Where(t => t.Date <= filters.DateTo.Value);
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .OrderByDescending(t => t.Date)
+                .ThenByDescending(t => t.CreatedAt)
+                .Skip((filters.Page - 1) * filters.PageSize)
+                .Take(filters.PageSize)
+                .ToListAsync();
+
+            return (items, totalCount);
         }
 
         public async Task<Transaction?> GetTransactionByIdAsync(Guid userId, Guid transactionId)
@@ -44,7 +66,14 @@ namespace TransactionService.Infrastructure.Repositories
                 return null;
             }
 
-            _context.Entry(existingTransaction).CurrentValues.SetValues(updatedTransaction);
+            existingTransaction.AccountId = updatedTransaction.AccountId;
+            existingTransaction.CategoryId = updatedTransaction.CategoryId;
+            existingTransaction.Amount = updatedTransaction.Amount;
+            existingTransaction.TransactionType = updatedTransaction.TransactionType;
+            existingTransaction.Description = updatedTransaction.Description;
+            existingTransaction.Date = updatedTransaction.Date;
+            existingTransaction.Note = updatedTransaction.Note;
+            existingTransaction.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
             return existingTransaction;

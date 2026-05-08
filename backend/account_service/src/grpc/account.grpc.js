@@ -34,9 +34,22 @@ const getAccountStatus = async (call, callback) => {
     }
 };
 
+const getAccountDisplay = async (call, callback) => {
+    try {
+        const { account_id, user_id } = call.request;
+        const display = await accountService.getAccountDisplayService(account_id, user_id);
+        callback(null, display);
+    } catch (error) {
+        callback({
+            code: grpc.status.INTERNAL,
+            message: error.message
+        });
+    }
+};
+
 const startGrpcServer = () => {
     const server = new grpc.Server();
-    server.addService(accountProto.service, { getAccountStatus });
+    server.addService(accountProto.service, { getAccountStatus, getAccountDisplay });
 
     server.bindAsync(`0.0.0.0:${ACCOUNT_PROTO_PORT}`, grpc.ServerCredentials.createInsecure(), (err, ACCOUNT_PROTO_PORT) => {
         if (err) {

@@ -13,27 +13,56 @@ async function handleTransactionCreated(message) {
     return await accountRepository.updateAccountBalance({ accountId: account.account_id, balance: account.balance });
 }
 
+function reverseBalanceForType(balance, amount, transactionType) {
+    const n = Number(amount);
+    if (transactionType === "Expense") return balance + n;
+    if (transactionType === "Income") return balance - n;
+    return balance;
+}
+
+function applyBalanceForType(balance, amount, transactionType) {
+    const n = Number(amount);
+    if (transactionType === "Expense") return balance - n;
+    if (transactionType === "Income") return balance + n;
+    return balance;
+}
+
 async function handleTransactionUpdated(message) {
-    const transaction = message;
+    const oldAccountId = message.account_id;
+    const newAccountId = message.account_id_update ?? message.account_id;
 
-    const account = await accountRepository.findAccountByAccountId({ accountId: transaction.account_id });
+    const oldAmount = Number(message.amount);
+    const oldType = message.transaction_type;
+    const newAmount =
+        message.amount_update !== undefined && message.amount_update !== null
+            ? Number(message.amount_update)
+            : oldAmount;
+    const newType = message.transaction_type_update ?? oldType;
 
-    if (transaction.TransactionType === "Expense") {
-        account.balance = Number(account.balance) + Number(transaction.Amount);
-    } else if (transaction.TransactionType === "Income") {
-        account.balance = Number(account.balance) - Number(transaction.Amount);
+    if (oldAccountId === newAccountId) {
+        const account = await accountRepository.findAccountByAccountId({ accountId: oldAccountId });
+        let balance = Number(account.balance);
+        balance = reverseBalanceForType(balance, oldAmount, oldType);
+        balance = applyBalanceForType(balance, newAmount, newType);
+        return await accountRepository.updateAccountBalance({
+            accountId: account.account_id,
+            balance,
+        });
     }
 
-    const newAmount = transaction.AmountUpdate !== undefined ? transaction.AmountUpdate : transaction.Amount;
-    const newType = transaction.TransactionTypeUpdate || transaction.TransactionType;
+    const oldAccount = await accountRepository.findAccountByAccountId({ accountId: oldAccountId });
+    const oldBal = reverseBalanceForType(Number(oldAccount.balance), oldAmount, oldType);
+    await accountRepository.updateAccountBalance({
+        accountId: oldAccountId,
+        balance: oldBal,
+    });
 
-    if (newType === "Expense") {
-        account.balance = Number(account.balance) - Number(newAmount);
-    } else if (newType === "Income") {
-        account.balance = Number(account.balance) + Number(newAmount);
-    }
-
-    return await accountRepository.updateAccountBalance({ accountId: account.account_id, balance: account.balance });
+    const newAccount = await accountRepository.findAccountByAccountId({ accountId: newAccountId });
+    const newBal = applyBalanceForType(Number(newAccount.balance), newAmount, newType);
+    return await accountRepository.updateAccountBalance({
+        accountId: newAccountId,
+        balance: newBal,
+    });
 }
 
 async function handleTransactionDeleted(message) {

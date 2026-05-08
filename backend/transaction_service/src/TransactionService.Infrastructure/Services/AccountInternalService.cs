@@ -1,3 +1,4 @@
+using TransactionService.Core.DTOs;
 using TransactionService.Core.Interfaces;
 using TransactionService.Infrastructure.Protos;
 
@@ -29,6 +30,29 @@ namespace TransactionService.Infrastructure.Services
             {
                 Console.WriteLine($"Error calling Account Service: {ex.Message}");
                 return false;
+            }
+        }
+
+        public async Task<AccountDisplayDto> GetAccountDisplayAsync(Guid accountId, Guid userId)
+        {
+            var request = new GetAccountRequest
+            {
+                AccountId = accountId.ToString(),
+                UserId = userId.ToString()
+            };
+            try
+            {
+                var response = await _accountClient.GetAccountDisplayAsync(request);
+                return new AccountDisplayDto
+                {
+                    Found = response.Found,
+                    AccountName = string.IsNullOrEmpty(response.AccountName) ? null : response.AccountName
+                };
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error calling Account Service (display): {ex.Message}");
+                return new AccountDisplayDto { Found = false };
             }
         }
     }

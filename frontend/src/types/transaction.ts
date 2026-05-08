@@ -3,6 +3,7 @@ export type TransactionType = "Income" | "Expense";
 export interface TransactionResponse {
   transId: string;
   accountId: string;
+  accountName: string | null;
   categoryId: string | null;
   categoryName: string | null;
   categoryColor: string | null;
@@ -36,5 +37,19 @@ export interface UpdateTransactionRequest {
 
 export interface TransactionListParams {
   category_id?: string;
-  include_category?: boolean;
+  account_id?: string;
+  transaction_type?: string;
+  date_from?: string;
+  date_to?: string;
+  page?: number;
+  page_size?: number;
+  include_details?: boolean;
+}
+
+export interface PaginatedResult<T> {
+  items: T[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }

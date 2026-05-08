@@ -4,14 +4,19 @@ import type {
   CreateTransactionRequest,
   UpdateTransactionRequest,
   TransactionListParams,
+  PaginatedResult,
 } from '@/types/transaction';
 
 export const transactionsApi = {
   getTransactions: (params?: TransactionListParams) =>
-    axiosInstance.get<TransactionResponse[]>('/api/transactions', { params }),
+    axiosInstance.get<PaginatedResult<TransactionResponse>>('/api/transactions', {
+      params: { include_details: true, ...params },
+    }),
 
-  getTransactionById: (id: string, params?: { include_category?: boolean }) =>
-    axiosInstance.get<TransactionResponse>(`/api/transactions/${id}`, { params }),
+  getTransactionById: (id: string) =>
+    axiosInstance.get<TransactionResponse>(`/api/transactions/${id}`, {
+      params: { include_details: true },
+    }),
 
   createTransaction: (data: CreateTransactionRequest) =>
     axiosInstance.post<TransactionResponse>('/api/transactions', data),

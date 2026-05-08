@@ -1505,6 +1505,7 @@ const service = {
     // }
     const {
       trans_id, user_id, account_id,
+      account_id_update,
       category_id,
       amount, amount_update,
       transaction_type, transaction_type_update,
@@ -1531,7 +1532,7 @@ const service = {
       const newTransaction = {
         trans_id,
         user_id,
-        account_id,
+        account_id: account_id_update ?? account_id,
         category_id,
         amount: Number(amount_update ?? amount),
         transaction_type: transaction_type_update ?? transaction_type,

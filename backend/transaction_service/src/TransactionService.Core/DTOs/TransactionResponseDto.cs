@@ -9,6 +9,8 @@ namespace TransactionService.Core.DTOs
         [Required]
         public Guid AccountId { get; set; }
 
+        public string? AccountName { get; set; }
+
         [Required]
         public Guid? CategoryId { get; set; }
 

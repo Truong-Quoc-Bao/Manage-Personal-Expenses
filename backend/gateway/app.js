@@ -71,6 +71,11 @@ app.use('/api/transactions', authenticate, createProxyMiddleware({
     target: process.env.TRANSACTION_SERVICE_URL,
     changeOrigin: true,
     logLevel: 'debug',
+    onProxyReq: (proxyReq, req) => {
+        if (req.user && req.user.userId) {
+            proxyReq.setHeader('X-User-Id', req.user.userId);
+        }
+    },
     onError: proxyOnError('transactions'),
 }));
 

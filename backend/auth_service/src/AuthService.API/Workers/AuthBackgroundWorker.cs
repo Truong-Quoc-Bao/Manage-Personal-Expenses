@@ -28,7 +28,7 @@ namespace AuthService.API.Workers
                 var authService = scope.ServiceProvider.GetRequiredService<IAuthService>();
 
                 // user.user_create_fail: có thể chỉ có UserId — coi là Fail (Rejected).
-                var event = string.IsNullOrEmpty(message.Status) && !string.IsNullOrEmpty(message.UserId)
+                var consumeEvent = string.IsNullOrEmpty(message.Status) && !string.IsNullOrEmpty(message.UserId)
                     ? new UserRegistrationConsumeEvent
                     {
                         UserId = message.UserId,
@@ -38,9 +38,9 @@ namespace AuthService.API.Workers
                     }
                     : message;
 
-                if (event.Status is "Success" or "Fail")
+                if (consumeEvent.Status is "Success" or "Fail")
                 {
-                    await authService.UpdateStatusUserAsync(event);
+                    await authService.UpdateStatusUserAsync(consumeEvent);
                 }
             });
         }
