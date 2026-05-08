@@ -43,23 +43,37 @@ const deleteBudget = async ({ budgetId }) => {
 };
 const updateBudget = async ({
   budgetId,
+  title,
   categoryId,
   amountLimit,
   dateStart,
 }) => {
+  const startDate = new Date(dateStart);
+
+  const dateEnd = new Date(
+    startDate.getFullYear(),
+    startDate.getMonth() + 1,
+    0
+  );
+
   return prisma.budget.update({
     where: {
       budget_id: budgetId,
     },
     data: {
+      title,
       category_id: categoryId,
       amount_limit: amountLimit,
-      date_start: dateStart,
+      date_start: startDate,
+      date_end: dateEnd,
     },
     select: {
+      title: true,
+      budget_id: true,
       category_id: true,
       amount_limit: true,
       date_start: true,
+      date_end: true,
     },
   });
 };
@@ -82,6 +96,7 @@ const findBudgetByBudgetId = async ({ userId, budgetId }) => {
   });
 };
 const createBudgetId = async ({
+  title,
   userId,
   categoryId,
   amountLimit,
@@ -97,6 +112,7 @@ const createBudgetId = async ({
 
   return prisma.budget.create({
     data: {
+      title: title,
       user_id: userId,
       category_id: categoryId,
       amount_limit: amountLimit,
@@ -105,7 +121,9 @@ const createBudgetId = async ({
       date_end: dateEnd,
     },
     select: {
+      title: true,
       budget_id: true,
+      category_id: true,
       amount_limit: true,
       date_start: true,
       date_end: true,
@@ -121,7 +139,7 @@ const findBudgets = async ({ userId, categoryId, dateStart }) => {
   if (dateStart) {
     const dateFilter = buildDateFilter(dateStart);
     if (dateFilter) {
-      where.dateStart = dateFilter;
+      where.date_start = dateFilter;
     }
   }
 
@@ -132,18 +150,8 @@ const findBudgets = async ({ userId, categoryId, dateStart }) => {
 
 // MQ budget -> category
 
-const findCategoryByIdAndUserId = async ({ categoryId, userId }) => {
-  return prisma.budget.findFirst({
-    where: {
-      category_id: categoryId,
-      user_id: userId,
-    },
-  });
-};
-
 module.exports = {
   findBudgets,
-  findCategoryByIdAndUserId,
   findBudgetByBudgetId,
   createBudgetId,
   findDateByCategory,

@@ -1,7 +1,7 @@
 const USER_STATUS = {
     PENDING: 'Pending',
     SUCCESS: 'Success',
-    FAILED: 'Failed',
+    FAILED: 'Fail',
 };
 
 module.exports = { USER_STATUS };

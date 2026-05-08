@@ -38,9 +38,26 @@ const getCategoryStatus = async (call, callback) => {
     }
 };
 
+const getCategoryDisplay = async (call, callback) => {
+    try {
+        const { category_id, user_id, transaction_type } = call.request;
+        const result = await categoryService.getCategoryForDisplay({
+            categoryId: category_id,
+            userId: user_id,
+            transactionType: transaction_type
+        });
+        callback(null, result);
+    } catch (error) {
+        callback({
+            code: grpc.status.INTERNAL,
+            message: error.message
+        });
+    }
+};
+
 const startGrpcServer = () => {
     const server = new grpc.Server();
-    server.addService(categoryProto.service, { getCategoryStatus });
+    server.addService(categoryProto.service, { getCategoryStatus, getCategoryDisplay });
 
     server.bindAsync(`0.0.0.0:${CATEGORY_PROTO_PORT}`, grpc.ServerCredentials.createInsecure(), (err, CATEGORY_PROTO_PORT) => {
         if (err) {

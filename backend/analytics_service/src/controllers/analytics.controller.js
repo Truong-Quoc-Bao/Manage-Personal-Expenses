@@ -6,6 +6,15 @@ const service = require('../services/analytics.service.js');
 // USER ANALYTICS
 // ================================================================
 
+function requireUserId(req, res) {
+  const userId = req.user?.userId ?? req.user?.user_id;
+  if (userId == null || userId === "") {
+    res.status(401).json({ success: false, message: "Unauthorized" });
+    return null;
+  }
+  return String(userId);
+}
+
 const getUserAnalytics = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -82,7 +91,8 @@ const deleteUserAnalytics = async (req, res) => {
 
 const getAnomalyLogs = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = requireUserId(req, res);
+    if (!userId) return;
     const data = await service.getAnomalyLogs(userId);
     return res.status(200).json({ success: true, data });
   } catch (err) {
@@ -103,7 +113,8 @@ const getAnomalyLogById = async (req, res) => {
 
 const getUnreadAnomalyLogs = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = requireUserId(req, res);
+    if (!userId) return;
     const data = await service.getUnreadAnomalyLogs(userId);
     return res.status(200).json({ success: true, data });
   } catch (err) {
@@ -113,7 +124,8 @@ const getUnreadAnomalyLogs = async (req, res) => {
 
 const countUnreadAnomalyLogs = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = requireUserId(req, res);
+    if (!userId) return;
     const count = await service.countUnreadAnomalyLogs(userId);
     return res.status(200).json({ success: true, data: { count } });
   } catch (err) {
@@ -123,7 +135,8 @@ const countUnreadAnomalyLogs = async (req, res) => {
 
 const createAnomalyLog = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = requireUserId(req, res);
+    if (!userId) return;
     const data = req.body;
 
     if (!data.type || !data.severity || !data.description) {
@@ -198,7 +211,8 @@ const deleteAllAnomalyLogs = async (req, res) => {
 
 const getCategorySummary = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = requireUserId(req, res);
+    if (!userId) return;
     const data = await service.getCategorySummary(userId);
     return res.status(200).json({ success: true, data });
   } catch (err) {
@@ -208,7 +222,8 @@ const getCategorySummary = async (req, res) => {
 
 const getCategorySummaryByMonth = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = requireUserId(req, res);
+    if (!userId) return;
     const { year, month } = req.query;
 
     if (!year || !month) {
@@ -235,7 +250,8 @@ const getCategorySummaryById = async (req, res) => {
 
 const getOverBudgetCategories = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = requireUserId(req, res);
+    if (!userId) return;
     const data = await service.getOverBudgetCategories(userId);
     return res.status(200).json({ success: true, data });
   } catch (err) {
@@ -315,7 +331,8 @@ const deleteAllCategorySummary = async (req, res) => {
 
 const getDashboardCache = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = requireUserId(req, res);
+    if (!userId) return;
     const data = await service.getDashboardCache(userId);
     return res.status(200).json({ success: true, data });
   } catch (err) {
@@ -335,7 +352,8 @@ const getDashboardCachebyAccount = async (req, res) => {
 
 const upsertDashboardCache = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = requireUserId(req, res);
+    if (!userId) return;
     const data = req.body;
 
     if (!data || !data.account_id || Object.keys(data).length === 0) {
@@ -354,7 +372,8 @@ const upsertDashboardCache = async (req, res) => {
 
 const invalidateDashboardCache = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = requireUserId(req, res);
+    if (!userId) return;
     const result = await service.invalidateDashboardCache(userId);
     return res.status(200).json({ success: true, message: 'Dashboard cache invalidated', data: result });
   } catch (err) {
@@ -368,7 +387,8 @@ const invalidateDashboardCache = async (req, res) => {
 
 const getMonthlyReport = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = requireUserId(req, res);
+    if (!userId) return;
 
     if (!userId) {
       return res.status(400).json({
@@ -394,7 +414,8 @@ const getMonthlyReport = async (req, res) => {
 
 const getMonthlyReportByMonth = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = requireUserId(req, res);
+    if (!userId) return;
     const { year, month } = req.query;
 
     if (!year || !month) {
@@ -411,7 +432,8 @@ const getMonthlyReportByMonth = async (req, res) => {
 
 const getRecentMonthlyReports = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = requireUserId(req, res);
+    if (!userId) return;
     const limit = Number(req.query.limit) || 6;
     const data = await service.getRecentMonthlyReports(userId, limit);
     return res.status(200).json({ success: true, data });
@@ -422,7 +444,8 @@ const getRecentMonthlyReports = async (req, res) => {
 
 const getMonthlyReportById = async (req, res) => {
   try {
-    const { id } = req.params;
+    const userId = requireUserId(req, res);
+    if (!userId) return;
     const data = await service.getMonthlyReportById(id);
     return res.status(200).json({ success: true, data });
   } catch (err) {
@@ -503,7 +526,8 @@ const deleteAllMonthlyReports = async (req, res) => {
 
 const getSpendingTrend = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = requireUserId(req, res);
+    if (!userId) return;
     const data = await service.getSpendingTrend(userId);
     return res.status(200).json({ success: true, data });
   } catch (err) {
@@ -513,7 +537,10 @@ const getSpendingTrend = async (req, res) => {
 
 const getSpendingTrendByCategory = async (req, res) => {
   try {
-    const { userId, categoryId } = req.params;
+    const { categoryId } = req.params;
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
     const data = await service.getSpendingTrendByCategory(userId, categoryId);
     return res.status(200).json({ success: true, data });
   } catch (err) {
@@ -605,7 +632,8 @@ const deleteAllSpendingTrends = async (req, res) => {
 
 const getTransactions = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = requireUserId(req, res);
+    if (!userId) return;
     const limit = Number(req.query.limit) || 20;
     const skip = Number(req.query.skip) || 0;
     const data = await service.getTransactions(userId, { limit, skip });

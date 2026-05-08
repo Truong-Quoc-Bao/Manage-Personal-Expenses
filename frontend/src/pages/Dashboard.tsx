@@ -191,7 +191,7 @@ export function Dashboard() {
               <p className="text-lg text-gray-600">
                 Chào Bảo!{' '}
                 {stats
-                  ? `Tháng ${stats.month} này Bảo đã chi ${formatCurrency(stats.expense)}`
+                  ? Tháng ${stats.month} này Bảo đã chi ${formatCurrency(stats.expense)}
                   : 'Đây là tổng quan tài chính của bạn.'}
               </p>
             </div>

@@ -9,8 +9,16 @@ namespace TransactionService.Core.DTOs
         [Required]
         public Guid AccountId { get; set; }
 
+        public string? AccountName { get; set; }
+
         [Required]
         public Guid? CategoryId { get; set; }
+
+        public string? CategoryName { get; set; }
+
+        public string? CategoryColor { get; set; }
+
+        public string? CategoryIconCode { get; set; }
 
         [Required]
         public decimal Amount { get; set; }
@@ -20,7 +28,7 @@ namespace TransactionService.Core.DTOs
 
         public string? Description { get; set; }
 
-        public DateOnly Date { get; set; }
+        public DateTime Date { get; set; }
 
         public string? Note { get; set; }
     }

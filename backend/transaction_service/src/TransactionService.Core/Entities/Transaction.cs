@@ -38,7 +38,7 @@ namespace TransactionService.Core.Entities
         public string? Description { get; set; }
 
         [Column("date")]
-        public DateOnly Date { get; set; }
+        public DateTime Date { get; set; }
 
         [MaxLength(255)]
         [Column("note")]

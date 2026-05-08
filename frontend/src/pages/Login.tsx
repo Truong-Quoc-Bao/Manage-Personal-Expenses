@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
+import { authApi, getAuthErrorMessage, takeAccessToken } from "../api/auth.api";
 
 export function Login() {
   const navigate = useNavigate();
@@ -23,11 +24,22 @@ export function Login() {
         return;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const { data } = await authApi.login({
+        email: formData.email.trim(),
+        password: formData.password,
+      });
+
+      const token = takeAccessToken(data);
+      if (!token) {
+        toast.error("Phản hồi đăng nhập không hợp lệ (thiếu token).");
+        return;
+      }
+
+      localStorage.setItem("token", token);
       toast.success("Đăng nhập thành công!");
       navigate("/dashboard");
     } catch (error) {
-      toast.error("Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin!");
+      toast.error(getAuthErrorMessage(error, "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin!"));
     } finally {
       setLoading(false);
     }
@@ -47,6 +59,7 @@ export function Login() {
             Kiểm soát chi tiêu, nắm bắt tài chính
           </p>
         </div>
+        
 
         <div className="bg-white rounded-3xl shadow-xl p-8 md:p-9">
           <div className="mb-6">

@@ -155,7 +155,22 @@ http://localhost:3004/spending_trends/detail/{id}
 ```
 
 ---
+POST (create)
+http://localhost:3000/api/transactions
 
+body
+{
+  "account_id": "d4ffbef0-8bcc-445e-9ea3-7bc854e2ad76",
+  "category_id": "cf4dfdab-3dda-4ae1-a1b2-09364b6c5d01",
+  "amount": 130000.00,
+  "transaction_type": "Income",
+  "description": "Tiền lương ",
+  "date": "2026-05-05",
+  "note": "Giao dịch tự động qua ứng dụng"
+}
+
+
+---
 ## PUT
 
 ### User Analytics — Cập nhật
@@ -280,45 +295,7 @@ http://localhost:3004/user_analytics/4f4b144d-e3f8-4e6b-9e32-408030a85698
   }
 }
 ```
-
----
-
-### Anomaly Logs — Cập nhật log
-```
-PUT
-
-http://localhost:3004/anomaly_logs/detail/{logId}
-```
-```json
-{
-  "type": "category_spike",
-  "severity": "low",
-  "description": "Chi tiêu danh mục 'Di chuyển' tháng 4/2026 tăng nhẹ 12% so với tháng trước. Trong ngưỡng bình thường.",
-  "amount_flagged": 1205000,
-  "expected_range": {
-    "min": 870759,
-    "max": 1221508
-  },
-  "is_read": true,
-  "is_dismissed": false
-}
-```
-
-### Anomaly Logs — Đánh dấu tất cả đã đọc (PATCH)
-```
-PATCH
-
-http://localhost:3004/anomaly_logs/4f4b144d-e3f8-4e6b-9e32-408030a85698/read_all
-```
-
-### Anomaly Logs — Dismiss một log (PATCH)
-```
-PATCH
-
-http://localhost:3004/anomaly_logs/detail/{logId}/dismiss
-```
-
----
+<!--  -->
 
 ### Category Summary — Upsert
 ```
@@ -500,7 +477,7 @@ http://localhost:3004/monthly_reports/detail/{id}
   "status": "reviewed"
 }
 ```
-
+<!-- 
 ---
 
 ### Spending Trend — Upsert
@@ -540,6 +517,44 @@ http://localhost:3004/spending_trends/4f4b144d-e3f8-4e6b-9e32-408030a85698/upser
 }
 ```
 
+---
+
+### Anomaly Logs — Cập nhật log
+```
+PUT
+
+http://localhost:3004/anomaly_logs/detail/{logId}
+```
+```json
+{
+  "type": "category_spike",
+  "severity": "low",
+  "description": "Chi tiêu danh mục 'Di chuyển' tháng 4/2026 tăng nhẹ 12% so với tháng trước. Trong ngưỡng bình thường.",
+  "amount_flagged": 1205000,
+  "expected_range": {
+    "min": 870759,
+    "max": 1221508
+  },
+  "is_read": true,
+  "is_dismissed": false
+}
+```
+
+### Anomaly Logs — Đánh dấu tất cả đã đọc (PATCH)
+```
+PATCH
+
+http://localhost:3004/anomaly_logs/4f4b144d-e3f8-4e6b-9e32-408030a85698/read_all
+```
+
+### Anomaly Logs — Dismiss một log (PATCH)
+```
+PATCH
+
+http://localhost:3004/anomaly_logs/detail/{logId}/dismiss
+```
+
+---
 ### Spending Trend — Cập nhật theo _id
 ```
 PUT
@@ -573,52 +588,51 @@ http://localhost:3004/spending_trends/detail/{id}
 }
 ```
 
----
+--- -->
 
-### Transactions — Cập nhật
-```
-PUT
 
-http://localhost:3004/transactions/detail/trans-chau-test-001
-```
-```json
+
+# các document trong collection
+## user_analytics
 {
-  "amount": 70000,
-  "description": "Highlands Coffee - Quan 1 (updated)",
-  "note": "Them banh mi"
-}
-```
-
----
-<!-- 
-## POST
-
-### User Analytics — Tạo mới
-```
-POST
-
-http://localhost:3004/user_analytics/4f4b144d-e3f8-4e6b-9e32-408030a85698
-```
-```json
-{
-  "user_id": "mcb96e5d-3cd9-40dc-ad99-635f08456301",
-  "display_name": "Phucccccccccccccccccccccccccc",
-  "total_income": 0,
-  "total_expense": 36290000,
-  "current_balance": -36290000,
+  "_id": {
+    "$oid": "69f998847332b5dea0d8fc9b"
+  },
+  "user_id": "4f4b144d-e3f8-4e6b-9e32-408030a85698",
+  "display_name": "Dat đẹp trai hơn",
+  "account_id": [
+    "d722044d-7259-4a95-9a9f-930935073828",
+    "d4ffbef0-8bcc-445e-9ea3-7bc854e2ad76",
+    "d922044d-7259-4a95-9a9f-930935073821",
+    "f9a729df-e5cc-4cf5-88ef-cc2a2cb581e2",
+    "eecf4602-ff44-4526-a7d7-e7f56e8d4855"
+  ],
+  "total_income": 165400000,
+  "total_expense": 102920000,
+  "current_balance": 62480000,
   "current_month": {
     "year": 2026,
-    "month": 4,
-    "income": 0,
-    "expense": 2199000,
-    "savings": -2199000,
-    "savings_rate": 0
+    "month": 3,
+    "income": 14738000,
+    "expense": 8168000,
+    "savings": 6570000,
+    "savings_rate": 44.58
   },
   "top_categories": [
     {
+      "category_id": "9b870dba-7323-4dfe-9da5-54dfef366f52",
+      "category_name": "Entertainment",
+      "total_amount": 59327000
+    },
+    {
+      "category_id": "615b0d7a-5ace-4297-a404-0d67b7b0087a",
+      "category_name": "Ăn uống",
+      "total_amount": 27901000
+    },
+    {
       "category_id": "c6e31bec-9e96-4981-832d-e8a38feaa9e6",
-      "category_name": "Coffee",
-      "total_amount": 14351000
+      "category_name": "Di chuyển",
+      "total_amount": 15692000
     }
   ],
   "ai_insights": {
@@ -628,327 +642,508 @@ http://localhost:3004/user_analytics/4f4b144d-e3f8-4e6b-9e32-408030a85698
   },
   "budget_alert": {
     "enabled": true,
-    "alerts": [],
-    "last_checked": null
+    "alerts": [
+      {
+        "category_id": "9b870dba-7323-4dfe-9da5-54dfef366f52",
+        "category_name": "Entertainment",
+        "budget_limit": 5000000,
+        "current_spent": 4921000,
+        "percent_used": 98.42,
+        "status": "critical",
+        "alerted_at": {
+          "$date": "2026-03-29T08:00:00.000Z"
+        }
+      },
+      {
+        "category_id": "615b0d7a-5ace-4297-a404-0d67b7b0087a",
+        "category_name": "Ăn uống",
+        "budget_limit": 3000000,
+        "current_spent": 2172000,
+        "percent_used": 72.4,
+        "status": "warning",
+        "alerted_at": {
+          "$date": "2026-03-25T08:00:00.000Z"
+        }
+      }
+    ],
+    "last_checked": {
+      "$date": "2026-03-30T23:00:00.000Z"
+    }
   },
   "goal_tracking": {
     "goals": [
       {
-        "goal_id": "goal-chau-001",
-        "title": "Tiet kiem 3 thang chi phi",
-        "target_amount": 5000000,
-        "current_amount": 0,
-        "deadline": "2026-06-30T00:00:00.000Z",
-        "status": "in_progress",
-        "note": "Can cat giam ca phe"
+        "goal_id": "goal-dat-001",
+        "title": "Quỹ khẩn cấp 6 tháng",
+        "target_amount": 50000000,
+        "current_amount": 60660000,
+        "deadline": {
+          "$date": "2026-06-30T00:00:00.000Z"
+        },
+        "status": "completed",
+        "note": "Đã đạt mục tiêu, tiếp tục duy trì"
+      },
+      {
+        "goal_id": "goal-dat-002",
+        "title": "Giảm chi tiêu Entertainment",
+        "target_amount": 4000000,
+        "current_amount": 4921000,
+        "deadline": {
+          "$date": "2026-04-30T00:00:00.000Z"
+        },
+        "status": "exceeded",
+        "note": "Đã vượt ngân sách Entertainment tháng này"
       }
     ]
   },
   "streak": {
-    "saving_months": 0,
+    "saving_months": 15,
     "unit": "months"
+  },
+  "created_at": {
+    "$date": "2026-03-27T17:23:02.000Z"
+  },
+  "updated_at": {
+    "$date": "2026-05-07T02:21:53.880Z"
   }
 }
-```
-
----
-
-### Anomaly Logs — Tạo mới
-```
-POST
-
-http://localhost:3004/anomaly_logs/4f4b144d-e3f8-4e6b-9e32-408030a85698
-```
-```json
+## anomaly_logs
 {
+  "_id": {
+    "$oid": "69f998a37332b5dea0d8fd50"
+  },
+  "user_id": "4f4b144d-e3f8-4e6b-9e32-408030a85698",
+  "account_id": "d722044d-7259-4a95-9a9f-930935073828",
   "type": "category_spike",
-  "severity": "high",
-  "description": "Chi tieu Coffee tang 80% so voi thang truoc",
+  "severity": "medium",
+  "description": "Chi tiêu danh mục 'Di chuyển' tháng 9/2025 tăng 54.4% so với tháng trước (1,292,000đ vs 837,000đ). Có thể do phát sinh ngoài kế hoạch.",
   "transaction_id": null,
   "category_id": "c6e31bec-9e96-4981-832d-e8a38feaa9e6",
-  "amount_flagged": 670000,
+  "amount_flagged": 1292000,
   "expected_range": {
-    "min": 200000,
-    "max": 400000
+    "min": 870759,
+    "max": 1221508
   },
   "is_read": false,
   "is_dismissed": false,
-  "detected_at": "2026-04-14T08:00:00.000Z"
-}
-```
-
----
-
-### Category Summary — Tạo mới
-```
-POST
-
-http://localhost:3004/category_summary/4f4b144d-e3f8-4e6b-9e32-408030a85698
-```
-```json
-{
-  "category_id": "c6e31bec-9e96-4981-832d-e8a38feaa9e6",
-  "category_name": "Coffee",
-  "category_type": "expense",
-  "year": 2026,
-  "month": 4,
-  "total_amount": 320000,
-  "transaction_count": 5,
-  "budget_limit": 1000000,
-  "is_over_budget": false,
-  "daily_breakdown": [
-    { "day": 1,  "amount": 55000 },
-    { "day": 3,  "amount": 65000 },
-    { "day": 7,  "amount": 80000 },
-    { "day": 10, "amount": 55000 },
-    { "day": 14, "amount": 65000 }
-  ]
-}
-```
-
----
-
-### Monthly Report — Tạo mới
-```
-POST
-
-http://localhost:3004/monthly_reports/4f4b144d-e3f8-4e6b-9e32-408030a85698
-```
-```json
-{
-  "year": 2026,
-  "month": 4,
-  "summary": {
-    "total_income": 0,
-    "total_expense": 320000,
-    "savings": -320000,
-    "savings_rate": 0,
-    "transaction_count": 5
-  },
-  "income_by_category": [],
-  "expense_by_category": [
-    {
-      "category_id": "c6e31bec-9e96-4981-832d-e8a38feaa9e6",
-      "category_name": "Coffee",
-      "amount": 320000
-    }
-  ],
-  "weekly_trend": [
-    { "week": 1, "income": 0, "expense": 120000 },
-    { "week": 2, "income": 0, "expense": 145000 },
-    { "week": 3, "income": 0, "expense": 55000 }
-  ],
-  "daily_cashflow": [
-    { "day": 1,  "income": 0, "expense": 55000 },
-    { "day": 3,  "income": 0, "expense": 65000 },
-    { "day": 7,  "income": 0, "expense": 80000 },
-    { "day": 10, "income": 0, "expense": 55000 },
-    { "day": 14, "income": 0, "expense": 65000 }
-  ],
-  "top_expenses": [
-    {
-      "trans_id": "trans-chau-test-001",
-      "description": "Highlands Coffee",
-      "amount": 80000,
-      "category_id": "c6e31bec-9e96-4981-832d-e8a38feaa9e6",
-      "date": "2026-04-07T00:00:00.000Z"
-    }
-  ],
-  "comparison": {
-    "prev_income": 0,
-    "prev_expense": 2199000,
-    "income_change_pct": 0,
-    "expense_change_pct": -85.45
-  },
-  "ai_report": {
-    "generated": false,
-    "content": null,
-    "generated_at": null
-  },
-  "status": "draft",
-  "generated_at": "2026-04-14T10:00:00.000Z"
-}
-```
-
----
-
-### Spending Trend — Tạo mới
-```
-POST
-
-http://localhost:3004/spending_trends/4f4b144d-e3f8-4e6b-9e32-408030a85698
-```
-```json
-{
-  "category_id": "c6e31bec-9e96-4981-832d-e8a38feaa9e6",
-  "category_name": "Coffee",
-  "category_type": "expense",
-  "monthly_data": [
-    { "year": 2026, "month": 1, "amount": 580000 },
-    { "year": 2026, "month": 2, "amount": 620000 },
-    { "year": 2026, "month": 3, "amount": 670000 },
-    { "year": 2026, "month": 4, "amount": 320000 }
-  ],
-  "stats": {
-    "total_amount": 2190000,
-    "avg_monthly": 547500,
-    "max_month": { "year": 2026, "month": 3, "amount": 670000 },
-    "min_month": { "year": 2026, "month": 4, "amount": 320000 },
-    "last_updated": "2026-04-14T10:00:00.000Z"
+  "detected_at": {
+    "$date": "2025-09-28T08:00:00.000Z"
   }
 }
-```
-
----
-
-### Transactions — Tạo mới
-```
-POST
-
-http://localhost:3004/transactions/4f4b144d-e3f8-4e6b-9e32-408030a85698
-```
-```json
+## category_summary
 {
-  "trans_id": "trans-chau-test-001",
-  "category_id": "c6e31bec-9e96-4981-832d-e8a38feaa9e6",
-  "amount": 65000,
-  "transaction_type": "expense",
-  "description": "Highlands Coffee - Quan 1",
-  "date": "2026-04-14T08:30:00.000Z",
-  "note": "Ca phe buoi sang voi dong nghiep"
+  "_id": {
+    "$oid": "69f998907332b5dea0d8fcae"
+  },
+  "user_id": "4f4b144d-e3f8-4e6b-9e32-408030a85698",
+  "account_id": "d722044d-7259-4a95-9a9f-930935073828",
+  "category_id": "615b0d7a-5ace-4297-a404-0d67b7b0087a",
+  "category_name": "Ăn uống",
+  "category_type": "expense",
+  "year": 2025,
+  "month": 3,
+  "total_amount": 2093000,
+  "transaction_count": 26,
+  "budget_limit": 0,
+  "is_over_budget": false,
+  "daily_breakdown": [
+    {
+      "day": 2,
+      "amount": 222000,
+      "trans_id": [
+        "c423dcd8-2899-4341-8db0-f86c82754e75",
+        "3ac4c4ab-1839-4561-8f06-aeada581df27"
+      ]
+    },
+    {
+      "day": 3,
+      "amount": 71000,
+      "trans_id": [
+        "6885be11-ef8c-445c-8d9f-e71ec0ac8b62",
+        "a8557d1a-dfaf-463b-88c5-07639318274d"
+      ]
+    },
+    {
+      "day": 4,
+      "amount": 100000,
+      "trans_id": [
+        "cce9da8f-59c6-4a0f-853c-3ec377188fd7"
+      ]
+    },
+    {
+      "day": 5,
+      "amount": 115000,
+      "trans_id": [
+        "b8fdaa27-0d4b-4a6e-9d0e-c70329be1a29"
+      ]
+    },
+    {
+      "day": 6,
+      "amount": 52000,
+      "trans_id": [
+        "692ecfd5-836c-4612-8ead-2dbd55c9d442"
+      ]
+    },
+    {
+      "day": 8,
+      "amount": 147000,
+      "trans_id": [
+        "72998db4-2ba5-431b-b276-be6c112f6a01",
+        "0d6e79ea-a61d-4abc-b3b5-e92579ebe944"
+      ]
+    },
+    {
+      "day": 9,
+      "amount": 77000,
+      "trans_id": [
+        "f3e4dbd8-03b0-4005-851e-30592e48ccea"
+      ]
+    },
+    {
+      "day": 10,
+      "amount": 78000,
+      "trans_id": [
+        "1871367b-47b6-4c46-8cb2-ab18e9c5692a"
+      ]
+    },
+    {
+      "day": 12,
+      "amount": 57000,
+      "trans_id": [
+        "6773df66-2c1f-445f-a770-fb4e41c4f16a"
+      ]
+    },
+    {
+      "day": 14,
+      "amount": 21000,
+      "trans_id": [
+        "f8b3a0df-3262-437b-a7d3-7f67470028d7"
+      ]
+    },
+    {
+      "day": 15,
+      "amount": 77000,
+      "trans_id": [
+        "33178908-4b49-4143-b7ab-280509a9924e"
+      ]
+    },
+    {
+      "day": 17,
+      "amount": 195000,
+      "trans_id": [
+        "ab761aa4-a51d-4879-8843-186fb4f1a905",
+        "e98aa6f1-f8ae-40be-a470-f715035128f9"
+      ]
+    },
+    {
+      "day": 19,
+      "amount": 217000,
+      "trans_id": [
+        "0a4c9d0b-a558-4404-8ab4-9fba5a7de1bc",
+        "64c7b4f5-9ef6-44bd-98b9-57575bac3f81"
+      ]
+    },
+    {
+      "day": 21,
+      "amount": 88000,
+      "trans_id": [
+        "b12c0b2a-8cab-4303-b638-40ee9bec9806"
+      ]
+    },
+    {
+      "day": 22,
+      "amount": 98000,
+      "trans_id": [
+        "ff192ec0-5a9b-4c7a-8370-1e23aff30a3e"
+      ]
+    },
+    {
+      "day": 23,
+      "amount": 45000,
+      "trans_id": [
+        "48bf781b-6097-4d1c-b1db-a138846f40bb"
+      ]
+    },
+    {
+      "day": 24,
+      "amount": 133000,
+      "trans_id": [
+        "46e6abc5-278a-4ea2-aad6-e34708a3f9a7",
+        "78464d16-64a6-47e6-b32c-a9842a021882"
+      ]
+    },
+    {
+      "day": 29,
+      "amount": 147000,
+      "trans_id": [
+        "6f0f96e5-e8fb-424e-bf66-9df1d146865f"
+      ]
+    },
+    {
+      "day": 30,
+      "amount": 91000,
+      "trans_id": [
+        "d93401d2-ee33-4fb9-9319-751316fcd79e"
+      ]
+    },
+    {
+      "day": 31,
+      "amount": 62000,
+      "trans_id": [
+        "b7abfb44-7b6a-4a5b-a01f-2fd2bd6e1239"
+      ]
+    }
+  ],
+  "updated_at": {
+    "$date": "2025-03-28T12:00:00.000Z"
+  }
 }
-```
-
----
-
-
-
-## DELETE
-
-### User Analytics — Xóa
-```
-DELETE
-
-http://localhost:3004/user_analytics/4f4b144d-e3f8-4e6b-9e32-408030a85698
-```
-
----
-
-### Anomaly Logs — Xóa một log
-```
-DELETE
-
-http://localhost:3004/anomaly_logs/detail/{logId}
-```
-
-### Anomaly Logs — Xóa tất cả
-```
-DELETE
-
-http://localhost:3004/anomaly_logs/4f4b144d-e3f8-4e6b-9e32-408030a85698
-```
-
----
-
-### Category Summary — Xóa một summary
-```
-DELETE
-
-http://localhost:3004/category_summary/detail/{id}
-```
-
-### Category Summary — Xóa tất cả
-```
-DELETE
-
-http://localhost:3004/category_summary/4f4b144d-e3f8-4e6b-9e32-408030a85698
-```
-
----
-
-### Dashboard Cache — Invalidate cache
-```
-DELETE
-
-http://localhost:3004/dashboard_cache/4f4b144d-e3f8-4e6b-9e32-408030a85698
-```
-
----
-
-### Monthly Report — Xóa một report
-```
-DELETE
-
-http://localhost:3004/monthly_reports/detail/{id}
-```
-
-### Monthly Report — Xóa tất cả
-```
-DELETE
-
-http://localhost:3004/monthly_reports/4f4b144d-e3f8-4e6b-9e32-408030a85698
-```
-
----
-
-### Spending Trend — Xóa một trend
-```
-DELETE
-
-http://localhost:3004/spending_trends/detail/{id}
-```
-
-### Spending Trend — Xóa tất cả
-```
-DELETE
-
-http://localhost:3004/spending_trends/4f4b144d-e3f8-4e6b-9e32-408030a85698
-```
-
----
-
-### Transactions — Xóa
-```
-DELETE
-
-http://localhost:3004/transactions/detail/trans-chau-test-001
-```
-
----
-
-## Thứ tự test gợi ý
-
-```
-1.  POST   user_analytics           tao truoc
-2.  GET    user_analytics
-3.  PUT    user_analytics
-4.  POST   transactions              luu trans_id
-5.  GET    transactions by trans_id
-6.  GET    transactions date_range
-7.  GET    transactions by category
-8.  PUT    transactions
-9.  POST   anomaly_logs              luu logId tu response._id
-10. GET    anomaly_logs
-11. GET    anomaly_logs unread
-12. GET    anomaly_logs unread/count
-13. GET    anomaly_logs detail/logId
-14. PUT    anomaly_logs detail
-15. PATCH  anomaly_logs read_all
-16. PATCH  anomaly_logs dismiss
-17. POST   category_summary
-18. PUT    category_summary upsert
-19. GET    category_summary by_month
-20. GET    category_summary over_budget
-21. PUT    dashboard_cache upsert
-22. GET    dashboard_cache
-23. POST   monthly_reports
-24. PUT    monthly_reports upsert
-25. GET    monthly_reports by_month
-26. GET    monthly_reports recent
-27. PUT    monthly_reports detail
-28. POST   spending_trends
-29. PUT    spending_trends upsert
-30. GET    spending_trends by category
-31. PUT    spending_trends detail
-32. DELETE (don dep nguoc lai neu can)
-``` -->
+## ## dashboard_cache
+{
+  "_id": {
+    "$oid": "69f998957332b5dea0d8fd2d"
+  },
+  "user_id": "4f4b144d-e3f8-4e6b-9e32-408030a85698",
+  "account_id": "d722044d-7259-4a95-9a9f-930935073828",
+  "summary": {
+    "current_balance": 60000,
+    "monthly_income": 0,
+    "monthly_expense": 3247000,
+    "monthly_savings": -3247000,
+    "savings_rate": 0
+  },
+  "top_categories": [
+    {
+      "category_id": "615b0d7a-5ace-4297-a404-0d67b7b0087a",
+      "category_name": "Ăn uống",
+      "total_amount": 27901000
+    },
+    {
+      "category_id": "c6e31bec-9e96-4981-832d-e8a38feaa9e6",
+      "category_name": "Di chuyển",
+      "total_amount": 15692000
+    }
+  ],
+  "recent_transactions": [
+    {
+      "trans_id": "ec1d4251-2691-4784-9fa5-744c793e5b66",
+      "description": "Cơm tấm",
+      "amount": 98000,
+      "type": "expense",
+      "date": "2026-03-30",
+      "category_id": "615b0d7a-5ace-4297-a404-0d67b7b0087a"
+    },
+    {
+      "trans_id": "3a66604e-cdbd-4a50-95c6-92e6691481e2",
+      "description": "Ăn tối",
+      "amount": 57000,
+      "type": "expense",
+      "date": "2026-03-29",
+      "category_id": "615b0d7a-5ace-4297-a404-0d67b7b0087a"
+    },
+    {
+      "trans_id": "150cbadb-c9b7-4ed2-a572-124a3d8f2f69",
+      "description": "Xăng xe",
+      "amount": 54000,
+      "type": "expense",
+      "date": "2026-03-29",
+      "category_id": "c6e31bec-9e96-4981-832d-e8a38feaa9e6"
+    },
+    {
+      "trans_id": "26efc08a-a1e7-4030-8f6b-c95242b632d4",
+      "description": "Gửi xe",
+      "amount": 39000,
+      "type": "expense",
+      "date": "2026-03-29",
+      "category_id": "c6e31bec-9e96-4981-832d-e8a38feaa9e6"
+    },
+    {
+      "trans_id": "649b59f8-0245-4ced-95b0-bb80c9b15b56",
+      "description": "Cơm tấm",
+      "amount": 94000,
+      "type": "expense",
+      "date": "2026-03-29",
+      "category_id": "615b0d7a-5ace-4297-a404-0d67b7b0087a"
+    }
+  ],
+  "streak": {
+    "saving_months": 15,
+    "unit": "months"
+  },
+  "expires_at": {
+    "$date": "2026-03-30T23:15:00.000Z"
+  },
+  "top_account_id": "d722044d-7259-4a95-9a9f-930935073828"
+}
+## monthly_reports
+{
+  "_id": {
+    "$oid": "69f998957332b5dea0d8fd2d"
+  },
+  "user_id": "4f4b144d-e3f8-4e6b-9e32-408030a85698",
+  "account_id": "d722044d-7259-4a95-9a9f-930935073828",
+  "summary": {
+    "current_balance": 60000,
+    "monthly_income": 0,
+    "monthly_expense": 3247000,
+    "monthly_savings": -3247000,
+    "savings_rate": 0
+  },
+  "top_categories": [
+    {
+      "category_id": "615b0d7a-5ace-4297-a404-0d67b7b0087a",
+      "category_name": "Ăn uống",
+      "total_amount": 27901000
+    },
+    {
+      "category_id": "c6e31bec-9e96-4981-832d-e8a38feaa9e6",
+      "category_name": "Di chuyển",
+      "total_amount": 15692000
+    }
+  ],
+  "recent_transactions": [
+    {
+      "trans_id": "ec1d4251-2691-4784-9fa5-744c793e5b66",
+      "description": "Cơm tấm",
+      "amount": 98000,
+      "type": "expense",
+      "date": "2026-03-30",
+      "category_id": "615b0d7a-5ace-4297-a404-0d67b7b0087a"
+    },
+    {
+      "trans_id": "3a66604e-cdbd-4a50-95c6-92e6691481e2",
+      "description": "Ăn tối",
+      "amount": 57000,
+      "type": "expense",
+      "date": "2026-03-29",
+      "category_id": "615b0d7a-5ace-4297-a404-0d67b7b0087a"
+    },
+    {
+      "trans_id": "150cbadb-c9b7-4ed2-a572-124a3d8f2f69",
+      "description": "Xăng xe",
+      "amount": 54000,
+      "type": "expense",
+      "date": "2026-03-29",
+      "category_id": "c6e31bec-9e96-4981-832d-e8a38feaa9e6"
+    },
+    {
+      "trans_id": "26efc08a-a1e7-4030-8f6b-c95242b632d4",
+      "description": "Gửi xe",
+      "amount": 39000,
+      "type": "expense",
+      "date": "2026-03-29",
+      "category_id": "c6e31bec-9e96-4981-832d-e8a38feaa9e6"
+    },
+    {
+      "trans_id": "649b59f8-0245-4ced-95b0-bb80c9b15b56",
+      "description": "Cơm tấm",
+      "amount": 94000,
+      "type": "expense",
+      "date": "2026-03-29",
+      "category_id": "615b0d7a-5ace-4297-a404-0d67b7b0087a"
+    }
+  ],
+  "streak": {
+    "saving_months": 15,
+    "unit": "months"
+  },
+  "expires_at": {
+    "$date": "2026-03-30T23:15:00.000Z"
+  },
+  "top_account_id": "d722044d-7259-4a95-9a9f-930935073828"
+}
+## spending_trends
+{
+  "_id": {
+    "$oid": "69f998aa7332b5dea0d8fd63"
+  },
+  "user_id": "4f4b144d-e3f8-4e6b-9e32-408030a85698",
+  "account_id": "d722044d-7259-4a95-9a9f-930935073828",
+  "category_id": "c6e31bec-9e96-4981-832d-e8a38feaa9e6",
+  "category_name": "Di chuyển",
+  "category_type": "expense",
+  "monthly_data": [
+    {
+      "year": 2025,
+      "month": 1,
+      "amount": 1162000
+    },
+    {
+      "year": 2025,
+      "month": 2,
+      "amount": 1054000
+    },
+    {
+      "year": 2025,
+      "month": 3,
+      "amount": 1119000
+    },
+    {
+      "year": 2025,
+      "month": 4,
+      "amount": 1147000
+    },
+    {
+      "year": 2025,
+      "month": 5,
+      "amount": 1046000
+    },
+    {
+      "year": 2025,
+      "month": 6,
+      "amount": 1135000
+    },
+    {
+      "year": 2025,
+      "month": 7,
+      "amount": 868000
+    },
+    {
+      "year": 2025,
+      "month": 8,
+      "amount": 837000
+    },
+    {
+      "year": 2025,
+      "month": 9,
+      "amount": 1292000
+    },
+    {
+      "year": 2025,
+      "month": 10,
+      "amount": 889000
+    },
+    {
+      "year": 2025,
+      "month": 11,
+      "amount": 1132000
+    },
+    {
+      "year": 2025,
+      "month": 12,
+      "amount": 1180000
+    },
+    {
+      "year": 2026,
+      "month": 1,
+      "amount": 577000
+    },
+    {
+      "year": 2026,
+      "month": 2,
+      "amount": 1179000
+    },
+    {
+      "year": 2026,
+      "month": 3,
+      "amount": 1075000
+    }
+  ],
+  "avg_monthly": 1046133.33,
+  "trend": "stable",
+  "total_months": 15,
+  "total_transactions": 351,
+  "updated_at": {
+    "$date": "2026-03-30T23:59:00.000Z"
+  }
+}

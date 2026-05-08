@@ -1,8 +1,9 @@
 import { useState } from "react";
 import React from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { ArrowLeft, Mail, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
+import { authApi, getAuthErrorMessage } from "../api/auth.api";
 
 export function ForgotPassword() {
   const [email, setEmail] = useState("");

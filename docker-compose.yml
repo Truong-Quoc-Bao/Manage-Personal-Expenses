@@ -102,6 +102,7 @@ services:
       - .env
     ports:
       - '${USER_SERVICE_PORT}:3001'
+      - '${GRPC_USER_SERVICE_PORT}:50054'
     environment:
       - NODE_ENV=development
     depends_on:
@@ -210,6 +211,7 @@ services:
     volumes:
       - ./backend/analytics_service:/app/backend/analytics_service
       - ./backend/shared/rabbitmq-client:/app/backend/shared/rabbitmq-client
+      - ./backend/shared/protos:/app/backend/shared/protos
       - /app/backend/analytics_service/node_modules
       - /app/backend/shared/rabbitmq-client/node_modules
 
@@ -244,6 +246,7 @@ services:
       - .env
     ports:
       - '${BUDGET_SERVICE_PORT}:3008'
+      - '${GRPC_BUDGET_SERVICE_PORT}:50053'
     environment:
       - NODE_ENV=development
     depends_on:
@@ -254,6 +257,7 @@ services:
     volumes:
       - ./backend/budget_service:/app/backend/budget_service
       - ./backend/shared/rabbitmq-client:/app/backend/shared/rabbitmq-client
+      - ./backend/shared/protos:/app/backend/shared/protos
       - /app/backend/budget_service/node_modules
       - /app/backend/shared/rabbitmq-client/node_modules
 

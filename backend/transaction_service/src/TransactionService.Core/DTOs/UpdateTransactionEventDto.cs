@@ -13,6 +13,8 @@ namespace TransactionService.Core.DTOs
         [Required]
         public Guid AccountId { get; set; }
 
+        public Guid? AccountIdUpdate { get; set; }
+
         [Required]
         public Guid? CategoryId { get; set; }
 
@@ -28,7 +30,7 @@ namespace TransactionService.Core.DTOs
 
         public string? Description { get; set; }
 
-        public DateOnly Date { get; set; }
+        public DateTime Date { get; set; }
 
         public string? Note { get; set; }
     }

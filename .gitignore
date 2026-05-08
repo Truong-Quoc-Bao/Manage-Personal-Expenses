@@ -114,14 +114,11 @@ TestResults/
 # =========================
 *.dbmdl
 
-
+# GitNexus — local graph index (regenerate: gitnexus analyze)
 .gitnexus/
 AGENTS.md
 CLAUDE.md
 .claude/
 _bmad
 .agents/
-_bmad/
 _bmad_output/
-AGENTS.md
-CLAUDE.md

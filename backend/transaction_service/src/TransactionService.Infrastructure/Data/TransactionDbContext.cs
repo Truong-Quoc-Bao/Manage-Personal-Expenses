@@ -25,7 +25,7 @@ namespace TransactionService.Infrastructure.Data
                     .HasPrecision(15, 2); 
 
                 entity.Property(e => e.Date)
-                    .HasColumnType("date");
+                    .HasColumnType("timestamptz");
 
                 entity.Property(e => e.CreatedAt)
                     .HasDefaultValueSql("CURRENT_TIMESTAMP");

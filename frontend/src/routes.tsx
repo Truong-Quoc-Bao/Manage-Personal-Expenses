@@ -2,17 +2,18 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthLayout } from './components/layouts/AuthLayout';
 import { MainLayout } from './components/layouts/MainLayout';
 
-import { Login } from './pages/Login';
-import { Register } from './pages/Register';
-import { ForgotPassword } from './pages/ForgotPassword';
-import { ResetPassword } from './pages/ResetPassword';
-import { Dashboard } from './pages/Dashboard';
-import { Accounts } from './pages/Accounts';
-import { Transactions } from './pages/Transactions';
-import { Statistics } from './pages/Statistics';
-import { ChatBox } from './pages/ChatBox';
-import { NotFound } from './pages/NotFound';
-
+import { Login } from "./pages/Login";
+import { Register } from "./pages/Register";
+import { ForgotPassword } from "./pages/ForgotPassword";
+import { ResetPassword } from "./pages/ResetPassword";
+import { Dashboard } from "./pages/Dashboard";
+import { Accounts } from "./pages/Accounts";
+import { Transactions } from "./pages/Transactions";
+import { TransactionDetail } from "./pages/TransactionDetail";
+import { Budgets } from "./pages/Budgets";
+import { Statistics } from "./pages/Statistics";
+import { ChatBox } from "./pages/ChatBox";
+import { NotFound } from "./pages/NotFound";
 import ApiTestPage from './pages/ApiTestPage';
 
 export default function AppRoutes() {
@@ -31,6 +32,8 @@ export default function AppRoutes() {
           <Route path="/accounts" element={<Accounts />} />
           <Route path="/transactions" element={<Transactions />} />
           {/* <Route path="/budgets" element={<Budgets />} /> */}
+          <Route path="/transactions/:id" element={<TransactionDetail />} />
+          <Route path="/budgets" element={<Budgets />} />
           <Route path="/statistics" element={<Statistics />} />
           <Route path="/chatbox" element={<ChatBox />} />
         </Route>
