@@ -34,48 +34,6 @@ export function Dashboard() {
   const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // const loadAllData = useCallback(async () => {
-  //   try {
-  //     setIsLoading(true);
-  //     console.log('🔄 Dashboard đang đồng bộ dữ liệu từ Server...');
-
-  //     const [resStats, resRecents] = await Promise.all([
-  //       statsApi.getStats(),
-  //       statsApi.getRecentTransactions(),
-  //     ]);
-
-  //     // ✅ 1. Cập nhật Stats (Chỉ set 1 lần từ resStats)
-  //     if (resStats.data) {
-  //       setStats(resStats.data);
-  //     }
-
-  //     // ✅ 2. Cập nhật danh sách Giao dịch
-  //     if (resRecents.data && resRecents.data.length > 0) {
-  //       const serverTransactions = resRecents.data.map((t: any) => ({
-  //         id: t.trans_id || t.id || Math.random(),
-  //         type: t.type,
-  //         category: t.category_name || t.category || 'Khác',
-  //         amount: Math.abs(parseFloat(t.amount)),
-  //         description: t.description || 'Không có mô tả',
-  //         account: t.account_name || 'Tiền mặt',
-  //         // 🔥 BẮT BUỘC PHẢI CÓ DÒNG NÀY ĐỂ HÀM formatDateTime CHẠY ĐÚNG
-  //         created_at: t.created_at,
-  //         // Trường date này để hiển thị ngày tháng tĩnh (nếu cần)
-  //         date: new Date(t.created_at).toLocaleDateString('vi-VN'),
-  //       }));
-  //       setTransactions(serverTransactions);
-  //     } else {
-  //       setTransactions(transactionStore.getAll());
-  //     }
-
-  //     setAccounts(accountStore.getAll());
-  //   } catch (err) {
-  //     console.error('Lỗi khi load dữ liệu Dashboard:', err);
-  //   } finally {
-  //     setIsLoading(false);
-  //   }
-  // }, []);
-
   const loadAllData = useCallback(async () => {
     try {
       setIsLoading(true);

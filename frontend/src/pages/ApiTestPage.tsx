@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { authApi, statsApi, chatApi, notificationApi } from '../api/ai.api';
+import { authApi, statsApi, chatApi, notificationApi, bankApi } from '../api/ai.api';
+
+const mockBankData = {
+  gateway: 'TPBank',
+  content: 'NGUYEN VAN A CHUYEN TIEN AN SANG',
+  transferAmount: 50000,
+  transferType: 'out',
+  transactionDate: '2024-05-09 08:00:00',
+};
 
 const ApiTestPage = () => {
   const [result, setResult] = useState<any>(null);
@@ -60,14 +68,12 @@ const ApiTestPage = () => {
           Xóa log
         </button>
       </div>
-
       {/* NHÓM AUTH */}
       <Group title="🔐 Authentication">
         <button onClick={() => runTest(authApi.login({ username: 'admin', password: '123' }))}>
           Login (Admin)
         </button>
       </Group>
-
       {/* NHÓM THỐNG KÊ */}
       <Group title="📊 Statistics">
         <button onClick={() => runTest(statsApi.getStats())}>Get General Stats</button>
@@ -76,7 +82,6 @@ const ApiTestPage = () => {
         </button>
         <button onClick={() => runTest(statsApi.getAllTransactions())}>Get Transactions</button>
       </Group>
-
       {/* NHÓM CHAT & AI */}
       <Group title="🤖 Chat & AI Services">
         <button onClick={() => runTest(chatApi.getChatHistory())}>Get History</button>
@@ -85,12 +90,17 @@ const ApiTestPage = () => {
         </button>
         <button onClick={() => runTest(chatApi.getAiHealth())}>Check AI Health</button>
       </Group>
+      {/* bank */}
+      <Group title="🏦 Bank Webhook Test">
+        <button onClick={() => runTest(bankApi.receiveBankWebhook(mockBankData))}>
+          Test Webhook (Ăn sáng 50k)
+        </button>
+      </Group>
 
       {/* NHÓM THÔNG BÁO */}
       <Group title="🔔 Notifications">
         <button onClick={() => runTest(notificationApi.getAll())}>Get All Notifications</button>
       </Group>
-
       {/* HIỂN THỊ KẾT QUẢ */}
       <div style={{ marginTop: '20px' }}>
         <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -122,7 +132,6 @@ const ApiTestPage = () => {
           </pre>
         </div>
       </div>
-
       <style>{`
         button {
           padding: 8px 12px;

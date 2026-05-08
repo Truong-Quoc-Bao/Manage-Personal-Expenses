@@ -383,10 +383,10 @@ async function addNotification(message) {
   if (!userId) {
     return;
   }
-  await pool.query('INSERT INTO ai_service.notifications (user_id, message) VALUES ($1, $2)', [
-    userId,
-    message,
-  ]);
+  await pool.query(
+    'INSERT INTO ai_service.notifications (user_id, message, is_read) VALUES ($1, $2, $3)',
+    [userId, message],
+  );
 
   // Sau khi lưu DB thì mới bắn socket
   io.emit('new_notification', { message, time: new Date() });
@@ -626,6 +626,7 @@ app.get('/api/create-bank', async (req, res) => {
   }
 });
 
+const WEBHOOK_SECRET = 'my_super_secret_123';
 // --- LOG QUÁ TRÌNH XỬ LÝ GIAO DỊCH (BANK) ---
 app.post('/webhook/bank-transfer', async (req, res) => {
   console.log('\n--- 🚀 [BẮT ĐẦU NHẬN WEBHOOK TỪ SEPAY] ---');
@@ -655,9 +656,21 @@ app.post('/webhook/bank-transfer', async (req, res) => {
       transferAmount || transfer_amount || amount_out || amount_in || 0,
     );
 
-    const userId = requireUserId(req, res);
-    if (!userId) {
-      return;
+    // const userId = requireUserId(req, res);
+    // console.log('trả user webhook', userId);
+    // if (!userId) {
+    //   return;
+    // }
+    const apiKey = req.headers['x-api-key']; // Kiểm tra header mới
+    let userId;
+
+    if (apiKey === WEBHOOK_SECRET) {
+      // Nếu n8n gửi đúng mã bí mật, cho qua luôn và gán ID admin
+      userId = 'd4ffbef0-8bcc-445e-9ea3-7bc854e2ad76';
+    } else {
+      // Nếu không có mã bí mật, mới check JWT (cho việc test từ Dashboard)
+      userId = requireUserId(req, res);
+      if (!userId) return;
     }
 
     // 1. PHÂN BIỆT LOẠI GIAO DỊCH (VÀO hay RA)
@@ -795,12 +808,7 @@ app.post('/webhook/bank-transfer', async (req, res) => {
     try {
       await pool.query(
         'INSERT INTO ai_service.message_history (user_id, role, message) VALUES ($1, $2, $3)',
-        [
-          // targetUserId,
-          userId,
-          'model',
-          finalMsg,
-        ],
+        [userId, 'model', finalMsg],
       );
       console.log('💾 Đã lưu thông báo ngân hàng vào lịch sử chat');
     } catch (chatErr) {
@@ -812,7 +820,7 @@ app.post('/webhook/bank-transfer', async (req, res) => {
     io.emit('bank_notification', { message: finalMsg });
     console.log('📡 [PROACTIVE]: Đã bắn Socket cảnh báo về Web.');
 
-    await addNotification(finalMsg);
+    await addNotification(finalMsg, userId);
 
     // Test xem client có đang lắng nghe không
     socket.on('new_notification', (data) => {
@@ -826,8 +834,13 @@ app.post('/webhook/bank-transfer', async (req, res) => {
     console.log(`✅ Thành công: ${notificationMsg}`);
     res.status(200).json({ status: 'Success' });
   } catch (err) {
-    console.error('❌ LỖI:', err.message);
-    res.status(200).send('Error');
+    console.error('❌ LỖI CHI TIẾT:', err);
+    // Trả về lỗi chi tiết thay vì chữ "Error" chung chung để debug
+    res.status(500).json({
+      status: 'Error',
+      message: err.message,
+      stack: err.stack,
+    });
   }
 });
 

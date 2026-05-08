@@ -77,7 +77,9 @@ export const bankApi = {
   createBankLink: () => axiosInstance.get('/api/ai/api/create-bank'),
 
   receiveBankWebhook: (payload: Record<string, unknown>) =>
-    axiosInstance.post('/api/ai/webhook/bank-transfer', payload),
+    axiosInstance.post('/api/ai/webhook/bank-transfer', payload, {
+      headers: { 'x-api-key': 'MY_SUPER_SECRET_KEY' }, // Thêm dòng này để bypass xác thực JWT khi test
+    }),
 };
 
 export const debugApi = {
