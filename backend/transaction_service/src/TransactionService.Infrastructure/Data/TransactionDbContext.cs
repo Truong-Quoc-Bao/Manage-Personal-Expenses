@@ -11,6 +11,35 @@ namespace TransactionService.Infrastructure.Data
 
         public DbSet<Transaction> Transactions { get; set; }
 
+        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            NormalizeDateTimesToUtc();
+            return base.SaveChangesAsync(cancellationToken);
+        }
+
+        public override int SaveChanges()
+        {
+            NormalizeDateTimesToUtc();
+            return base.SaveChanges();
+        }
+
+        private void NormalizeDateTimesToUtc()
+        {
+            foreach (var entry in ChangeTracker.Entries())
+            {
+                if (entry.State is not (EntityState.Added or EntityState.Modified))
+                    continue;
+
+                foreach (var prop in entry.Properties)
+                {
+                    if (prop.CurrentValue is DateTime dt && dt.Kind != DateTimeKind.Utc)
+                    {
+                        prop.CurrentValue = DateTime.SpecifyKind(dt, DateTimeKind.Utc);
+                    }
+                }
+            }
+        }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.HasDefaultSchema("transaction_service");

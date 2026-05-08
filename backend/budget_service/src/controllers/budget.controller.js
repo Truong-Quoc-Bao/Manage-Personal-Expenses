@@ -41,13 +41,14 @@ const updateBudgetController = async (req, res, next) => {
     if (!userId) return;
     const budgetId = req.params.id;
 
-    const { title, categoryId, amountLimit, dateStart } = req.body;
+    const { title, categoryId, type, amountLimit, dateStart } = req.body;
 
     const budgets = await updateBudgetService({
       userId,
       budgetId,
       title,
       categoryId,
+      type,
       amountLimit,
       dateStart,
     });
@@ -67,12 +68,13 @@ const createBudgetController = async (req, res, next) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
-    const { title, categoryId, amountLimit, dateStart } = req.body;
+    const { title, categoryId, type, amountLimit, dateStart } = req.body;
 
     const budgets = await createBudgetService({
       userId,
       title,
       categoryId,
+      type,
       amountLimit,
       dateStart,
     });

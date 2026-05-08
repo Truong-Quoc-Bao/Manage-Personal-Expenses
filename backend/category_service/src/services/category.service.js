@@ -4,6 +4,7 @@ const { updateCategory } = require("../repositories/category.repository");
 const { findOneCategory } = require("../repositories/category.repository");
 const { deleteCategory } = require("../repositories/category.repository");
 const categoryRepository = require("../repositories/category.repository");
+const rabbitMQClient = require("../../../shared/rabbitmq-client");
 
 
 
@@ -30,9 +31,21 @@ const getCategories = async ({ userId}) => {
 
 const creaCategories = async ({ userId , cat}) => {
 
-  console.log("Creating service category with data:", { userId, cat }); // Debug log to check input data
+  console.log("Creating service category with data:", { userId, cat });
 
   const categories = await createCategories({ userId ,cat});
+
+  try {
+    await rabbitMQClient.publish("category.created", {
+      category_id: categories.category_id,
+      user_id: userId,
+      category_name: categories.category_name,
+      type: categories.type,
+      color: categories.color,
+    });
+  } catch (err) {
+    console.error("[Category] Failed to publish category.created:", err.message);
+  }
 
   return categories;
 };
@@ -40,9 +53,9 @@ const creaCategories = async ({ userId , cat}) => {
 const updCategories = async ({ userId , catid, cat}) => {
 
   const existing = await findOneCategory(catid);
-  console.log("Existing category:", existing); // Debug log to check the existing category
+  console.log("Existing category:", existing);
 
-  const check_issystem = existing ? existing.is_system : false; // Handle case where category is not found
+  const check_issystem = existing ? existing.is_system : false;
   if (!existing) {
     const error = new Error("Category not found");
     error.statusCode = 404;
@@ -57,10 +70,24 @@ const updCategories = async ({ userId , catid, cat}) => {
   }
   const categories = await updateCategory({ userId , category_id: catid, cat });
 
+  try {
+    await rabbitMQClient.publish("category.updated", {
+      category_id: catid,
+      user_id: userId,
+      category_name: categories.category_name,
+      type: categories.type,
+      color: categories.color,
+      old_category_name: existing.category_name,
+      old_type: existing.type,
+    });
+  } catch (err) {
+    console.error("[Category] Failed to publish category.updated:", err.message);
+  }
+
   return categories;
 };
 
-const delCategoryService = async ({ categoryId }) => {
+const delCategoryService = async ({ categoryId, userId }) => {
   const category = await findOneCategory(categoryId);
 
   if (!category) {
@@ -70,6 +97,18 @@ const delCategoryService = async ({ categoryId }) => {
   }
 
   const categories = await deleteCategory(categoryId);
+
+  try {
+    await rabbitMQClient.publish("category.deleted", {
+      category_id: categoryId,
+      user_id: userId || category.user_id,
+      category_name: category.category_name,
+      type: category.type,
+    });
+  } catch (err) {
+    console.error("[Category] Failed to publish category.deleted:", err.message);
+  }
+
   return categories;
 };
 

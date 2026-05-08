@@ -1,4 +1,3 @@
-const { budget } = require("../config/database");
 const {
   findBudgets,
   findBudgetByBudgetId,
@@ -7,6 +6,45 @@ const {
   updateBudget,
   deleteBudget,
 } = require("../repositories/budget.repository");
+const { validateCategory } = require("../gRPC/category.client");
+
+const VALID_BUDGET_TYPES = ["limit", "plan"];
+
+const BUDGET_TYPE_TO_CATEGORY_TYPE = {
+  limit: "Expense",
+  plan: "Income",
+};
+
+async function validateCategoryForBudgetType({ categoryId, userId, type }) {
+  const expectedCategoryType = BUDGET_TYPE_TO_CATEGORY_TYPE[type];
+  if (!expectedCategoryType) {
+    const error = new Error(`Invalid budget type: ${type}. Must be one of: ${VALID_BUDGET_TYPES.join(", ")}`);
+    error.statusCode = 400;
+    throw error;
+  }
+
+  try {
+    const result = await validateCategory({
+      categoryId,
+      userId,
+      transactionType: expectedCategoryType,
+    });
+
+    if (!result.valid) {
+      const error = new Error(
+        `Category does not match budget type. Budget type "${type}" requires a "${expectedCategoryType}" category.`
+      );
+      error.statusCode = 400;
+      throw error;
+    }
+  } catch (err) {
+    if (err.statusCode) throw err;
+    console.error("[Budget] Category validation via gRPC failed:", err.message);
+    const error = new Error("Unable to validate category. Category service unavailable.");
+    error.statusCode = 503;
+    throw error;
+  }
+}
 
 const deleteBudgetService = async ({ userId, budgetId }) => {
   if (!userId) {
@@ -31,6 +69,7 @@ const updateBudgetService = async ({
   budgetId,
   title,
   categoryId,
+  type,
   amountLimit,
   dateStart,
 }) => {
@@ -72,23 +111,19 @@ const updateBudgetService = async ({
     throw error;
   }
 
-  // Bỏ check category vì category thuộc category_service.
-  // Frontend đã gọi category API để lấy category_id hợp lệ.
-  // Nếu cần validate category thật sự, nên gọi category_service qua API/gRPC,
-  // không nên check bằng bảng budget.
-  /*
-  const checkCategory = await findCategoryByIdAndUserId({ categoryId, userId });
+  const budgetType = type || checkBudget.type || "limit";
 
-  if (!checkCategory) {
-    const error = new Error("Category does not exist");
-    error.statusCode = 404;
+  if (!VALID_BUDGET_TYPES.includes(budgetType)) {
+    const error = new Error(`Invalid budget type: ${budgetType}. Must be one of: ${VALID_BUDGET_TYPES.join(", ")}`);
+    error.statusCode = 400;
     throw error;
   }
-  */
+
+  await validateCategoryForBudgetType({ categoryId, userId, type: budgetType });
 
   if (amountLimit <= 0) {
     const error = new Error("AmountLimit can not be less than 0");
-    error.statusCode = 404;
+    error.statusCode = 400;
     throw error;
   }
 
@@ -97,6 +132,7 @@ const updateBudgetService = async ({
     budgetId,
     title,
     categoryId,
+    type: budgetType,
     amountLimit,
     dateStart,
   });
@@ -108,6 +144,7 @@ const createBudgetService = async ({
   title,
   userId,
   categoryId,
+  type,
   amountLimit,
   dateStart,
 }) => {
@@ -141,16 +178,15 @@ const createBudgetService = async ({
     throw error;
   }
 
-  // Bỏ check category vì category thuộc category_service.
-  /*
-  const category = await findCategoryByIdAndUserId({ categoryId, userId });
+  const budgetType = type || "limit";
 
-  if (!category) {
-    const error = new Error("Category does not exist");
-    error.statusCode = 404;
+  if (!VALID_BUDGET_TYPES.includes(budgetType)) {
+    const error = new Error(`Invalid budget type: ${budgetType}. Must be one of: ${VALID_BUDGET_TYPES.join(", ")}`);
+    error.statusCode = 400;
     throw error;
   }
-  */
+
+  await validateCategoryForBudgetType({ categoryId, userId, type: budgetType });
 
   const checkDate = await findDateByCategory({
     userId,
@@ -160,7 +196,7 @@ const createBudgetService = async ({
 
   if (checkDate) {
     const error = new Error("this Budget is set today");
-    error.statusCode = 404;
+    error.statusCode = 400;
     throw error;
   }
 
@@ -168,6 +204,7 @@ const createBudgetService = async ({
     title,
     userId,
     categoryId,
+    type: budgetType,
     amountLimit,
     dateStart,
   });
@@ -192,23 +229,11 @@ const getBudgetByUserIdService = async ({ userId, categoryId, dateStart }) => {
     throw error;
   }
 
-  // Bỏ check category vì category thuộc category_service.
-  /*
-  if (categoryId) {
-    const category = await findCategoryByIdAndUserId({ categoryId, userId });
-
-    if (!category) {
-      const error = new Error("Category does not exist");
-      error.statusCode = 404;
-      throw error;
-    }
-  }
-  */
-
   const budgets = await findBudgets({ userId, categoryId, dateStart });
 
   return budgets;
 };
+
 module.exports = {
   getBudgetByUserIdService,
   getBudgetByBudgetIdService,

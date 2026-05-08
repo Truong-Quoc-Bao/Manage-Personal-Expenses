@@ -15,6 +15,7 @@ model Budget {
   category_id    String?  @db.Uuid
 
   title          String?
+  type           BudgetType @default(limit)
   current_amount Decimal  @default(0) @db.Decimal(15, 2)
   amount_limit   Decimal  @db.Decimal(15, 2)
 
@@ -32,6 +33,13 @@ model Budget {
   updated_at     DateTime?
 
   @@map("budgets")
+  @@schema("budgets_service")
+}
+
+enum BudgetType {
+  limit
+  plan
+
   @@schema("budgets_service")
 }
 
