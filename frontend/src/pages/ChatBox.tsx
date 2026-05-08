@@ -1,5 +1,5 @@
-import { FinanceAIChatbox } from "../components/ui/FinanceAIChatbox";
-import React from "react";
+import { FinanceAIChatbox } from '../components/ui/FinanceAIChatbox';
+import React from 'react';
 
 export function ChatBox() {
   return (

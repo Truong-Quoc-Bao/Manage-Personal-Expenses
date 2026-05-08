@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
-import { Outlet, Link, useLocation } from "react-router-dom";
-import { ViewProfileModal } from "../modals/ViewProfileModal";
-import { EditProfileModal } from "../modals/EditProfileModal";
+import React, { useEffect, useState } from 'react';
+import { Outlet, Link, useLocation } from 'react-router-dom';
+import { ViewProfileModal } from '../modals/ViewProfileModal';
+import { EditProfileModal } from '../modals/EditProfileModal';
 import {
   LayoutDashboard,
   Receipt,
@@ -12,8 +12,11 @@ import {
   X,
   LogOut,
   PiggyBank,
-} from "lucide-react";
-import { userApi } from "../../api/user.api";
+} from 'lucide-react';
+import { userApi } from '../../api/user.api';
+import { FloatingChat } from './FloatingChat';
+import { NotificationCenter } from './NotifCenter';
+import { socketService } from '../../services/SocketService';
 
 type UserProfile = {
   user_id?: string;
@@ -30,44 +33,53 @@ export function MainLayout() {
 
   const location = useLocation();
 
+  // Kiểm tra nếu đang ở trang trợ lý AI thì không hiện nút nổi
+  const isChatPage = location.pathname === '/chatbox';
+
   useEffect(() => {
+    socketService.connect();
+
     const fetchUserProfile = async () => {
       try {
         const res = await userApi.getProfile();
-        console.log("USER API RESPONSE:", res.data);
+        console.log('USER API RESPONSE:', res.data);
         setUser(res.data.data);
       } catch (error) {
-        console.error("Get user profile failed:", error);
+        console.error('Get user profile failed:', error);
       }
     };
 
     fetchUserProfile();
+
+    return () => {
+      socketService.disconnect();
+    };
   }, []);
 
   const navigation = [
-    { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
-    { name: "Giao dịch", path: "/transactions", icon: Receipt },
-    { name: "Tài khoản", path: "/accounts", icon: Wallet },
-    { name: "Ngân sách", path: "/budgets", icon: PiggyBank },
-    { name: "Thống kê", path: "/statistics", icon: BarChart3 },
-    { name: "Trợ lý AI", path: "/chatbox", icon: MessageCircle },
+    { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+    { name: 'Giao dịch', path: '/transactions', icon: Receipt },
+    { name: 'Tài khoản', path: '/accounts', icon: Wallet },
+    { name: 'Ngân sách', path: '/budgets', icon: PiggyBank },
+    { name: 'Thống kê', path: '/statistics', icon: BarChart3 },
+    { name: 'Trợ lý AI', path: '/chatbox', icon: MessageCircle },
   ];
 
   const isActive = (path: string) => location.pathname === path;
 
-  const displayName = user?.user_name || "Người dùng";
-  const displayEmail = user?.email || "Chưa có email";
+  const displayName = user?.user_name || 'Người dùng';
+  const displayEmail = user?.email || 'Chưa có email';
 
   const avatarText = displayName
-    .split(" ")
+    .split(' ')
     .map((word) => word[0])
-    .join("")
+    .join('')
     .slice(0, 2)
     .toUpperCase();
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
   };
 
   return (
@@ -81,7 +93,7 @@ export function MainLayout() {
 
       <aside
         className={`fixed inset-y-0 left-0 z-50 w-[300px] bg-white shadow-xl transition-transform duration-300 lg:translate-x-0 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="flex h-full flex-col">
@@ -103,9 +115,7 @@ export function MainLayout() {
                 </svg>
               </div>
 
-              <span className="text-2xl font-semibold !text-gray-900">
-                Tài chính
-              </span>
+              <span className="text-2xl font-semibold !text-gray-900">Tài chính</span>
             </div>
 
             <button
@@ -129,12 +139,8 @@ export function MainLayout() {
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-xl font-medium !text-gray-900">
-                    {displayName}
-                  </p>
-                  <p className="truncate text-lg !text-gray-500">
-                    {displayEmail}
-                  </p>
+                  <p className="truncate text-xl font-medium !text-gray-900">{displayName}</p>
+                  <p className="truncate text-lg !text-gray-500">{displayEmail}</p>
                 </div>
               </div>
             </button>
@@ -152,8 +158,8 @@ export function MainLayout() {
                   onClick={() => setSidebarOpen(false)}
                   className={`flex items-center gap-5 rounded-2xl px-5 py-4 text-xl font-medium transition-all ${
                     active
-                      ? "!bg-gradient-to-r !from-orange-400 !to-rose-400 !text-white shadow-lg"
-                      : "!bg-transparent !text-gray-700 hover:!bg-gray-100 hover:!text-gray-900"
+                      ? '!bg-gradient-to-r !from-orange-400 !to-rose-400 !text-white shadow-lg'
+                      : '!bg-transparent !text-gray-700 hover:!bg-gray-100 hover:!text-gray-900'
                   }`}
                 >
                   <Icon className="h-7 w-7" />
@@ -177,6 +183,11 @@ export function MainLayout() {
       </aside>
 
       <div className="lg:pl-[300px]">
+        {/* Header Desktop - Để hiện thông báo ở góc phải trên cùng màn hình máy tính */}
+        <header className="hidden lg:flex sticky top-0 z-30 h-16 items-center justify-end px-8 bg-transparent">
+           <NotificationCenter />
+        </header>
+
         <header className="sticky top-0 z-30 bg-white shadow-sm lg:hidden">
           <div className="flex h-16 items-center justify-between px-4">
             <button
@@ -189,12 +200,14 @@ export function MainLayout() {
 
             <span className="font-semibold !text-gray-900">Tài chính</span>
 
-            <div className="w-10" />
+            {/* HIỆN CHUÔNG THÔNG BÁO Ở MOBILE - Thay cho div w-10 */}
+            <NotificationCenter />
           </div>
         </header>
 
         <main className="min-h-screen p-6 lg:p-10">
           <Outlet />
+          {!isChatPage && <FloatingChat />}
         </main>
       </div>
 

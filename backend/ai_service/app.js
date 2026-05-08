@@ -15,7 +15,7 @@ import axios from 'axios';
 import got from 'got';
 import { getBestModel, getStatusData } from './super_check.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { MONEY_GUARD_RULES } from './systemRules.js';
+import { getMoneyGuardRules } from './systemRules.js';
 
 import { setDefaultResultOrder } from 'dns';
 setDefaultResultOrder('ipv4first');
@@ -50,8 +50,9 @@ const pool = new Pool({
 
 // Cách để ép tất cả kết nối dùng đúng Schema
 pool.on('connect', (client) => {
-  client.query(`SET search_path TO ${SCHEMA_NAME}, public`)
-    .catch(err => console.error('❌ Lỗi khi set Search Path:', err));
+  client.query(
+    'SET search_path TO ai_service, transaction_service, category_service, budgets_service, public',
+  );
 });
 
 // Đoạn check kết nối của bạn
@@ -61,7 +62,7 @@ pool.connect((err, client, release) => {
     console.error('❌ Lỗi kết nối Postgres:', err.message);
   } else {
     console.log(`✅ CHÚC MỪNG BẢO! Đã thông suốt tới Schema: ${SCHEMA_NAME}`);
-    
+
     // Test thử xem có đọc được bảng trong schema đó không
     client.query('SELECT current_schema()', (err, res) => {
       release(); // Giải phóng client lại cho pool
@@ -100,10 +101,27 @@ const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 let chatHistory = [];
 
-// Biến tạm để lưu thông tin trình duyệt của Bảo (Sau này nên lưu vào DB)
 let lastUserMessage = { time: 0, content: '' };
 let lastSavedTransaction = { time: 0, content: '' };
 let subscriptions = [];
+
+const userNameCache = new Map();
+async function getUserName(userId) {
+  if (userNameCache.has(userId)) return userNameCache.get(userId);
+  try {
+    const result = await pool.query(
+      'SELECT user_name FROM user_service.users WHERE user_id = $1',
+      [userId],
+    );
+    const name = result.rows[0]?.user_name || 'Người dùng';
+    userNameCache.set(userId, name);
+    setTimeout(() => userNameCache.delete(userId), 10 * 60 * 1000);
+    return name;
+  } catch (err) {
+    console.error('❌ Lỗi lấy user_name:', err.message);
+    return 'Người dùng';
+  }
+}
 
 // 1. Cấu hình Web Push
 webpush.setVapidDetails(
@@ -124,37 +142,23 @@ app.post('/login', (req, res) => {
   });
 });
 
-//lấy token đăng nhập
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  // 1. Nếu hoàn toàn không có token hoặc token là chữ "null"/"undefined"
-  if (!token || token === 'null' || token === 'undefined') {
-    console.log('⚠️ Không có token, dùng User ID 1');
-    req.user = { user_id: 1 };
-    return next();
+function requireUserId(req, res) {
+  const userId = req.headers['x-user-id'];
+  console.log('user', userId);
+  if (userId == null || userId === '') {
+    res.status(401).json({ success: false, message: 'Unauthorized' });
+    return null;
   }
-
-  // 2. Nếu có token, kiểm tra xem nó còn sống không
-  jwt.verify(token, process.env.JWT_SECRET || 'secret_key', (err, user) => {
-    if (err) {
-      // ✅ SỬA TẠI ĐÂY: Thay vì báo lỗi 403, mình log ra rồi cho đi tiếp với ID 1
-      console.log('⚠️ Token hết hạn hoặc sai, tự động dùng User ID 1 để Demo');
-      req.user = { user_id: 1 };
-      return next();
-    }
-
-    // Nếu token chuẩn thì dùng thông tin từ token
-    req.user = user;
-    next();
-  });
-};
+  return String(userId);
+}
 
 // --- API LẤY THỐNG KÊ CHO DASHBOARD ---
 app.get('/api/stats', async (req, res) => {
   try {
-    const userId = 1;
+    const userId = requireUserId(req, res);
+    if (!userId) {
+      return;
+    }
     const now = new Date();
     const currentMonth = now.getMonth() + 1;
     const currentYear = now.getFullYear();
@@ -165,8 +169,8 @@ app.get('/api/stats', async (req, res) => {
         SELECT 
           SUM(CASE WHEN t.transaction_type = 'income' THEN t.amount ELSE 0 END) as total_income,
           SUM(CASE WHEN t.transaction_type = 'expense' THEN t.amount ELSE 0 END) as total_expense
-        FROM transactions t
-        JOIN accounts a ON t.account_id = a.account_id
+        FROM transaction_service.transactions t
+        JOIN account_service.accounts a ON t.account_id = a.account_id
         WHERE a.user_id = $1 
           AND EXTRACT(MONTH FROM t.date) = $2 
           AND EXTRACT(YEAR FROM t.date) = $3
@@ -181,9 +185,9 @@ app.get('/api/stats', async (req, res) => {
         COALESCE(c.category_name, 'Chưa phân loại') as category_name, 
         SUM(t.amount) as amount, 
         t.transaction_type
-      FROM transactions t
-      LEFT JOIN categories c ON t.category_id = c.category_id -- Dùng LEFT JOIN ở đây
-      JOIN accounts a ON t.account_id = a.account_id
+      FROM transaction_service.transactions t
+      LEFT JOIN category_service.categories c ON t.category_id = c.category_id -- Dùng LEFT JOIN ở đây
+      JOIN account_service.accounts a ON t.account_id = a.account_id
       WHERE a.user_id = $1 
         AND EXTRACT(MONTH FROM t.date) = $2 
         AND EXTRACT(YEAR FROM t.date) = $3
@@ -213,7 +217,10 @@ app.get('/api/stats', async (req, res) => {
 // API lấy danh sách ngân sách tháng hiện tại
 app.get('/api/budgets', async (req, res) => {
   try {
-    const userId = 1;
+    const userId = requireUserId(req, res);
+    if (!userId) {
+      return;
+    }
     const now = new Date();
     const result = await pool.query(
       `
@@ -221,9 +228,9 @@ app.get('/api/budgets', async (req, res) => {
         c.category_name, 
         c.icon,
         COALESCE(SUM(t.amount), 0) as spent,
-        (SELECT amount_limit FROM budgets b WHERE b.category_id = c.category_id AND b.month = $2 AND b.year = $3) as amount_limit
-      FROM categories c
-      LEFT JOIN transactions t ON c.category_id = t.category_id 
+        (SELECT amount_limit FROM budgets_service.budgets b WHERE b.category_id = c.category_id AND b.month = $2 AND b.year = $3) as amount_limit
+      FROM category_service.categories c
+      LEFT JOIN transaction_service.transactions t ON c.category_id = t.category_id 
         AND EXTRACT(MONTH FROM t.date) = $2 
         AND EXTRACT(YEAR FROM t.date) = $3
       WHERE c.user_id = $1
@@ -241,23 +248,24 @@ app.get('/api/budgets', async (req, res) => {
 // api giao dịch gần đây
 app.get('/api/recent-transactions', async (req, res) => {
   try {
-    const userId = 1;
-
+    const userId = requireUserId(req, res);
+    if (!userId) {
+      return;
+    }
     const result = await pool.query(
       `
         SELECT 
           t.trans_id, 
           t.amount, 
-          /* 👉 Dùng cú pháp này để chuyển UTC sang giờ Việt Nam (Asia/Ho_Chi_Minh) */
-          (t.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh') as created_at,
+          t.date as created_at, 
           t.transaction_type as type, 
           t.description,
           COALESCE(c.category_name, 'Khác') as category_name
-        FROM transactions t
-        JOIN accounts a ON t.account_id = a.account_id
-        LEFT JOIN categories c ON t.category_id = c.category_id
+        FROM transaction_service.transactions t
+        JOIN account_service.accounts a ON t.account_id = a.account_id
+        LEFT JOIN category_service.categories c ON t.category_id = c.category_id
         WHERE a.user_id = $1
-        ORDER BY t.created_at DESC, t.trans_id DESC
+        ORDER BY t.date DESC, t.trans_id DESC
         LIMIT 20
       `,
       [userId],
@@ -269,15 +277,50 @@ app.get('/api/recent-transactions', async (req, res) => {
     res.status(500).json({ error: 'Lỗi server' });
   }
 });
+
+// all giao dịch
+app.get('/api/all-transactions', async (req, res) => {
+  try {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
+    const result = await pool.query(
+      `
+        SELECT 
+          t.trans_id, 
+          t.amount, 
+          t.date as created_at, 
+          t.transaction_type as type, 
+          t.description,
+          COALESCE(c.category_name, 'Khác') as category_name,
+          a.account_name
+        FROM transaction_service.transactions t
+        JOIN account_service.accounts a ON t.account_id = a.account_id
+        LEFT JOIN category_service.categories c ON t.category_id = c.category_id
+        WHERE a.user_id = $1
+        ORDER BY t.date DESC, t.trans_id DESC
+      `,
+      [userId],
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Lỗi lấy toàn bộ giao dịch:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
 // Route lấy toàn bộ lịch sử chat để hiện lên màn hình khi load trang
-app.get('/chat-history', authenticateToken, async (req, res) => {
+app.get('/chat-history', async (req, res) => {
   try {
     const { message, model: requestedModel } = req.body;
 
-    // const userId = req.user.user_id;
-    const userId = 1; // Tạm thời fix là Bảo
+    const userId = requireUserId(req, res);
+    if (!userId) {
+      return;
+    }
     const result = await pool.query(
-      'SELECT role, message FROM message_history WHERE user_id = $1 ORDER BY created_at ASC',
+      'SELECT role, message FROM ai_service.message_history WHERE user_id = $1 ORDER BY created_at ASC',
       [userId],
     );
     res.json(result.rows);
@@ -351,13 +394,16 @@ const sendPushNotification = (message) => {
   });
 };
 
-// Thay vì chỉ bắn socket, hãy lưu vào DB
-async function addNotification(message) {
-  const userId = 1; // ID của Bảo
-  await pool.query('INSERT INTO notifications (user_id, message) VALUES ($1, $2)', [
-    userId,
-    message,
-  ]);
+// Lưu thông báo vào DB rồi bắn socket
+async function addNotification(message, userId) {
+  if (!userId) {
+    console.warn('⚠️ addNotification: userId is missing, skip.');
+    return;
+  }
+  await pool.query(
+    'INSERT INTO ai_service.notifications (user_id, message, is_read) VALUES ($1, $2, $3)',
+    [userId, message],
+  );
 
   // Sau khi lưu DB thì mới bắn socket
   io.emit('new_notification', { message, time: new Date() });
@@ -366,9 +412,12 @@ async function addNotification(message) {
 // API Lấy thông báo (Lấy hết, không lọc is_read để không bị mất tin khi load lại)
 app.get('/api/notifications', async (req, res) => {
   try {
-    const userId = 1;
+    const userId = requireUserId(req, res);
+    if (!userId) {
+      return;
+    }
     const result = await pool.query(
-      "SELECT id, message, is_read, (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh') as created_at FROM notifications WHERE user_id = $1 ORDER BY created_at DESC ",
+      'SELECT id, message, is_read, created_at FROM ai_service.notifications WHERE user_id = $1 ORDER BY created_at DESC ',
       [userId],
     );
     res.json(result.rows);
@@ -381,11 +430,14 @@ app.get('/api/notifications', async (req, res) => {
 app.post('/api/notifications/read/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = 1;
-    await pool.query('UPDATE notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2', [
-      id,
-      userId,
-    ]);
+    const userId = requireUserId(req, res);
+    if (!userId) {
+      return;
+    }
+    await pool.query(
+      'UPDATE ai_service.notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2',
+      [id, userId],
+    );
     res.json({ success: true });
   } catch (err) {
     console.error('Lỗi update thông báo:', err);
@@ -394,8 +446,13 @@ app.post('/api/notifications/read/:id', async (req, res) => {
 });
 // Route 2: Đánh dấu đọc TẤT CẢ (Không cần ID)
 app.post('/api/notifications/read-all', async (req, res) => {
-  const userId = 1;
-  await pool.query('UPDATE notifications SET is_read = TRUE WHERE user_id = $1', [userId]);
+  const userId = requireUserId(req, res);
+  if (!userId) {
+    return;
+  }
+  await pool.query('UPDATE ai_service.notifications SET is_read = TRUE WHERE user_id = $1', [
+    userId,
+  ]);
   res.json({ success: true });
 });
 
@@ -404,8 +461,15 @@ app.post('/api/notifications/read-all', async (req, res) => {
 app.delete('/api/notifications/delete/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = 1;
-    await pool.query('DELETE FROM notifications WHERE id = $1 AND user_id = $2', [id, userId]);
+
+    const userId = requireUserId(req, res);
+    if (!userId) {
+      return;
+    }
+    await pool.query('DELETE FROM ai_service.notifications WHERE id = $1 AND user_id = $2', [
+      id,
+      userId,
+    ]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Lỗi server' });
@@ -415,8 +479,11 @@ app.delete('/api/notifications/delete/:id', async (req, res) => {
 // Xóa tất cả thông báo của người dùng
 app.delete('/api/notifications/delete-all', async (req, res) => {
   try {
-    const userId = 1;
-    await pool.query('DELETE FROM notifications WHERE user_id = $1', [userId]);
+    const userId = requireUserId(req, res);
+    if (!userId) {
+      return;
+    }
+    await pool.query('DELETE FROM ai_service.notifications WHERE user_id = $1', [userId]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Lỗi server' });
@@ -429,9 +496,9 @@ async function getAnomalyStatus(userId, categoryName, amount) {
     const res = await pool.query(
       `
       SELECT AVG(t.amount) as average 
-      FROM transactions t
-      JOIN categories c ON t.category_id = c.category_id
-      JOIN accounts a ON t.account_id = a.account_id
+      FROM transaction_service.transactions t
+      JOIN category_service.categories c ON t.category_id = c.category_id
+      JOIN account_service.accounts a ON t.account_id = a.account_id
       WHERE a.user_id = $1 AND c.category_name ILIKE $2
     `,
       [userId, categoryName],
@@ -458,7 +525,7 @@ async function getProactiveContext(userId) {
     SELECT 
       COALESCE(SUM(CASE WHEN transaction_type = 'income' THEN amount ELSE 0 END), 0) as total_inc,
       COALESCE(SUM(CASE WHEN transaction_type = 'expense' THEN amount ELSE 0 END), 0) as total_exp
-    FROM transactions t JOIN accounts a ON t.account_id = a.account_id
+    FROM transaction_service.transactions t JOIN account_service.accounts a ON t.account_id = a.account_id
     WHERE a.user_id = $1 AND EXTRACT(MONTH FROM t.date) = $2 AND EXTRACT(YEAR FROM t.date) = $3
   `,
     [userId, month, now.getFullYear()],
@@ -482,9 +549,12 @@ async function getProactiveContext(userId) {
 }
 
 // --- API TẠO LINK LIÊN KẾT (CHỈNH THEO CHUẨN SEPAY) ---
-app.get('/api/create-bank', authenticateToken, async (req, res) => {
+app.get('/api/create-bank', async (req, res) => {
   try {
-    const userId = req.user?.user_id || 1;
+    const userId = requireUserId(req, res);
+    if (!userId) {
+      return;
+    }
     const companyXid = process.env.BANKHUB_COMPANY_XID;
 
     if (!companyXid) {
@@ -573,8 +643,9 @@ app.get('/api/create-bank', authenticateToken, async (req, res) => {
   }
 });
 
+const WEBHOOK_SECRET = 'my_super_secret_123';
 // --- LOG QUÁ TRÌNH XỬ LÝ GIAO DỊCH (BANK) ---
-app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
+app.post('/webhook/bank-transfer', async (req, res) => {
   console.log('\n--- 🚀 [BẮT ĐẦU NHẬN WEBHOOK TỪ SEPAY] ---');
 
   try {
@@ -601,8 +672,24 @@ app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
     const finalAmount = parseFloat(
       transferAmount || transfer_amount || amount_out || amount_in || 0,
     );
-    const userId = 1;
-    // const userId = req.user.user_id;
+
+    // const userId = requireUserId(req, res);
+    // console.log('trả user webhook', userId);
+    // if (!userId) {
+    //   return;
+    // }
+    const apiKey = req.headers['x-api-key']; // Kiểm tra header mới
+    let userId;
+
+    if (apiKey === WEBHOOK_SECRET) {
+      // Nếu n8n gửi đúng mã bí mật, cho qua luôn và gán ID admin
+      userId = 'd4ffbef0-8bcc-445e-9ea3-7bc854e2ad76';
+    } else {
+      // Nếu không có mã bí mật, mới check JWT (cho việc test từ Dashboard)
+      userId = requireUserId(req, res);
+      if (!userId) return;
+    }
+    const userName = await getUserName(userId);
 
     // 1. PHÂN BIỆT LOẠI GIAO DỊCH (VÀO hay RA)
     // SePay gửi "in" là tiền vào, "out" là tiền ra
@@ -668,7 +755,7 @@ app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
 
     // 3. LƯU DATABASE (Dùng đúng transactionType)
     let catRes = await pool.query(
-      `SELECT category_id FROM categories WHERE category_name ILIKE $1 AND user_id = $2 LIMIT 1`,
+      `SELECT category_id FROM category_service.categories WHERE category_name ILIKE $1 AND user_id = $2 LIMIT 1`,
       [aiData.category_name, userId],
     );
 
@@ -677,7 +764,7 @@ app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
       categoryId = catRes.rows[0].category_id;
     } else {
       const newCat = await pool.query(
-        "INSERT INTO categories (user_id, category_name, type, icon, color) VALUES ($1, $2, $3, '🏦', 'blue') RETURNING category_id",
+        "INSERT INTO category_service.categories (user_id, category_name, type, icon, color) VALUES ($1, $2, $3, '🏦', 'blue') RETURNING category_id",
         [userId, aiData.category_name, transactionType],
       );
       categoryId = newCat.rows[0].category_id;
@@ -686,11 +773,11 @@ app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
     const nowICT = new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' });
 
     await pool.query(
-      `INSERT INTO transactions (account_id, category_id, amount, transaction_type, description, date, note)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      `INSERT INTO transaction_service.transactions (user_id, account_id, category_id, amount, transaction_type, description, date, note)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
-        1,
-        // targetAccountId,
+        userId,
+        'd4ffbef0-8bcc-445e-9ea3-7bc854e2ad76',
         categoryId,
         finalAmount,
         transactionType,
@@ -703,11 +790,11 @@ app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
     // 4. THÔNG BÁO THÔNG MINH (Thay đổi câu chữ dựa trên isIncome)
     let notificationMsg = '';
     if (isIncome) {
-      notificationMsg = `💰 **Ting ting!** Money Guard thấy Bảo vừa **nhận được** **${finalAmount.toLocaleString()}đ** từ "${
+      notificationMsg = `💰 **Ting ting!** Money Guard thấy ${userName} vừa **nhận được** **${finalAmount.toLocaleString()}đ** từ "${
         aiData.clean_name
-      }". Chúc mừng Bảo có thêm thu nhập! 🥳`;
+      }". Chúc mừng ${userName} có thêm thu nhập! 🥳`;
     } else {
-      notificationMsg = `💸 **Ting ting!** Money Guard thấy Bảo vừa **chuyển đi** **${finalAmount.toLocaleString()}đ** cho "${
+      notificationMsg = `💸 **Ting ting!** Money Guard thấy ${userName} vừa **chuyển đi** **${finalAmount.toLocaleString()}đ** cho "${
         aiData.clean_name
       }". Đã ghi vào sổ rồi nhé!`;
     }
@@ -722,13 +809,13 @@ app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
     // 2. Moni tự động "soi" dữ liệu để đưa ra lời khuyên "đanh đá"
     let proactiveMsg = '';
     if (health.status.includes('🔴')) {
-      proactiveMsg = `\n\n🚨 **TỔNG BÁO ĐỘNG**: Bảo ơi, hiện tại Bảo đang TIÊU VƯỢT THU NHẬP rồi! Cất ngay cái thẻ đi trước khi cái ví "đăng xuất" khỏi trái đất! 😤`;
+      proactiveMsg = `\n\n🚨 **TỔNG BÁO ĐỘNG**: ${userName} ơi, hiện tại ${userName} đang TIÊU VƯỢT THU NHẬP rồi! Cất ngay cái thẻ đi trước khi cái ví "đăng xuất" khỏi trái đất! 😤`;
     } else if (health.daysToEmpty <= 5 && health.balance > 0) {
-      proactiveMsg = `\n\n⚠️ **CẢNH BÁO ĐÓI KÉM**: Với đà này Bảo chỉ còn đủ tiền sống trong **${health.daysToEmpty} ngày** nữa thôi. Chuẩn bị tinh thần ăn mì tôm cả tháng nhé! 🍜`;
+      proactiveMsg = `\n\n⚠️ **CẢNH BÁO ĐÓI KÉM**: Với đà này ${userName} chỉ còn đủ tiền sống trong **${health.daysToEmpty} ngày** nữa thôi. Chuẩn bị tinh thần ăn mì tôm cả tháng nhé! 🍜`;
     } else if (finalAmount > 1000000 && transactionType === 'expense') {
-      proactiveMsg = `\n\n💸 **XÀI SANG QUÁ**: Món này tận **${finalAmount.toLocaleString()}đ**, Bảo có thực sự cần nó không hay chỉ là nhất thời? Suy nghĩ kỹ đi nhé! 🤔`;
+      proactiveMsg = `\n\n💸 **XÀI SANG QUÁ**: Món này tận **${finalAmount.toLocaleString()}đ**, ${userName} có thực sự cần nó không hay chỉ là nhất thời? Suy nghĩ kỹ đi nhé! 🤔`;
     } else {
-      proactiveMsg = `\n\n✅ **TỐT LẮM**: Duy trì phong độ này nhé Bảo, hiện Bảo vẫn còn sống sót được thêm **${health.daysToEmpty} ngày** nữa. Tiết kiệm là quốc sách! 💎`;
+      proactiveMsg = `\n\n✅ **TỐT LẮM**: Duy trì phong độ này nhé ${userName}, hiện ${userName} vẫn còn sống sót được thêm **${health.daysToEmpty} ngày** nữa. Tiết kiệm là quốc sách! 💎`;
     }
 
     // 3. Gộp nội dung thông báo gốc + Lời cảnh báo chủ động của AI
@@ -736,12 +823,10 @@ app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
 
     // 5.MỚI: LƯU VÀO LỊCH SỬ CHAT (Để khi F5 web nó vẫn hiện ra)
     try {
-      await pool.query('INSERT INTO message_history (user_id, role, message) VALUES ($1, $2, $3)', [
-        // targetUserId,
-        userId,
-        'model',
-        finalMsg,
-      ]);
+      await pool.query(
+        'INSERT INTO ai_service.message_history (user_id, role, message) VALUES ($1, $2, $3)',
+        [userId, 'model', finalMsg],
+      );
       console.log('💾 Đã lưu thông báo ngân hàng vào lịch sử chat');
     } catch (chatErr) {
       console.error('❌ Lỗi lưu lịch sử chat ngân hàng:', chatErr.message);
@@ -752,7 +837,7 @@ app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
     io.emit('bank_notification', { message: finalMsg });
     console.log('📡 [PROACTIVE]: Đã bắn Socket cảnh báo về Web.');
 
-    await addNotification(finalMsg);
+    await addNotification(finalMsg, userId);
 
     // Test xem client có đang lắng nghe không
     socket.on('new_notification', (data) => {
@@ -766,20 +851,28 @@ app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
     console.log(`✅ Thành công: ${notificationMsg}`);
     res.status(200).json({ status: 'Success' });
   } catch (err) {
-    console.error('❌ LỖI:', err.message);
-    res.status(200).send('Error');
+    console.error('❌ LỖI CHI TIẾT:', err);
+    // Trả về lỗi chi tiết thay vì chữ "Error" chung chung để debug
+    res.status(500).json({
+      status: 'Error',
+      message: err.message,
+      stack: err.stack,
+    });
   }
 });
 
-app.post('/chat', authenticateToken, upload.single('image'), async (req, res) => {
+app.post('/chat', upload.single('image'), async (req, res) => {
   try {
     const { message, model: requestedModel } = req.body;
 
     // const { message } = req.body;
     const imageFile = req.file; // Lấy file ảnh nếu có
-    const currentUserId = 1;
-    // const currentUserId = req.user.user_id;
-
+    const currentUserId = requireUserId(req, res);
+    console.log('user trả vô', currentUserId);
+    if (!currentUserId) {
+      return;
+    }
+    const currentUserName = await getUserName(currentUserId);
     // CHẶN NGAY TỪ ĐẦU NẾU LỖI
     if (message.length > 30000) {
       return res.status(400).json({ error: 'Message quá dài (tối đa ~30k ký tự)' });
@@ -787,7 +880,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
 
     // Kiểm tra nếu cả chữ và ảnh đều trống thì báo lỗi
     if (!message && !imageFile) {
-      return res.status(400).json({ error: 'Bảo ơi, hãy nhập tin nhắn hoặc gửi ảnh nhé!' });
+      return res.status(400).json({ error: 'Hãy nhập tin nhắn hoặc gửi ảnh nhé!' });
     }
 
     // Sanitize XSS
@@ -810,7 +903,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     if (lastUserMessage.content === messageKey && nowBlock - lastUserMessage.time < 3000) {
       console.log('🚫 Chặn Double Submit tin nhắn');
       return res.json({
-        reply: 'Bảo ơi, từ từ thôi, Money Guard đang xử lý tin nhắn trước đó rồi!',
+        reply: 'Từ từ thôi, Money Guard đang xử lý tin nhắn trước đó rồi!',
       });
     }
     lastUserMessage = { time: nowBlock, content: messageKey };
@@ -822,18 +915,16 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     // VỊ TRÍ 1: DÁN ĐOẠN LƯU TIN NHẮN USER TẠI ĐÂY
     // ==========================================
     try {
-      await pool.query('INSERT INTO message_history (user_id, role, message) VALUES ($1, $2, $3)', [
-        currentUserId,
-        'user',
-        message || '[Gửi ảnh]',
-      ]);
+      await pool.query(
+        'INSERT INTO ai_service.message_history (user_id, role, message) VALUES ($1, $2, $3)',
+        [currentUserId, 'user', message || '[Gửi ảnh]'],
+      );
       console.log('💾 Đã lưu tin nhắn của Bảo vào DB');
     } catch (err) {
       console.error('❌ Lỗi lưu tin nhắn user:', err.message);
     }
 
     // --- 2. LẤY DỮ LIỆU THẬT TỪ DATABASE ---
-    // const currentUserId = 1; // ID của Bảo trong DB
     const now = new Date();
     const currentMonth = now.getMonth() + 1;
     const currentYear = now.getFullYear();
@@ -855,9 +946,9 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
         SELECT 
             c.category_name, 
             COALESCE(SUM(t.amount), 0) as spent,
-            (SELECT amount_limit FROM budgets b WHERE b.category_id = c.category_id AND b.month = $2 AND b.year = $3 AND b.user_id = $1) as limit_amount
-        FROM categories c
-        LEFT JOIN transactions t ON c.category_id = t.category_id 
+            (SELECT amount_limit FROM budgets_service.budgets b WHERE b.category_id = c.category_id AND b.month = $2 AND b.year = $3 AND b.user_id = $1) as limit_amount
+        FROM category_service.categories c
+        LEFT JOIN transaction_service.transactions t ON c.category_id = t.category_id 
             AND EXTRACT(MONTH FROM t.date) = $2 
             AND EXTRACT(YEAR FROM t.date) = $3
             AND t.transaction_type = 'expense'
@@ -875,8 +966,8 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
           COUNT(CASE WHEN t.transaction_type = 'income' THEN 1 END) as income_count,
           COALESCE(SUM(CASE WHEN t.transaction_type = 'expense' THEN t.amount ELSE 0 END), 0) as total_expense,
           COALESCE(SUM(CASE WHEN t.transaction_type = 'income' THEN t.amount ELSE 0 END), 0) as total_income
-      FROM transactions t
-      JOIN accounts a ON t.account_id = a.account_id
+      FROM transaction_service.transactions t
+      JOIN account_service.accounts a ON t.account_id = a.account_id
       WHERE a.user_id = $1 
         AND EXTRACT(MONTH FROM t.date) = $2 
         AND EXTRACT(YEAR FROM t.date) = $3
@@ -888,7 +979,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     const budgetRes = await pool.query(
       `
         SELECT COALESCE(SUM(amount_limit), 0) as total_limit
-        FROM budgets
+        FROM budgets_service.budgets
         WHERE user_id = $1 AND month = $2 AND year = $3
       `,
       [currentUserId, currentMonth, currentYear],
@@ -944,9 +1035,9 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     const recentTransactionsRes = await pool.query(
       `
           SELECT t.trans_id, t.description, t.amount, t.date, c.category_name
-          FROM transactions t
-          JOIN categories c ON t.category_id = c.category_id
-          JOIN accounts a ON t.account_id = a.account_id
+          FROM transaction_service.transactions t
+          JOIN category_service.categories c ON t.category_id = c.category_id
+          JOIN account_service.accounts a ON t.account_id = a.account_id
           WHERE a.user_id = $1
           ORDER BY t.created_at DESC LIMIT 10
       `,
@@ -979,9 +1070,9 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     // --- LOGIC CHẶN AI ẢO GIÁC ---
     let adviceContext = '';
     if (totalExpense > totalIncome && totalIncome > 0) {
-      adviceContext = `[CẢNH BÁO NGUY HIỂM]: Bảo đang tiêu vượt mức thu nhập (${stats.expense} > ${stats.income}). Hãy mắng thật gắt!`;
+      adviceContext = `[CẢNH BÁO NGUY HIỂM]: ${currentUserName} đang tiêu vượt mức thu nhập (${stats.expense} > ${stats.income}). Hãy mắng thật gắt!`;
     } else if (totalIncome === 0 && totalExpense > 0) {
-      adviceContext = `[GHI CHÚ]: Bảo chưa nhập thu nhập tháng này, chỉ toàn thấy chi ra thôi.`;
+      adviceContext = `[GHI CHÚ]: ${currentUserName} chưa nhập thu nhập tháng này, chỉ toàn thấy chi ra thôi.`;
     }
 
     console.log(`📊 Đã nạp dữ liệu thật tháng ${stats.month} cho Money Guard: ${stats.total}`);
@@ -1002,6 +1093,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     // 2. Tạo Prompt tổng hợp ngữ cảnh
     const inputPrompt = `
     [THÔNG TIN HỆ THỐNG - TỐI MẬT]:
+    [TÊN NGƯỜI DÙNG]: ${currentUserName}
     [DỮ LIỆU THẬT THÁNG ${stats.month}]:
     - Tổng cả thu và chi: ${stats.total}
     - Tổng Chi tháng này: ${stats.expense} (${stats.expense_count} lần chi)
@@ -1010,9 +1102,9 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     - Giao dịch: ${stats.count}
     - Tình trạng: ${health.status}.
     - Tốc độ đốt tiền: ${health.dailyAvg}đ/ngày.
-    - Dự báo: Bảo sẽ cạn sạch tiền sau ${health.daysToEmpty} ngày nữa.
+    - Dự báo: ${currentUserName} sẽ cạn sạch tiền sau ${health.daysToEmpty} ngày nữa.
     
-    - Tổng ngân sách Bảo tự đặt (Budget): ${totalLimit.toLocaleString()}đ.
+    - Tổng ngân sách ${currentUserName} tự đặt (Budget): ${totalLimit.toLocaleString()}đ.
     - Người dùng đã tiêu hết: ${totalExpense.toLocaleString()}đ.
     - Quỹ còn lại ĐƯỢC PHÉP TIÊU: ${remainingBudget.toLocaleString()}đ.
     - Số ngày còn lại của tháng: ${daysLeft} ngày.
@@ -1021,7 +1113,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     ${adviceContext}
 
     [NGỮ CẢNH HỆ THỐNG]:
-    Dưới đây là dữ liệu tài chính của Bảo:
+    Dưới đây là dữ liệu tài chính của ${currentUserName}:
     - THỜI GIAN THỰC: Hôm nay là ${currentDayName}, ngày ${currentDate}.
     - Tháng: ${stats.month} | Tổng chi: ${stats.total} | Giao dịch: ${stats.count} | TB/ngày: ${
       stats.avg
@@ -1033,26 +1125,26 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     }.
     - Báo cáo hạng mục & Ngân sách:
     ${categoryReport}
-    - 5 Giao dịch gần nhất của Bảo:
+    - 5 Giao dịch gần nhất của ${currentUserName}:
     ${recentData}
 
     [YÊU CẦU XỬ LÝ NGÀY THÁNG]:
-    1. Nếu Bảo nói "hôm nay" hoặc không nói ngày: Dùng ngày ${currentDate}.
-    2. Nếu Bảo nói "hôm qua": Bạn tự tính toán lấy ngày ${currentDate} trừ đi 1 ngày (Kết quả phải là 2026-03-27).
-    3. Nếu Bảo nói "hôm kia": Trừ đi 2 ngày.
-    4. Nếu Bảo nói "thứ mấy" (vd: thứ 2 vừa rồi): Dựa vào hôm nay là ${currentDayName} để suy luận ra ngày chính xác.
+    1. Nếu ${currentUserName} nói "hôm nay" hoặc không nói ngày: Dùng ngày ${currentDate}.
+    2. Nếu ${currentUserName} nói "hôm qua": Bạn tự tính toán lấy ngày ${currentDate} trừ đi 1 ngày.
+    3. Nếu ${currentUserName} nói "hôm kia": Trừ đi 2 ngày.
+    4. Nếu ${currentUserName} nói "thứ mấy" (vd: thứ 2 vừa rồi): Dựa vào hôm nay là ${currentDayName} để suy luận ra ngày chính xác.
     5. LUÔN luôn xuất ngày tháng cuối cùng ở định dạng YYYY-MM-DD bên trong thẻ <transaction>.
     
     [YÊU CẦU XỬ LÝ]:
-    - Nếu câu hỏi của Bảo liên quan đến: "chi tiêu", "tiền bạc", "báo cáo", "tháng này", "bao nhiêu tiền", hoặc "tổng kết" -> Hãy lôi dữ liệu trên ra báo cáo chuyên nghiệp theo Rules (4 đoạn, có icon).
-    - Nếu Bảo chỉ: "Chào hỏi", "Hỏi danh tính (bạn là ai)", "Nói chuyện phiếm" -> Tuyệt đối KHÔNG hiện số liệu chi tiêu. Hãy trả lời thân thiện, khích lệ và nhắc Bảo tập trung vào mục tiêu tài chính một cách khéo léo.
-    - ƯU TIÊN: Nếu Bảo đang cung cấp số tiền cho một món đồ đã nhắc ở câu trước (ví dụ: Bảo gõ "100k"), hãy thực hiện trích xuất <transaction> ngay thay vì hiện báo cáo tổng.
+    - Nếu câu hỏi của ${currentUserName} liên quan đến: "chi tiêu", "tiền bạc", "báo cáo", "tháng này", "bao nhiêu tiền", hoặc "tổng kết" -> Hãy lôi dữ liệu trên ra báo cáo chuyên nghiệp theo Rules (4 đoạn, có icon).
+    - Nếu ${currentUserName} chỉ: "Chào hỏi", "Hỏi danh tính (bạn là ai)", "Nói chuyện phiếm" -> Tuyệt đối KHÔNG hiện số liệu chi tiêu. Hãy trả lời thân thiện, khích lệ và nhắc ${currentUserName} tập trung vào mục tiêu tài chính một cách khéo léo.
+    - ƯU TIÊN: Nếu ${currentUserName} đang cung cấp số tiền cho một món đồ đã nhắc ở câu trước (ví dụ: ${currentUserName} gõ "100k"), hãy thực hiện trích xuất <transaction> ngay thay vì hiện báo cáo tổng.
 
     [NHIỆM VỤ MỞ RỘNG]:
-    1. PHÁT HIỆN BẤT THƯỜNG: Nếu Bảo nhập món đồ cao hơn 3 lần mức trung bình các món trước, hãy cảnh báo và xác nhận lại để lưu database và nếu chỉnh database thì nhớ chỉnh luôn note của cái vừa chỉnh 🚨.
-    2. DỰ BÁO: Nếu Bảo hỏi về tương lai, hãy lấy tổng chi chia cho ngày hiện tại để dự báo chi tiêu cuối tháng.
+    1. PHÁT HIỆN BẤT THƯỜNG: Nếu ${currentUserName} nhập món đồ cao hơn 3 lần mức trung bình các món trước, hãy cảnh báo và xác nhận lại để lưu database và nếu chỉnh database thì nhớ chỉnh luôn note của cái vừa chỉnh 🚨.
+    2. DỰ BÁO: Nếu ${currentUserName} hỏi về tương lai, hãy lấy tổng chi chia cho ngày hiện tại để dự báo chi tiêu cuối tháng.
     3. NLP CRUD (SỬA/XÓA): 
-       - Nếu Bảo muốn xóa (vd: "Xóa món phở nãy đi"), hãy tìm ID trong danh sách "Giao dịch gần nhất" và trả về thẻ <delete_transaction>{"id": ID_CẦN_XÓA}</delete_transaction>.
+       - Nếu ${currentUserName} muốn xóa (vd: "Xóa món phở nãy đi"), hãy tìm ID trong danh sách "Giao dịch gần nhất" và trả về thẻ <delete_transaction>{"id": ID_CẦN_XÓA}</delete_transaction>.
        - Tương tự cho Sửa: <update_transaction>{"id": ID, "amount": SỐ_TIỀN_MỚI}</update_transaction>.
     4. SMART BUDGET: Nếu chi tiêu hạng mục nào vượt quá Hạn mức, hãy "mắng" thật gắt và yêu cầu cắt giảm.
     5. Khi in ra số dư nếu âm thì phải có dấu - đằng trước balance
@@ -1060,68 +1152,68 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     [DỮ LIỆU DỰ BÁO]:
     - Tiêu xài tuần này tăng {{ n% }} so với tuần trước.
     - Các món thuộc nhóm 'Wants' chiếm {{ m% }} tổng chi.
-    - Nếu không cắt giảm, Bảo sẽ nợ {{ X }} đồng vào cuối tháng.
-    - Hãy dùng mô hình dự báo để chỉ ra ngày chính xác Bảo sẽ hết tiền.
+    - Nếu không cắt giảm, ${currentUserName} sẽ nợ {{ X }} đồng vào cuối tháng.
+    - Hãy dùng mô hình dự báo để chỉ ra ngày chính xác ${currentUserName} sẽ hết tiền.
 
     [CHỈ THỊ CỰC GẮT CHO AI]:
-    1. Nếu "Quỹ còn lại" bị âm: Hãy mắng Bảo là 'Chiến thần phá gia chi tử' và yêu cầu dừng mọi khoản chi.
+    1. Nếu "Quỹ còn lại" bị âm: Hãy mắng ${currentUserName} là 'Chiến thần phá gia chi tử' và yêu cầu dừng mọi khoản chi.
     2. Khi Người dùng hỏi 'Mua gì tự thưởng', hãy nhìn vào 'Hạn mức chi tiêu mỗi ngày' (${dailyAllowance}đ). 
     3. Tuyệt đối KHÔNG ĐƯỢC lấy số dư tài khoản (${
       stats.balance
-    }) để khuyên Bảo tiêu xài. Phải giữ kỷ luật theo Ngân sách (Budget).
+    }) để khuyên ${currentUserName} tiêu xài. Phải giữ kỷ luật theo Ngân sách (Budget).
     
     [CÔNG VIỆC CỤ THỂ]:
-    1. PHÁT HIỆN BẤT THƯỜNG: So sánh món đồ Bảo vừa nhập với "5 giao dịch gần nhất". Nếu giá cao gấp 3 lần trung bình, hãy dừng lại, mắng Bảo một trận và yêu cầu Bảo xác nhận: "Có thực sự muốn đốt tiền không?" mới được nhả thẻ <transaction>.
-    - Nếu giá món đồ cao bất thường (gấp 3 lần trung bình): Bạn PHẢI mắng Bảo và hỏi xác nhận. 
+    1. PHÁT HIỆN BẤT THƯỜNG: So sánh món đồ ${currentUserName} vừa nhập với "5 giao dịch gần nhất". Nếu giá cao gấp 3 lần trung bình, hãy dừng lại, mắng ${currentUserName} một trận và yêu cầu ${currentUserName} xác nhận: "Có thực sự muốn đốt tiền không?" mới được nhả thẻ <transaction>.
+    - Nếu giá món đồ cao bất thường (gấp 3 lần trung bình): Bạn PHẢI mắng ${currentUserName} và hỏi xác nhận. 
     - TUYỆT ĐỐI KHÔNG được in thẻ <transaction> trong câu hỏi xác nhận này.
-    - CHỈ KHI NÀO Bảo trả lời "Đúng rồi", "Lưu đi", "Xác nhận" thì bạn mới được in thẻ <transaction> ở câu trả lời sau đó.
-    - NHƯNG: Nếu Bảo đã trả lời "Đúng rồi", "Lưu đi", "Xác nhận", "Ghi đi" hoặc các từ tương tự: 
+    - CHỈ KHI NÀO ${currentUserName} trả lời "Đúng rồi", "Lưu đi", "Xác nhận" thì bạn mới được in thẻ <transaction> ở câu trả lời sau đó.
+    - NHƯNG: Nếu ${currentUserName} đã trả lời "Đúng rồi", "Lưu đi", "Xác nhận", "Ghi đi" hoặc các từ tương tự: 
     => BẠN PHẢI DỪNG VIỆC HỎI LẠI. 
     => BẠN PHẢI IN THẺ <transaction> NGAY LẬP TỨC ở cuối câu trả lời. 
     => Không được chần chừ, không được hỏi thêm lần 2, lần 3.
 
-    2. KIỂM TRA TƯƠNG LAI: Nếu Bảo nhập ngày là tương lai (ví dụ hôm nay 31 mà nhập cho ngày 01 tháng sau), hãy hỏi: "Bảo đang tính trước tương lai à? Chắc chắn thì Money Guard mới ghi sổ nhé".
+    2. KIỂM TRA TƯƠNG LAI: Nếu ${currentUserName} nhập ngày là tương lai (ví dụ hôm nay 31 mà nhập cho ngày 01 tháng sau), hãy hỏi: "${currentUserName} đang tính trước tương lai à? Chắc chắn thì Money Guard mới ghi sổ nhé".
 
     3. TRUY VẤN DỮ LIỆU (NLP QUERY): 
-       - Nếu Bảo hỏi ví dụ "Tháng này uống Cafe bao nhiêu lần và bao nhiêu tiền?", hãy lục lại [Báo cáo hạng mục] và [5 giao dịch gần nhất] để trả lời chính xác. Nếu thông tin không đủ, hãy dựa vào dữ liệu đã có để ước tính.
+       - Nếu ${currentUserName} hỏi ví dụ "Tháng này uống Cafe bao nhiêu lần và bao nhiêu tiền?", hãy lục lại [Báo cáo hạng mục] và [5 giao dịch gần nhất] để trả lời chính xác. Nếu thông tin không đủ, hãy dựa vào dữ liệu đã có để ước tính.
 
     4. DỰ BÁO TÀI CHÍNH: Dựa vào tốc độ chi tiêu ${
       stats.avg
-    }/ngày, hãy dự báo nếu cứ tiếp tục thế này thì cuối tháng Bảo sẽ thâm hụt bao nhiêu lúa.
+    }/ngày, hãy dự báo nếu cứ tiếp tục thế này thì cuối tháng ${currentUserName} sẽ thâm hụt bao nhiêu lúa.
 
     5. NLP CRUD (ĐIỀU KHIỂN CSDL QUA GIỌNG NÓI):
-       - XÓA: Nếu Bảo nói "Xóa món...", hãy tìm ID trong danh sách gần nhất và trả về thẻ: <delete_transaction>{"id": ID}</delete_transaction>
-       - SỬA: Nếu Bảo nói "Sửa món ID... thành...", trả về thẻ: <update_transaction>{"id": ID, "amount": SỐ_TIỀN_MỚI}</update_transaction>. Khi sửa, hãy tự động cập nhật note thành: "Đã điều chỉnh theo yêu cầu của Bảo".
+       - XÓA: Nếu ${currentUserName} nói "Xóa món...", hãy tìm ID trong danh sách gần nhất và trả về thẻ: <delete_transaction>{"id": ID}</delete_transaction>
+       - SỬA: Nếu ${currentUserName} nói "Sửa món ID... thành...", trả về thẻ: <update_transaction>{"id": ID, "amount": SỐ_TIỀN_MỚI}</update_transaction>. Khi sửa, hãy tự động cập nhật note thành: "Đã điều chỉnh theo yêu cầu của ${currentUserName}".
 
-    6. SMART BUDGET: Nếu hạng mục nào ở [Báo cáo hạng mục] ghi "Vượt hạn mức", hãy kích hoạt chế độ "Chửi gắt" ngay lập tức khi Bảo nhắc đến hạng mục đó.
+    6. SMART BUDGET: Nếu hạng mục nào ở [Báo cáo hạng mục] ghi "Vượt hạn mức", hãy kích hoạt chế độ "Chửi gắt" ngay lập tức khi ${currentUserName} nhắc đến hạng mục đó.
 
     7. DỰ BÁO TÀI CHÍNH (PREDICTIVE AI): 
-       - Khi Bảo hỏi "Dự báo", "Tháng này ổn không?", hãy dùng con số dự báo ${projectedTotal.toLocaleString()}đ để phân tích. 
+       - Khi ${currentUserName} hỏi "Dự báo", "Tháng này ổn không?", hãy dùng con số dự báo ${projectedTotal.toLocaleString()}đ để phân tích. 
        - Nếu số này lớn hơn Thu nhập (${
          stats.income
-       }), hãy "dọa" Bảo về việc cuối tháng sẽ hết sạch tiền.
+       }), hãy "dọa" ${currentUserName} về việc cuối tháng sẽ hết sạch tiền.
 
     8. SMART BUDGET (QUẢN LÝ NGÂN SÁCH): 
        - Nhìn vào [Báo cáo hạng mục], nếu thấy hạng mục nào có ghi "🚨 [VƯỢT HẠN MỨC]":
-       - Mỗi khi Bảo nhắc đến hoặc nhập thêm món vào hạng mục đó, bạn PHẢI mắng Bảo thật gắt trước khi làm bất cứ việc gì khác. 
-       - Dùng giọng điệu "sát thủ tài chính" để ngăn chặn Bảo tiêu thêm.
+       - Mỗi khi ${currentUserName} nhắc đến hoặc nhập thêm món vào hạng mục đó, bạn PHẢI mắng ${currentUserName} thật gắt trước khi làm bất cứ việc gì khác. 
+       - Dùng giọng điệu "sát thủ tài chính" để ngăn chặn ${currentUserName} tiêu thêm.
    
     9. ĐỐI VỚI THÁNG NÀY: Dữ liệu ĐÃ CÓ SẴN ở [DỮ LIỆU THẬT THÁNG ${
       stats.month
-    }]. Khi Bảo hỏi "Tháng này tiêu bao nhiêu?", "Còn dư bao nhiêu?" -> HÃY ĐỌC DỮ LIỆU ĐÓ VÀ TRẢ LỜI LUÔN. TUYỆT ĐỐI KHÔNG dùng thẻ <query_db>.
+    }]. Khi ${currentUserName} hỏi "Tháng này tiêu bao nhiêu?", "Còn dư bao nhiêu?" -> HÃY ĐỌC DỮ LIỆU ĐÓ VÀ TRẢ LỜI LUÔN. TUYỆT ĐỐI KHÔNG dùng thẻ <query_db>.
     10. CHỈ DÙNG thẻ <query_db> KHI hỏi quá khứ hoặc chi tiết:
          - "Tháng trước tiêu bao nhiêu?" -> <query_db>{"type": "total_spending", "month": ${
            currentMonth - 1
          }, "year": ${currentYear}}</query_db>
          - "Tháng này ăn uống mấy lần?" -> <query_db>{"type": "category_spending", "category": "ăn uống", "month": ${currentMonth}, "year": ${currentYear}}</query_db>
 
-    Nếu Bảo vừa nhập một món đồ mà trong 7 ngày qua Bảo đã mua món đó hơn 3 lần (ví dụ Trà sữa), bạn PHẢI khịa Bảo về việc nghiện món này và tính tổng tiền Bảo đã 'cúng' cho món đó trong tuần.
+    Nếu ${currentUserName} vừa nhập một món đồ mà trong 7 ngày qua ${currentUserName} đã mua món đó hơn 3 lần (ví dụ Trà sữa), bạn PHẢI khịa ${currentUserName} về việc nghiện món này và tính tổng tiền ${currentUserName} đã 'cúng' cho món đó trong tuần.
     
     Dựa vào số dư ${
       health.balance
-    }đ, Money Guard dự báo Bảo chỉ còn trụ được đến ngày X tháng này. Nếu muốn sống sót đến ngày 30, từ mai Bảo chỉ được tiêu tối đa Y đồng/ngày thôi!
+    }đ, Money Guard dự báo ${currentUserName} chỉ còn trụ được đến ngày X tháng này. Nếu muốn sống sót đến ngày 30, từ mai ${currentUserName} chỉ được tiêu tối đa Y đồng/ngày thôi!
     
-    [CÂU HỎI CỦA BẢO]: "${message}"
+    [CÂU HỎI CỦA ${currentUserName.toUpperCase()}]: "${message}"
 
     [QUY TẮC PHẢN HỒI]: Trình bày theo phong cách hiện đại, sử dụng icon 🚨, 💸, 🛡️, 📈. Tuyệt đối không để lộ mã JSON rác ra ngoài các thẻ quy định.
   `;
@@ -1143,13 +1235,8 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     // Chỗ gọi genAI.getGenerativeModel...
     const model = genAI.getGenerativeModel({
       model: modelToUse,
-      systemInstruction: MONEY_GUARD_RULES,
+      systemInstruction: getMoneyGuardRules(currentUserName),
     });
-
-    // const model = genAI.getGenerativeModel({
-    //   model: 'gemini-robotics-er-1.5-preview', // quota free tier thường cao hơn một chút (khoảng 50-1500/ngày tùy thời điểm) // ← dùng cái này, ổn định hơn 2.0, ít lỗi hơn nếu không overload
-    //   systemInstruction: MONEY_GUARD_RULES, // Gọi biến từ file rules vào đây
-    // });
 
     // --- BẮT ĐẦU ĐOẠN FIX LỊCH SỬ ---
     const chat = model.startChat({
@@ -1167,7 +1254,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
           1. Đọc tên cửa hàng, ngày tháng và DANH SÁCH CHI TIẾT TỪNG MÓN.
           2. Với mỗi món trong bill, xuất một thẻ <transaction> riêng.
           Ví dụ: Bill 100k gồm Phở 60k, Cafe 40k -> Xuất 2 thẻ <transaction>.
-          3. Nếu ảnh mờ, hãy báo Bảo chụp lại.
+          3. Nếu ảnh mờ, hãy báo ${currentUserName} chụp lại.
         `,
       });
       promptParts.push({
@@ -1222,7 +1309,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
             if (queryData.time_range === 'last_week') {
               sql = `
                 SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count
-                FROM transactions t JOIN accounts a ON t.account_id = a.account_id
+                FROM transaction_service.transactions t JOIN account_service.accounts a ON t.account_id = a.account_id
                 WHERE a.user_id = $1 
                 AND t.date >= date_trunc('week', CURRENT_DATE - INTERVAL '1 week')
                 AND t.date < date_trunc('week', CURRENT_DATE)
@@ -1232,7 +1319,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
             else if (queryData.start_date && queryData.end_date) {
               sql = `
                 SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count
-                FROM transactions t JOIN accounts a ON t.account_id = a.account_id
+                FROM transaction_service.transactions t JOIN account_service.accounts a ON t.account_id = a.account_id
                 WHERE a.user_id = $1 
                 AND t.date >= $2 AND t.date <= $3
                 AND t.transaction_type = 'expense'`;
@@ -1243,7 +1330,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
             else if (queryData.type === 'total_spending') {
               sql = `
                 SELECT COALESCE(SUM(amount), 0) as total , COUNT(*) as count
-                FROM transactions t JOIN accounts a ON t.account_id = a.account_id
+                FROM transaction_service.transactions t JOIN account_service.accounts a ON t.account_id = a.account_id
                 WHERE a.user_id = $1 AND EXTRACT(MONTH FROM t.date) = $2 
                 AND t.transaction_type = 'expense'`;
               params.push(queryData.month || currentMonth);
@@ -1252,7 +1339,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
             else if (queryData.type === 'total_spending') {
               sql = `
                 SELECT COALESCE(SUM(amount), 0) as total , COUNT(*) as count
-                FROM transactions t JOIN accounts a ON t.account_id = a.account_id
+                FROM transaction_service.transactions t JOIN account_service.accounts a ON t.account_id = a.account_id
                 WHERE a.user_id = $1 AND EXTRACT(MONTH FROM t.date) = $2 
                 AND t.transaction_type = 'income'`;
               params.push(queryData.month || currentMonth);
@@ -1262,9 +1349,9 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
             else if (queryData.type === 'category_spending' && queryData.category) {
               sql = `
                 SELECT COALESCE(SUM(t.amount), 0) as total, COUNT(*) as count
-                FROM transactions t 
-                JOIN accounts a ON t.account_id = a.account_id
-                JOIN categories c ON t.category_id = c.category_id
+                FROM transaction_service.transactions t 
+                JOIN account_service.accounts a ON t.account_id = a.account_id
+                JOIN account_service.categories c ON t.category_id = c.category_id
                 WHERE a.user_id = $1 
                 AND (c.category_name ILIKE $2 OR $2 ILIKE '%' || c.category_name || '%')
                 AND EXTRACT(MONTH FROM t.date) = $3 
@@ -1287,8 +1374,8 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
                     END as "day_name",
                     SUM(t.amount) as "total_day",
                     COUNT(*) as "count"
-                  FROM transactions t 
-                  JOIN accounts a ON t.account_id = a.account_id
+                  FROM transaction_service.transactions t 
+                  JOIN account_service.accounts a ON t.account_id = a.account_id
                   WHERE a.user_id = $1 
                   AND EXTRACT(MONTH FROM t.date) = $2
                   AND t.transaction_type = 'expense'
@@ -1306,8 +1393,8 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
                     SUM(CASE WHEN t.date >= date_trunc('week', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') THEN t.amount ELSE 0 END)::bigint as this_week,
                     SUM(CASE WHEN t.date >= date_trunc('week', (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') - INTERVAL '1 week') 
                             AND t.date < date_trunc('week', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') THEN t.amount ELSE 0 END)::bigint as last_week
-                  FROM transactions t
-                  JOIN accounts a ON t.account_id = a.account_id
+                  FROM transaction_service.transactions t
+                  JOIN account_service.accounts a ON t.account_id = a.account_id
                   WHERE a.user_id = $1 AND t.transaction_type = 'expense'
                 `;
             }
@@ -1329,7 +1416,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
 
                   dbResult += `- Chi tiêu tuần này (đến hiện tại): ${thisW.toLocaleString()}đ\n`;
                   dbResult += `- Chi tiêu cả tuần trước: ${lastW.toLocaleString()}đ\n`;
-                  dbResult += `- Chênh lệch: Tuần này Bảo đang tiêu ${status} ${Math.abs(
+                  dbResult += `- Chênh lệch: Tuần này ${currentUserName} đang tiêu ${status} ${Math.abs(
                     diff,
                   ).toLocaleString()}đ so với tuần trước.`;
                 }
@@ -1355,7 +1442,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
                 }
               } else {
                 dbResult +=
-                  'Money Guard đã lục tung sổ sách nhưng không tìm thấy dữ liệu nào cho yêu cầu này của Bảo cả! 🕵️‍♂️';
+                  `Money Guard đã lục tung sổ sách nhưng không tìm thấy dữ liệu nào cho yêu cầu này của ${currentUserName} cả! 🕵️‍♂️`;
               }
               // --- KẾT THÚC GOM CHUNG ---
 
@@ -1382,7 +1469,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
             if (anomaly.isAnomaly && !message.includes('xác nhận') && !message.includes('Lưu đi')) {
               // Nếu bất thường, yêu cầu AI hỏi lại trước khi lưu
               const warnResult = await chat.sendMessage(
-                `[CẢNH BÁO]: Món này cao gấp ${anomaly.factor} lần bình thường. Hãy dừng lại hỏi Bảo xem có nhầm không, KHÔNG được lưu lúc này.`,
+                `[CẢNH BÁO]: Món này cao gấp ${anomaly.factor} lần bình thường. Hãy dừng lại hỏi ${currentUserName} xem có nhầm không, KHÔNG được lưu lúc này.`,
               );
               return res.json({ reply: warnResult.response.text() });
             }
@@ -1400,7 +1487,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
             .trim();
 
           await pool.query(
-            'INSERT INTO message_history (user_id, role, message) VALUES ($1, $2, $3)',
+            'INSERT INTO ai_service.message_history (user_id, role, message) VALUES ($1, $2, $3)',
             [currentUserId, 'model', cleanMessageForDB || 'Money Guard đã xử lý yêu cầu của bạn.'],
           );
           console.log('💾 Đã lưu phản hồi của Money Guard vào DB');
@@ -1419,22 +1506,67 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
           try {
             const catData = JSON.parse(createCatMatch[1].trim());
             const catName = catData.category_name;
-            const userId = 1;
+            const catType = catData.type || 'expense';
+
+            const userId = requireUserId(req, res);
+            if (!userId) {
+              return;
+            }
 
             if (catName) {
               // Tìm theo cột category_name
               const checkCat = await pool.query(
-                'SELECT category_id FROM categories WHERE category_name ILIKE $1 AND user_id = $2',
+                'SELECT category_id FROM category_service.categories WHERE category_name ILIKE $1 AND user_id = $2',
                 [catName, userId],
               );
 
               if (checkCat.rows.length === 0) {
-                // Insert vào cột category_name
+                // dùng toán tử || để nối chuỗi tìm kiếm trong SQL
+                let iconLookup = await pool.query(
+                  `SELECT icon_id FROM category_service.icons 
+                   WHERE $1 ILIKE '%' || name || '%' OR $1 ILIKE '%' || icon_code || '%' 
+                   LIMIT 1`,
+                  [catName], // Đã sửa từ catNameFromAI thành catName
+                );
+
+                let finalIconId;
+
+                if (iconLookup.rows.length > 0) {
+                  // Nếu có sẵn icon trong kho thì dùng luôn
+                  finalIconId = iconLookup.rows[0].icon_id;
+                  console.log(`🎯 Dùng icon có sẵn cho: ${catName}`);
+                } else {
+                  const iconModel = genAI.getGenerativeModel({
+                    model: 'gemini-3.1-flash-lite-preview',
+                  });
+                  const iconPrompt = `Bạn là chuyên gia thiết kế icon. Hãy gợi ý đúng 1 emoji duy nhất đại diện cho danh mục: "${catName}". 
+                  Chỉ trả về đúng 1 ký tự emoji, không giải thích, không backticks, không thêm chữ.`;
+
+                  const aiIconRes = await iconModel.generateContent(iconPrompt);
+                  let suggestedEmoji = aiIconRes.response.text().trim();
+
+                  // Làm sạch emoji (phòng hờ AI nhả ra markdown hoặc text)
+                  suggestedEmoji = suggestedEmoji.match(/\p{Emoji}/u)?.[0] || '📁';
+
+                  // 4. LƯU ICON MỚI NÀY VÀO KHO ICONS ĐỂ DÙNG LẠI SAU NÀY
+                  const newIcon = await pool.query(
+                    `INSERT INTO category_service.icons (name, icon_code, category) 
+                     VALUES ($1, $2, $3) 
+                     RETURNING icon_id`,
+                    [catName + ' Icon', suggestedEmoji, catType], // Đã sửa transactionType thành catType
+                  );
+
+                  finalIconId = newIcon.rows[0].icon_id;
+                  console.log(`✅ Đã tự tạo Icon mới thành công: ${suggestedEmoji}`);
+                }
+
                 await pool.query(
-                  "INSERT INTO categories (user_id, category_name, type, icon, color) VALUES ($1, $2, 'expense', '📁', 'grey')",
-                  [userId, catName],
+                  "INSERT INTO category_service.categories (user_id, category_name, type, icon_id, color) VALUES ($1, $2, 'expense', $3, $4)",
+                  [userId, catName, finalIconId, 'blue'],
                 );
                 console.log(`✨ Đã tạo danh mục mới: ${catName}`);
+              } else {
+                console.log(`🟡 Danh mục "${catName}" đã tồn tại rồi.`);
               }
             }
           } catch (e) {
@@ -1446,7 +1578,9 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
         const deleteMatch = reply.match(/<delete_transaction>(.*?)<\/delete_transaction>/s);
         if (deleteMatch) {
           const { id } = JSON.parse(deleteMatch[1]);
-          await pool.query('DELETE FROM transactions WHERE trans_id = $1', [id]);
+          await pool.query('DELETE FROM transaction_service.transactions WHERE trans_id = $1', [
+            id,
+          ]);
           console.log(`🗑️ Đã xóa giao dịch ID: ${id}`);
         }
 
@@ -1455,7 +1589,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
         if (updateMatch) {
           const { id, amount, description, category_name } = JSON.parse(updateMatch[1]);
           await pool.query(
-            'UPDATE transactions SET amount = COALESCE($1, amount), description = COALESCE($2, description) WHERE trans_id = $3',
+            'UPDATE transaction_service.transactions SET amount = COALESCE($1, amount), description = COALESCE($2, description) WHERE trans_id = $3',
             [amount, description, id],
           );
           console.log(`✏️ Đã cập nhật giao dịch ID: ${id} thành ${amount}đ`);
@@ -1469,7 +1603,11 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
           for (const match of matches) {
             try {
               const data = JSON.parse(match[1].trim());
-              const userId = 1;
+
+              const userId = requireUserId(req, res);
+              if (!userId) {
+                return;
+              }
               let catNameFromAI = data.category_name;
 
               const transactionType = data.transaction_type || 'expense';
@@ -1507,7 +1645,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
               // Kiểm tra xem trong DB đã có danh mục nào "chứa" hoặc "giống" cái AI gửi về không
               // Ví dụ: AI gửi "Cơm gà" mà DB đã có "Cơm" -> dùng luôn "Cơm"
               let catRes = await pool.query(
-                `SELECT category_id, category_name FROM categories 
+                `SELECT category_id, category_name FROM category_service.categories 
                   WHERE (category_name ILIKE $1 OR $1 ILIKE '%' || category_name || '%') 
                   AND user_id = $2 LIMIT 1`,
                 [catNameFromAI, userId],
@@ -1520,10 +1658,26 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
                   `♻️  Gom nhóm: "${catNameFromAI}" vào danh mục sẵn có: "${catRes.rows[0].category_name}"`,
                 );
               } else {
+                // NẾU CHƯA CÓ -> TỰ ĐỘNG TÌM ICON PHÙ HỢP TRONG KHO ICONS
+                console.log(`🔍 Đang tìm icon tự động cho danh mục mới: ${catNameFromAI}...`);
+
+                const iconLookup = await pool.query(
+                  `SELECT icon_id FROM category_service.icons 
+                      WHERE $1 ILIKE '%' || name || '%' OR $1 ILIKE '%' || icon_code || '%' 
+                      LIMIT 1`,
+                  [catNameFromAI],
+                );
+
+                // Nếu thấy icon phù hợp thì lấy, không thì lấy icon mặc định (Bills)
+                const finalIconId =
+                  iconLookup.rows.length > 0
+                    ? iconLookup.rows[0].icon_id
+                    : 'f1995874-297d-460c-882d-136585918831'; // Mã UUID mặc định của Bảo
+
                 // Nếu tạo danh mục mới, phải tạo đúng loại (income/expense)
                 const newCat = await pool.query(
-                  "INSERT INTO categories (user_id, category_name, type, icon, color) VALUES ($1, $2, $3, '💰', 'green') RETURNING category_id",
-                  [userId, data.category_name, transactionType],
+                  'INSERT INTO category_service.categories (user_id, category_name, type, icon_id, color) VALUES ($1, $2, $3, $4, $5) RETURNING category_id',
+                  [userId, data.category_name, transactionType, finalIconId, 'blue'],
                 );
                 categoryId = newCat.rows[0].category_id;
                 console.log(`✨ Tạo danh mục mới: ${catNameFromAI}`);
@@ -1531,11 +1685,12 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
 
               // 2. LƯU GIAO DỊCH
               const insertQuery = `
-                INSERT INTO transactions (account_id, category_id, amount, transaction_type, description, date, note)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                INSERT INTO transaction_service.transactions (user_id, account_id, category_id, amount, transaction_type, description, date, note)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
               `;
               const values = [
-                data.account_id || 1,
+                currentUserId,
+                'd4ffbef0-8bcc-445e-9ea3-7bc854e2ad76',
                 categoryId,
                 finalAmount,
                 transactionType,
@@ -1573,7 +1728,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
           }
         }
 
-        await addNotification('Money Guard đã ghi sổ xong giao dịch của bạn! 🛡️');
+        await addNotification('Money Guard đã ghi sổ xong giao dịch của bạn! 🛡️', currentUserId);
 
         // Trả về reply cho client
         return res.json({ reply });
@@ -1614,17 +1769,19 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
 //
 //
 //
-app.get('/api/ai-deep-scan', authenticateToken, async (req, res) => {
+app.get('/api/ai-deep-scan', async (req, res) => {
   try {
-    const userId = req.user?.user_id || 1;
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
     console.log(`🔍 [SCAN] Bắt đầu quét cho User ID: ${userId}`);
 
     const result = await pool.query(
       `
       SELECT t.description, t.amount, t.date, c.category_name 
-      FROM transactions t 
-      JOIN categories c ON t.category_id = c.category_id
-      JOIN accounts a ON t.account_id = a.account_id
+      FROM transaction_service.transactions t 
+      JOIN category_service.categories c ON t.category_id = c.category_id
+      JOIN account_service.accounts a ON t.account_id = a.account_id
       WHERE a.user_id = $1 AND EXTRACT(MONTH FROM t.date) = EXTRACT(MONTH FROM CURRENT_DATE)
       AND t.transaction_type = 'expense'
     `,
@@ -1639,7 +1796,7 @@ app.get('/api/ai-deep-scan', authenticateToken, async (req, res) => {
         score: 100,
         disease: 'Ví tiền sạch sẽ tuyệt đối',
         symptoms: ['Không có chi tiêu nào'],
-        advice: 'Bảo chưa tiêu gì nên không có bệnh để khám!',
+        advice: 'Bạn chưa tiêu gì nên không có bệnh để khám!',
         future: 'Giàu sang phú quý',
       });
     }
@@ -1671,10 +1828,14 @@ app.get('/api/ai-deep-scan', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/chat-stream', authenticateToken, async (req, res) => {
+app.post('/chat-stream', async (req, res) => {
   const { message } = req.body;
-  const currentUserId = req.user?.user_id || 1;
 
+  const currentUserId = requireUserId(req, res);
+  if (!currentUserId) {
+    return;
+  }
+  const currentUserName = await getUserName(currentUserId);
   // Set headers cho SSE
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -1683,11 +1844,11 @@ app.post('/chat-stream', authenticateToken, async (req, res) => {
   try {
     const model = genAI.getGenerativeModel({
       model: 'gemini-robotics-er-1.5-preview',
-      systemInstruction: MONEY_GUARD_RULES,
+      systemInstruction: getMoneyGuardRules(currentUserName),
     });
 
     const chat = model.startChat({
-      history: manageChatHistory(currentUserId, message, ''),
+      history: chatHistory.slice(-10),
     });
 
     // Stream response
@@ -1708,27 +1869,20 @@ app.post('/chat-stream', authenticateToken, async (req, res) => {
     res.end();
 
     // Lưu vào DB sau khi hoàn thành
-    await pool.query('INSERT INTO message_history (user_id, role, message) VALUES ($1, $2, $3)', [
-      currentUserId,
-      'user',
-      message,
-    ]);
+    await pool.query(
+      'INSERT INTO ai_service.message_history (user_id, role, message) VALUES ($1, $2, $3)',
+      [currentUserId, 'user', message],
+    );
 
-    await pool.query('INSERT INTO message_history (user_id, role, message) VALUES ($1, $2, $3)', [
-      currentUserId,
-      'model',
-      fullResponse,
-    ]);
+    await pool.query(
+      'INSERT INTO ai_service.message_history (user_id, role, message) VALUES ($1, $2, $3)',
+      [currentUserId, 'model', fullResponse],
+    );
   } catch (err) {
     res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
     res.end();
   }
 });
-
-// Health check đơn giản
-// app.get('/health', (req, res) => {
-//   res.json({ status: 'ok', message: 'AI service đang chạy' });
-// });
 
 // Middleware xử lý lỗi toàn cục
 app.use((err, req, res, next) => {
@@ -1763,7 +1917,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.get('/api/ai-health', (req, res) => {
+app.get('/ai-health', (req, res) => {
   res.json(getStatusData());
 });
 

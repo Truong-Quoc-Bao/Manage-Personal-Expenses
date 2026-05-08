@@ -1,4 +1,4 @@
-const prisma = require("../config/database");
+const prisma = require('../config/database');
 
 const findCategories = async ({ userId }) => {
   return prisma.category.findMany({
@@ -6,7 +6,7 @@ const findCategories = async ({ userId }) => {
       user_id: userId,
     },
     orderBy: {
-      created_at: "desc",
+      created_at: 'desc',
     },
   });
 };
@@ -15,7 +15,7 @@ const findOneCategory = async (category_id) => {
   return prisma.category.findUnique({
     where: {
       category_id: category_id,
-    }
+    },
   });
 };
 
@@ -25,7 +25,7 @@ const findOneCategoryForTransactionCheck = async (category_id, user_id, type) =>
       category_id: category_id,
       user_id: user_id,
       type: type,
-    }
+    },
   });
 };
 
@@ -36,14 +36,11 @@ const findCategoryForDisplay = async (category_id, user_id, type) => {
       user_id: user_id,
       type: type,
     },
-    include: {
-      icon: true,
-    },
   });
 };
 
-const createCategories = async ({ userId , cat }) => {
-  console.log("Creating repo category with data:", { userId, cat }); // Debug log to check input data
+const createCategories = async ({ userId, cat }) => {
+  console.log('Creating repo category with data:', { userId, cat }); // Debug log to check input data
   return prisma.category.create({
     data: {
       // category_id: crypto.randomUUID(),
@@ -58,7 +55,7 @@ const createCategories = async ({ userId , cat }) => {
   });
 };
 
-const updateCategory = async ({ userId , category_id, cat }) => {
+const updateCategory = async ({ userId, category_id, cat }) => {
   return prisma.category.update({
     where: {
       category_id: category_id,
@@ -71,9 +68,7 @@ const updateCategory = async ({ userId , category_id, cat }) => {
       color: cat.color,
       is_system: cat.is_system,
       created_at: cat.created_at,
-    }
-
-
+    },
 
     // orderBy: {
     //   created_at: "desc",
@@ -85,11 +80,15 @@ const deleteCategory = async (categoryId) => {
   return prisma.category.delete({
     where: {
       category_id: categoryId,
-    }
+    },
   });
 };
 module.exports = {
-  findCategories,createCategories,updateCategory,findOneCategory,deleteCategory,
+  findCategories,
+  createCategories,
+  updateCategory,
+  findOneCategory,
+  deleteCategory,
   findOneCategoryForTransactionCheck,
   findCategoryForDisplay,
 };
