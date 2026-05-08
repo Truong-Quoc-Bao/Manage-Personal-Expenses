@@ -1,9 +1,5 @@
 import axiosInstance from './axiosInstance';
 
-// Ghi chú cho Bảo:
-// Tất cả các route ở đây đều thêm tiền tố '/api/ai'
-// để Gateway (cổng 3000) biết đường mà đẩy sang AI Service (cổng 4005).
-
 // ─────────────────────────────────────────
 // 🔐 Auth
 // ─────────────────────────────────────────
@@ -23,6 +19,8 @@ export const statsApi = {
   getBudgets: () => axiosInstance.get('/api/ai/api/budgets'),
 
   getRecentTransactions: () => axiosInstance.get('/api/ai/api/recent-transactions'),
+
+  getAllTransactions: () => axiosInstance.get('/api/ai//api/all-transactions'),
 };
 
 // ─────────────────────────────────────────

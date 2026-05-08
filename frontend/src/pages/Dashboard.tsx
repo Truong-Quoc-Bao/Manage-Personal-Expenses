@@ -34,41 +34,90 @@ export function Dashboard() {
   const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  // const loadAllData = useCallback(async () => {
+  //   try {
+  //     setIsLoading(true);
+  //     console.log('🔄 Dashboard đang đồng bộ dữ liệu từ Server...');
+
+  //     const [resStats, resRecents] = await Promise.all([
+  //       statsApi.getStats(),
+  //       statsApi.getRecentTransactions(),
+  //     ]);
+
+  //     // ✅ 1. Cập nhật Stats (Chỉ set 1 lần từ resStats)
+  //     if (resStats.data) {
+  //       setStats(resStats.data);
+  //     }
+
+  //     // ✅ 2. Cập nhật danh sách Giao dịch
+  //     if (resRecents.data && resRecents.data.length > 0) {
+  //       const serverTransactions = resRecents.data.map((t: any) => ({
+  //         id: t.trans_id || t.id || Math.random(),
+  //         type: t.type,
+  //         category: t.category_name || t.category || 'Khác',
+  //         amount: Math.abs(parseFloat(t.amount)),
+  //         description: t.description || 'Không có mô tả',
+  //         account: t.account_name || 'Tiền mặt',
+  //         // 🔥 BẮT BUỘC PHẢI CÓ DÒNG NÀY ĐỂ HÀM formatDateTime CHẠY ĐÚNG
+  //         created_at: t.created_at,
+  //         // Trường date này để hiển thị ngày tháng tĩnh (nếu cần)
+  //         date: new Date(t.created_at).toLocaleDateString('vi-VN'),
+  //       }));
+  //       setTransactions(serverTransactions);
+  //     } else {
+  //       setTransactions(transactionStore.getAll());
+  //     }
+
+  //     setAccounts(accountStore.getAll());
+  //   } catch (err) {
+  //     console.error('Lỗi khi load dữ liệu Dashboard:', err);
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // }, []);
+
   const loadAllData = useCallback(async () => {
     try {
       setIsLoading(true);
-      console.log('🔄 Dashboard đang đồng bộ dữ liệu từ Server...');
+      console.log('🔄 Dashboard đang đồng bộ tất cả nguồn dữ liệu...');
 
-      const [resStats, resRecents] = await Promise.all([
+      // Gọi đồng thời cả 3 API để đạt tốc độ tối đa
+      const [resStats, resAll, resRecents] = await Promise.all([
         statsApi.getStats(),
+        statsApi.getAllTransactions(),
         statsApi.getRecentTransactions(),
       ]);
 
-      // ✅ 1. Cập nhật Stats (Chỉ set 1 lần từ resStats)
+      // ✅ 1. Ưu tiên lấy Stats tổng quát từ server
       if (resStats.data) {
         setStats(resStats.data);
       }
 
-      // ✅ 2. Cập nhật danh sách Giao dịch
-      if (resRecents.data && resRecents.data.length > 0) {
-        const serverTransactions = resRecents.data.map((t: any) => ({
+      // ✅ 2. Cập nhật Transactions bằng mảng TOÀN BỘ (resAll)
+      // Việc dùng resAll thay vì resRecents ở đây giúp biến transactions.length
+      // ở dưới Card hiện đúng số tổng (ví dụ 50, 100) thay vì chỉ hiện 20.
+      if (resAll.data && resAll.data.length > 0) {
+        const allServerTransactions = resAll.data.map((t: any) => ({
           id: t.trans_id || t.id || Math.random(),
           type: t.type,
-          category: t.category_name || t.category || 'Khác',
+          category: t.category_name || 'Khác',
           amount: Math.abs(parseFloat(t.amount)),
           description: t.description || 'Không có mô tả',
-          account: t.account_name || 'Tiền mặt',
-          // 🔥 BẮT BUỘC PHẢI CÓ DÒNG NÀY ĐỂ HÀM formatDateTime CHẠY ĐÚNG
+          account: t.account_name || 'Ví chính',
           created_at: t.created_at,
-          // Trường date này để hiển thị ngày tháng tĩnh (nếu cần)
-          date: new Date(t.created_at).toLocaleDateString('vi-VN'),
+          date: t.created_at,
         }));
-        setTransactions(serverTransactions);
+
+        setTransactions(allServerTransactions);
       } else {
         setTransactions(transactionStore.getAll());
       }
 
       setAccounts(accountStore.getAll());
+
+      // Note: resRecents có thể dùng để log hoặc kiểm tra nhanh nếu cần,
+      // nhưng resAll đã bao gồm cả resRecents rồi nên ta ưu tiên resAll.
+      console.log('✅ Đã tải', resAll.data.length, 'giao dịch.');
     } catch (err) {
       console.error('Lỗi khi load dữ liệu Dashboard:', err);
     } finally {
@@ -169,6 +218,15 @@ export function Dashboard() {
     loadAllData();
   };
 
+  // Lọc ra những giao dịch thuộc THÁNG NÀY
+  const monthlyTransactions = transactions.filter((t) => {
+    const tDate = new Date(t.date);
+    return tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear;
+  });
+
+  // SỐ LƯỢNG giao dịch trong tháng này (Đây là con số bạn muốn hiện thay cho số 20)
+  const monthlyCount = monthlyTransactions.length;
+
   return (
     <>
       <main
@@ -191,7 +249,7 @@ export function Dashboard() {
               <p className="text-lg text-gray-600">
                 Chào Bảo!{' '}
                 {stats
-                  ? Tháng ${stats.month} này Bảo đã chi ${formatCurrency(stats.expense)}
+                  ? `Tháng ${stats.month} này Bảo đã chi ${formatCurrency(stats.expense)}`
                   : 'Đây là tổng quan tài chính của bạn.'}
               </p>
             </div>
@@ -257,7 +315,7 @@ export function Dashboard() {
               </p>
               <div className="flex items-center gap-1 text-base font-medium text-red-600">
                 <ArrowDownRight className="h-5 w-5" />
-                Đã ghi sổ {transactions.length} giao dịch
+                Đã ghi sổ {monthlyCount} giao dịch
               </div>
             </div>
           </div>
@@ -308,7 +366,7 @@ export function Dashboard() {
                             {t.category}
                           </span>
                           <span className="text-xs text-gray-400 font-medium tracking-tight">
-                            {formatDateTime(t.created_at)} {/* Sử dụng Utils của Bảo */}
+                            {formatDateTime(t.date)} {/* Sử dụng Utils của Bảo */}
                           </span>
                         </div>
                       </div>

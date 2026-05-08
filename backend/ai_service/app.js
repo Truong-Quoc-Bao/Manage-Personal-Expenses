@@ -125,37 +125,11 @@ app.post('/login', (req, res) => {
   });
 });
 
-//lấy token đăng nhập
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  // 1. Nếu hoàn toàn không có token hoặc token là chữ "null"/"undefined"
-  if (!token || token === 'null' || token === 'undefined') {
-    console.log('⚠️ Không có token, dùng User ID sẵn có');
-    req.user = { user_id: '4f4b144d-e3f8-4e6b-9e32-408030a85698' };
-    return next();
-  }
-
-  // 2. Nếu có token, kiểm tra xem nó còn sống không
-  jwt.verify(token, process.env.JWT_SECRET || 'secret_key', (err, user) => {
-    if (err) {
-      // ✅ SỬA TẠI ĐÂY: Thay vì báo lỗi 403, mình log ra rồi cho đi tiếp với ID 1
-      console.log('⚠️ Token hết hạn hoặc sai, tự động dùng User ID sẵn có để Demo');
-      req.user = { user_id: '4f4b144d-e3f8-4e6b-9e32-408030a85698' };
-      return next();
-    }
-
-    // Nếu token chuẩn thì dùng thông tin từ token
-    req.user = user;
-    next();
-  });
-};
-
 function requireUserId(req, res) {
   const userId = req.headers['x-user-id'];
-  if (userId == null || userId === "") {
-    res.status(401).json({ success: false, message: "Unauthorized" });
+  console.log('user', userId);
+  if (userId == null || userId === '') {
+    res.status(401).json({ success: false, message: 'Unauthorized' });
     return null;
   }
   return String(userId);
@@ -226,8 +200,7 @@ app.get('/api/stats', async (req, res) => {
 // API lấy danh sách ngân sách tháng hiện tại
 app.get('/api/budgets', async (req, res) => {
   try {
-    // const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
-    const userId = requireUserId(req, res)
+    const userId = requireUserId(req, res);
     if (!userId) {
       return;
     }
@@ -258,8 +231,7 @@ app.get('/api/budgets', async (req, res) => {
 // api giao dịch gần đây
 app.get('/api/recent-transactions', async (req, res) => {
   try {
-    // const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
-    const userId = requireUserId(req, res)
+    const userId = requireUserId(req, res);
     if (!userId) {
       return;
     }
@@ -288,14 +260,45 @@ app.get('/api/recent-transactions', async (req, res) => {
     res.status(500).json({ error: 'Lỗi server' });
   }
 });
+
+// all giao dịch
+app.get('/api/all-transactions', async (req, res) => {
+  try {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
+    const result = await pool.query(
+      `
+        SELECT 
+          t.trans_id, 
+          t.amount, 
+          t.date as created_at, 
+          t.transaction_type as type, 
+          t.description,
+          COALESCE(c.category_name, 'Khác') as category_name,
+          a.account_name
+        FROM transaction_service.transactions t
+        JOIN account_service.accounts a ON t.account_id = a.account_id
+        LEFT JOIN category_service.categories c ON t.category_id = c.category_id
+        WHERE a.user_id = $1
+        ORDER BY t.date DESC, t.trans_id DESC
+      `,
+      [userId],
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Lỗi lấy toàn bộ giao dịch:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
 // Route lấy toàn bộ lịch sử chat để hiện lên màn hình khi load trang
-app.get('/chat-history', authenticateToken, async (req, res) => {
+app.get('/chat-history', async (req, res) => {
   try {
     const { message, model: requestedModel } = req.body;
 
-    // const userId = req.user.user_id;
-    // const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698'; // Tạm thời fix là Bảo
-    const userId = requireUserId(req, res)
+    const userId = requireUserId(req, res);
     if (!userId) {
       return;
     }
@@ -376,8 +379,7 @@ const sendPushNotification = (message) => {
 
 // Thay vì chỉ bắn socket, hãy lưu vào DB
 async function addNotification(message) {
-  // const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698'; // ID của Bảo
-  const userId = requireUserId(req, res)
+  const userId = requireUserId(req, res);
   if (!userId) {
     return;
   }
@@ -393,7 +395,6 @@ async function addNotification(message) {
 // API Lấy thông báo (Lấy hết, không lọc is_read để không bị mất tin khi load lại)
 app.get('/api/notifications', async (req, res) => {
   try {
-    // const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
     const userId = requireUserId(req, res);
     if (!userId) {
       return;
@@ -412,7 +413,6 @@ app.get('/api/notifications', async (req, res) => {
 app.post('/api/notifications/read/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    // const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
     const userId = requireUserId(req, res);
     if (!userId) {
       return;
@@ -429,7 +429,6 @@ app.post('/api/notifications/read/:id', async (req, res) => {
 });
 // Route 2: Đánh dấu đọc TẤT CẢ (Không cần ID)
 app.post('/api/notifications/read-all', async (req, res) => {
-  // const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
   const userId = requireUserId(req, res);
   if (!userId) {
     return;
@@ -445,7 +444,7 @@ app.post('/api/notifications/read-all', async (req, res) => {
 app.delete('/api/notifications/delete/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    // const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+
     const userId = requireUserId(req, res);
     if (!userId) {
       return;
@@ -463,7 +462,6 @@ app.delete('/api/notifications/delete/:id', async (req, res) => {
 // Xóa tất cả thông báo của người dùng
 app.delete('/api/notifications/delete-all', async (req, res) => {
   try {
-    // const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
     const userId = requireUserId(req, res);
     if (!userId) {
       return;
@@ -534,9 +532,12 @@ async function getProactiveContext(userId) {
 }
 
 // --- API TẠO LINK LIÊN KẾT (CHỈNH THEO CHUẨN SEPAY) ---
-app.get('/api/create-bank', authenticateToken, async (req, res) => {
+app.get('/api/create-bank', async (req, res) => {
   try {
-    const userId = req.user?.user_id || 1;
+    const userId = requireUserId(req, res);
+    if (!userId) {
+      return;
+    }
     const companyXid = process.env.BANKHUB_COMPANY_XID;
 
     if (!companyXid) {
@@ -626,7 +627,7 @@ app.get('/api/create-bank', authenticateToken, async (req, res) => {
 });
 
 // --- LOG QUÁ TRÌNH XỬ LÝ GIAO DỊCH (BANK) ---
-app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
+app.post('/webhook/bank-transfer', async (req, res) => {
   console.log('\n--- 🚀 [BẮT ĐẦU NHẬN WEBHOOK TỪ SEPAY] ---');
 
   try {
@@ -653,12 +654,11 @@ app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
     const finalAmount = parseFloat(
       transferAmount || transfer_amount || amount_out || amount_in || 0,
     );
-    // const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+
     const userId = requireUserId(req, res);
     if (!userId) {
       return;
     }
-    // const userId = req.user.user_id;
 
     // 1. PHÂN BIỆT LOẠI GIAO DỊCH (VÀO hay RA)
     // SePay gửi "in" là tiền vào, "out" là tiền ra
@@ -831,15 +831,17 @@ app.post('/webhook/bank-transfer', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/chat', authenticateToken, upload.single('image'), async (req, res) => {
+app.post('/chat', upload.single('image'), async (req, res) => {
   try {
     const { message, model: requestedModel } = req.body;
 
     // const { message } = req.body;
     const imageFile = req.file; // Lấy file ảnh nếu có
-    const currentUserId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
-    // const currentUserId = req.user.user_id;
-
+    const currentUserId = requireUserId(req, res);
+    console.log('user trả vô', currentUserId);
+    if (!currentUserId) {
+      return;
+    }
     // CHẶN NGAY TỪ ĐẦU NẾU LỖI
     if (message.length > 30000) {
       return res.status(400).json({ error: 'Message quá dài (tối đa ~30k ký tự)' });
@@ -892,7 +894,6 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
     }
 
     // --- 2. LẤY DỮ LIỆU THẬT TỪ DATABASE ---
-    // const currentUserId = 1; // ID của Bảo trong DB
     const now = new Date();
     const currentMonth = now.getMonth() + 1;
     const currentYear = now.getFullYear();
@@ -1479,7 +1480,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
             const catData = JSON.parse(createCatMatch[1].trim());
             const catName = catData.category_name;
             const catType = catData.type || 'expense';
-            // const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+
             const userId = requireUserId(req, res);
             if (!userId) {
               return;
@@ -1575,7 +1576,7 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
           for (const match of matches) {
             try {
               const data = JSON.parse(match[1].trim());
-              // const userId = '4f4b144d-e3f8-4e6b-9e32-408030a85698';
+
               const userId = requireUserId(req, res);
               if (!userId) {
                 return;
@@ -1741,9 +1742,8 @@ app.post('/chat', authenticateToken, upload.single('image'), async (req, res) =>
 //
 //
 //
-app.get('/api/ai-deep-scan', authenticateToken, async (req, res) => {
+app.get('/api/ai-deep-scan', async (req, res) => {
   try {
-    const userId = req.user?.user_id || 1;
     console.log(`🔍 [SCAN] Bắt đầu quét cho User ID: ${userId}`);
 
     const result = await pool.query(
@@ -1798,10 +1798,13 @@ app.get('/api/ai-deep-scan', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/chat-stream', authenticateToken, async (req, res) => {
+app.post('/chat-stream', async (req, res) => {
   const { message } = req.body;
-  const currentUserId = req.user?.user_id || 1;
 
+  const currentUserId = requireUserId(req, res);
+  if (!currentUserId) {
+    return;
+  }
   // Set headers cho SSE
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');

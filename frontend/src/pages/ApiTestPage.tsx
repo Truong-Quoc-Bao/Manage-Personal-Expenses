@@ -74,6 +74,7 @@ const ApiTestPage = () => {
         <button onClick={() => runTest(statsApi.getRecentTransactions())}>
           Get Recent Transactions
         </button>
+        <button onClick={() => runTest(statsApi.getAllTransactions())}>Get Transactions</button>
       </Group>
 
       {/* NHÓM CHAT & AI */}
