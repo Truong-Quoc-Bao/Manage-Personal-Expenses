@@ -127,29 +127,13 @@ app.use(
     pathRewrite: {
       '^/api/ai': '',
     },
+    proxyTimeout: 180000,
+    timeout: 180000,
     onError: (err, req, res) => {
       console.error('Proxy error (AI Service):', err);
-      res.status(500).send('AI Gateway error');
-    },
-  }),
-);
-
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
-});
-
-app.use(
-  '/api/ai',
-  createProxyMiddleware({
-    target: process.env.AI_SERVICE_URL || 'http://localhost:4005',
-    changeOrigin: true,
-    logLevel: 'debug',
-    pathRewrite: {
-      '^/api/ai': '',
-    },
-    onError: (err, req, res) => {
-      console.error('Proxy error (AI Service):', err);
-      res.status(500).send('AI Gateway error');
+      if (!res.headersSent) {
+        res.status(502).json({ error: 'AI Service đang xử lý lâu, vui lòng thử lại.' });
+      }
     },
   }),
 );

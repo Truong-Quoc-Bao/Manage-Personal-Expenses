@@ -15,7 +15,7 @@ import axios from 'axios';
 import got from 'got';
 import { getBestModel, getStatusData } from './super_check.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { MONEY_GUARD_RULES } from './systemRules.js';
+import { getMoneyGuardRules } from './systemRules.js';
 
 import { setDefaultResultOrder } from 'dns';
 setDefaultResultOrder('ipv4first');
@@ -101,10 +101,27 @@ const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 let chatHistory = [];
 
-// Biến tạm để lưu thông tin trình duyệt của Bảo (Sau này nên lưu vào DB)
 let lastUserMessage = { time: 0, content: '' };
 let lastSavedTransaction = { time: 0, content: '' };
 let subscriptions = [];
+
+const userNameCache = new Map();
+async function getUserName(userId) {
+  if (userNameCache.has(userId)) return userNameCache.get(userId);
+  try {
+    const result = await pool.query(
+      'SELECT user_name FROM user_service.users WHERE user_id = $1',
+      [userId],
+    );
+    const name = result.rows[0]?.user_name || 'Người dùng';
+    userNameCache.set(userId, name);
+    setTimeout(() => userNameCache.delete(userId), 10 * 60 * 1000);
+    return name;
+  } catch (err) {
+    console.error('❌ Lỗi lấy user_name:', err.message);
+    return 'Người dùng';
+  }
+}
 
 // 1. Cấu hình Web Push
 webpush.setVapidDetails(
@@ -377,10 +394,10 @@ const sendPushNotification = (message) => {
   });
 };
 
-// Thay vì chỉ bắn socket, hãy lưu vào DB
-async function addNotification(message) {
-  const userId = requireUserId(req, res);
+// Lưu thông báo vào DB rồi bắn socket
+async function addNotification(message, userId) {
   if (!userId) {
+    console.warn('⚠️ addNotification: userId is missing, skip.');
     return;
   }
   await pool.query(
@@ -672,6 +689,7 @@ app.post('/webhook/bank-transfer', async (req, res) => {
       userId = requireUserId(req, res);
       if (!userId) return;
     }
+    const userName = await getUserName(userId);
 
     // 1. PHÂN BIỆT LOẠI GIAO DỊCH (VÀO hay RA)
     // SePay gửi "in" là tiền vào, "out" là tiền ra
@@ -755,12 +773,11 @@ app.post('/webhook/bank-transfer', async (req, res) => {
     const nowICT = new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' });
 
     await pool.query(
-      `INSERT INTO transaction_service.transactions (account_id, category_id, amount, transaction_type, description, date, note)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      `INSERT INTO transaction_service.transactions (user_id, account_id, category_id, amount, transaction_type, description, date, note)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
-        // 1,
+        userId,
         'd4ffbef0-8bcc-445e-9ea3-7bc854e2ad76',
-        // targetAccountId,
         categoryId,
         finalAmount,
         transactionType,
@@ -773,11 +790,11 @@ app.post('/webhook/bank-transfer', async (req, res) => {
     // 4. THÔNG BÁO THÔNG MINH (Thay đổi câu chữ dựa trên isIncome)
     let notificationMsg = '';
     if (isIncome) {
-      notificationMsg = `💰 **Ting ting!** Money Guard thấy Bảo vừa **nhận được** **${finalAmount.toLocaleString()}đ** từ "${
+      notificationMsg = `💰 **Ting ting!** Money Guard thấy ${userName} vừa **nhận được** **${finalAmount.toLocaleString()}đ** từ "${
         aiData.clean_name
-      }". Chúc mừng Bảo có thêm thu nhập! 🥳`;
+      }". Chúc mừng ${userName} có thêm thu nhập! 🥳`;
     } else {
-      notificationMsg = `💸 **Ting ting!** Money Guard thấy Bảo vừa **chuyển đi** **${finalAmount.toLocaleString()}đ** cho "${
+      notificationMsg = `💸 **Ting ting!** Money Guard thấy ${userName} vừa **chuyển đi** **${finalAmount.toLocaleString()}đ** cho "${
         aiData.clean_name
       }". Đã ghi vào sổ rồi nhé!`;
     }
@@ -792,13 +809,13 @@ app.post('/webhook/bank-transfer', async (req, res) => {
     // 2. Moni tự động "soi" dữ liệu để đưa ra lời khuyên "đanh đá"
     let proactiveMsg = '';
     if (health.status.includes('🔴')) {
-      proactiveMsg = `\n\n🚨 **TỔNG BÁO ĐỘNG**: Bảo ơi, hiện tại Bảo đang TIÊU VƯỢT THU NHẬP rồi! Cất ngay cái thẻ đi trước khi cái ví "đăng xuất" khỏi trái đất! 😤`;
+      proactiveMsg = `\n\n🚨 **TỔNG BÁO ĐỘNG**: ${userName} ơi, hiện tại ${userName} đang TIÊU VƯỢT THU NHẬP rồi! Cất ngay cái thẻ đi trước khi cái ví "đăng xuất" khỏi trái đất! 😤`;
     } else if (health.daysToEmpty <= 5 && health.balance > 0) {
-      proactiveMsg = `\n\n⚠️ **CẢNH BÁO ĐÓI KÉM**: Với đà này Bảo chỉ còn đủ tiền sống trong **${health.daysToEmpty} ngày** nữa thôi. Chuẩn bị tinh thần ăn mì tôm cả tháng nhé! 🍜`;
+      proactiveMsg = `\n\n⚠️ **CẢNH BÁO ĐÓI KÉM**: Với đà này ${userName} chỉ còn đủ tiền sống trong **${health.daysToEmpty} ngày** nữa thôi. Chuẩn bị tinh thần ăn mì tôm cả tháng nhé! 🍜`;
     } else if (finalAmount > 1000000 && transactionType === 'expense') {
-      proactiveMsg = `\n\n💸 **XÀI SANG QUÁ**: Món này tận **${finalAmount.toLocaleString()}đ**, Bảo có thực sự cần nó không hay chỉ là nhất thời? Suy nghĩ kỹ đi nhé! 🤔`;
+      proactiveMsg = `\n\n💸 **XÀI SANG QUÁ**: Món này tận **${finalAmount.toLocaleString()}đ**, ${userName} có thực sự cần nó không hay chỉ là nhất thời? Suy nghĩ kỹ đi nhé! 🤔`;
     } else {
-      proactiveMsg = `\n\n✅ **TỐT LẮM**: Duy trì phong độ này nhé Bảo, hiện Bảo vẫn còn sống sót được thêm **${health.daysToEmpty} ngày** nữa. Tiết kiệm là quốc sách! 💎`;
+      proactiveMsg = `\n\n✅ **TỐT LẮM**: Duy trì phong độ này nhé ${userName}, hiện ${userName} vẫn còn sống sót được thêm **${health.daysToEmpty} ngày** nữa. Tiết kiệm là quốc sách! 💎`;
     }
 
     // 3. Gộp nội dung thông báo gốc + Lời cảnh báo chủ động của AI
@@ -855,6 +872,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
     if (!currentUserId) {
       return;
     }
+    const currentUserName = await getUserName(currentUserId);
     // CHẶN NGAY TỪ ĐẦU NẾU LỖI
     if (message.length > 30000) {
       return res.status(400).json({ error: 'Message quá dài (tối đa ~30k ký tự)' });
@@ -862,7 +880,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
 
     // Kiểm tra nếu cả chữ và ảnh đều trống thì báo lỗi
     if (!message && !imageFile) {
-      return res.status(400).json({ error: 'Bảo ơi, hãy nhập tin nhắn hoặc gửi ảnh nhé!' });
+      return res.status(400).json({ error: 'Hãy nhập tin nhắn hoặc gửi ảnh nhé!' });
     }
 
     // Sanitize XSS
@@ -885,7 +903,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
     if (lastUserMessage.content === messageKey && nowBlock - lastUserMessage.time < 3000) {
       console.log('🚫 Chặn Double Submit tin nhắn');
       return res.json({
-        reply: 'Bảo ơi, từ từ thôi, Money Guard đang xử lý tin nhắn trước đó rồi!',
+        reply: 'Từ từ thôi, Money Guard đang xử lý tin nhắn trước đó rồi!',
       });
     }
     lastUserMessage = { time: nowBlock, content: messageKey };
@@ -1052,9 +1070,9 @@ app.post('/chat', upload.single('image'), async (req, res) => {
     // --- LOGIC CHẶN AI ẢO GIÁC ---
     let adviceContext = '';
     if (totalExpense > totalIncome && totalIncome > 0) {
-      adviceContext = `[CẢNH BÁO NGUY HIỂM]: Bảo đang tiêu vượt mức thu nhập (${stats.expense} > ${stats.income}). Hãy mắng thật gắt!`;
+      adviceContext = `[CẢNH BÁO NGUY HIỂM]: ${currentUserName} đang tiêu vượt mức thu nhập (${stats.expense} > ${stats.income}). Hãy mắng thật gắt!`;
     } else if (totalIncome === 0 && totalExpense > 0) {
-      adviceContext = `[GHI CHÚ]: Bảo chưa nhập thu nhập tháng này, chỉ toàn thấy chi ra thôi.`;
+      adviceContext = `[GHI CHÚ]: ${currentUserName} chưa nhập thu nhập tháng này, chỉ toàn thấy chi ra thôi.`;
     }
 
     console.log(`📊 Đã nạp dữ liệu thật tháng ${stats.month} cho Money Guard: ${stats.total}`);
@@ -1075,6 +1093,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
     // 2. Tạo Prompt tổng hợp ngữ cảnh
     const inputPrompt = `
     [THÔNG TIN HỆ THỐNG - TỐI MẬT]:
+    [TÊN NGƯỜI DÙNG]: ${currentUserName}
     [DỮ LIỆU THẬT THÁNG ${stats.month}]:
     - Tổng cả thu và chi: ${stats.total}
     - Tổng Chi tháng này: ${stats.expense} (${stats.expense_count} lần chi)
@@ -1083,9 +1102,9 @@ app.post('/chat', upload.single('image'), async (req, res) => {
     - Giao dịch: ${stats.count}
     - Tình trạng: ${health.status}.
     - Tốc độ đốt tiền: ${health.dailyAvg}đ/ngày.
-    - Dự báo: Bảo sẽ cạn sạch tiền sau ${health.daysToEmpty} ngày nữa.
+    - Dự báo: ${currentUserName} sẽ cạn sạch tiền sau ${health.daysToEmpty} ngày nữa.
     
-    - Tổng ngân sách Bảo tự đặt (Budget): ${totalLimit.toLocaleString()}đ.
+    - Tổng ngân sách ${currentUserName} tự đặt (Budget): ${totalLimit.toLocaleString()}đ.
     - Người dùng đã tiêu hết: ${totalExpense.toLocaleString()}đ.
     - Quỹ còn lại ĐƯỢC PHÉP TIÊU: ${remainingBudget.toLocaleString()}đ.
     - Số ngày còn lại của tháng: ${daysLeft} ngày.
@@ -1094,7 +1113,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
     ${adviceContext}
 
     [NGỮ CẢNH HỆ THỐNG]:
-    Dưới đây là dữ liệu tài chính của Bảo:
+    Dưới đây là dữ liệu tài chính của ${currentUserName}:
     - THỜI GIAN THỰC: Hôm nay là ${currentDayName}, ngày ${currentDate}.
     - Tháng: ${stats.month} | Tổng chi: ${stats.total} | Giao dịch: ${stats.count} | TB/ngày: ${
       stats.avg
@@ -1106,26 +1125,26 @@ app.post('/chat', upload.single('image'), async (req, res) => {
     }.
     - Báo cáo hạng mục & Ngân sách:
     ${categoryReport}
-    - 5 Giao dịch gần nhất của Bảo:
+    - 5 Giao dịch gần nhất của ${currentUserName}:
     ${recentData}
 
     [YÊU CẦU XỬ LÝ NGÀY THÁNG]:
-    1. Nếu Bảo nói "hôm nay" hoặc không nói ngày: Dùng ngày ${currentDate}.
-    2. Nếu Bảo nói "hôm qua": Bạn tự tính toán lấy ngày ${currentDate} trừ đi 1 ngày (Kết quả phải là 2026-03-27).
-    3. Nếu Bảo nói "hôm kia": Trừ đi 2 ngày.
-    4. Nếu Bảo nói "thứ mấy" (vd: thứ 2 vừa rồi): Dựa vào hôm nay là ${currentDayName} để suy luận ra ngày chính xác.
+    1. Nếu ${currentUserName} nói "hôm nay" hoặc không nói ngày: Dùng ngày ${currentDate}.
+    2. Nếu ${currentUserName} nói "hôm qua": Bạn tự tính toán lấy ngày ${currentDate} trừ đi 1 ngày.
+    3. Nếu ${currentUserName} nói "hôm kia": Trừ đi 2 ngày.
+    4. Nếu ${currentUserName} nói "thứ mấy" (vd: thứ 2 vừa rồi): Dựa vào hôm nay là ${currentDayName} để suy luận ra ngày chính xác.
     5. LUÔN luôn xuất ngày tháng cuối cùng ở định dạng YYYY-MM-DD bên trong thẻ <transaction>.
     
     [YÊU CẦU XỬ LÝ]:
-    - Nếu câu hỏi của Bảo liên quan đến: "chi tiêu", "tiền bạc", "báo cáo", "tháng này", "bao nhiêu tiền", hoặc "tổng kết" -> Hãy lôi dữ liệu trên ra báo cáo chuyên nghiệp theo Rules (4 đoạn, có icon).
-    - Nếu Bảo chỉ: "Chào hỏi", "Hỏi danh tính (bạn là ai)", "Nói chuyện phiếm" -> Tuyệt đối KHÔNG hiện số liệu chi tiêu. Hãy trả lời thân thiện, khích lệ và nhắc Bảo tập trung vào mục tiêu tài chính một cách khéo léo.
-    - ƯU TIÊN: Nếu Bảo đang cung cấp số tiền cho một món đồ đã nhắc ở câu trước (ví dụ: Bảo gõ "100k"), hãy thực hiện trích xuất <transaction> ngay thay vì hiện báo cáo tổng.
+    - Nếu câu hỏi của ${currentUserName} liên quan đến: "chi tiêu", "tiền bạc", "báo cáo", "tháng này", "bao nhiêu tiền", hoặc "tổng kết" -> Hãy lôi dữ liệu trên ra báo cáo chuyên nghiệp theo Rules (4 đoạn, có icon).
+    - Nếu ${currentUserName} chỉ: "Chào hỏi", "Hỏi danh tính (bạn là ai)", "Nói chuyện phiếm" -> Tuyệt đối KHÔNG hiện số liệu chi tiêu. Hãy trả lời thân thiện, khích lệ và nhắc ${currentUserName} tập trung vào mục tiêu tài chính một cách khéo léo.
+    - ƯU TIÊN: Nếu ${currentUserName} đang cung cấp số tiền cho một món đồ đã nhắc ở câu trước (ví dụ: ${currentUserName} gõ "100k"), hãy thực hiện trích xuất <transaction> ngay thay vì hiện báo cáo tổng.
 
     [NHIỆM VỤ MỞ RỘNG]:
-    1. PHÁT HIỆN BẤT THƯỜNG: Nếu Bảo nhập món đồ cao hơn 3 lần mức trung bình các món trước, hãy cảnh báo và xác nhận lại để lưu database và nếu chỉnh database thì nhớ chỉnh luôn note của cái vừa chỉnh 🚨.
-    2. DỰ BÁO: Nếu Bảo hỏi về tương lai, hãy lấy tổng chi chia cho ngày hiện tại để dự báo chi tiêu cuối tháng.
+    1. PHÁT HIỆN BẤT THƯỜNG: Nếu ${currentUserName} nhập món đồ cao hơn 3 lần mức trung bình các món trước, hãy cảnh báo và xác nhận lại để lưu database và nếu chỉnh database thì nhớ chỉnh luôn note của cái vừa chỉnh 🚨.
+    2. DỰ BÁO: Nếu ${currentUserName} hỏi về tương lai, hãy lấy tổng chi chia cho ngày hiện tại để dự báo chi tiêu cuối tháng.
     3. NLP CRUD (SỬA/XÓA): 
-       - Nếu Bảo muốn xóa (vd: "Xóa món phở nãy đi"), hãy tìm ID trong danh sách "Giao dịch gần nhất" và trả về thẻ <delete_transaction>{"id": ID_CẦN_XÓA}</delete_transaction>.
+       - Nếu ${currentUserName} muốn xóa (vd: "Xóa món phở nãy đi"), hãy tìm ID trong danh sách "Giao dịch gần nhất" và trả về thẻ <delete_transaction>{"id": ID_CẦN_XÓA}</delete_transaction>.
        - Tương tự cho Sửa: <update_transaction>{"id": ID, "amount": SỐ_TIỀN_MỚI}</update_transaction>.
     4. SMART BUDGET: Nếu chi tiêu hạng mục nào vượt quá Hạn mức, hãy "mắng" thật gắt và yêu cầu cắt giảm.
     5. Khi in ra số dư nếu âm thì phải có dấu - đằng trước balance
@@ -1133,68 +1152,68 @@ app.post('/chat', upload.single('image'), async (req, res) => {
     [DỮ LIỆU DỰ BÁO]:
     - Tiêu xài tuần này tăng {{ n% }} so với tuần trước.
     - Các món thuộc nhóm 'Wants' chiếm {{ m% }} tổng chi.
-    - Nếu không cắt giảm, Bảo sẽ nợ {{ X }} đồng vào cuối tháng.
-    - Hãy dùng mô hình dự báo để chỉ ra ngày chính xác Bảo sẽ hết tiền.
+    - Nếu không cắt giảm, ${currentUserName} sẽ nợ {{ X }} đồng vào cuối tháng.
+    - Hãy dùng mô hình dự báo để chỉ ra ngày chính xác ${currentUserName} sẽ hết tiền.
 
     [CHỈ THỊ CỰC GẮT CHO AI]:
-    1. Nếu "Quỹ còn lại" bị âm: Hãy mắng Bảo là 'Chiến thần phá gia chi tử' và yêu cầu dừng mọi khoản chi.
+    1. Nếu "Quỹ còn lại" bị âm: Hãy mắng ${currentUserName} là 'Chiến thần phá gia chi tử' và yêu cầu dừng mọi khoản chi.
     2. Khi Người dùng hỏi 'Mua gì tự thưởng', hãy nhìn vào 'Hạn mức chi tiêu mỗi ngày' (${dailyAllowance}đ). 
     3. Tuyệt đối KHÔNG ĐƯỢC lấy số dư tài khoản (${
       stats.balance
-    }) để khuyên Bảo tiêu xài. Phải giữ kỷ luật theo Ngân sách (Budget).
+    }) để khuyên ${currentUserName} tiêu xài. Phải giữ kỷ luật theo Ngân sách (Budget).
     
     [CÔNG VIỆC CỤ THỂ]:
-    1. PHÁT HIỆN BẤT THƯỜNG: So sánh món đồ Bảo vừa nhập với "5 giao dịch gần nhất". Nếu giá cao gấp 3 lần trung bình, hãy dừng lại, mắng Bảo một trận và yêu cầu Bảo xác nhận: "Có thực sự muốn đốt tiền không?" mới được nhả thẻ <transaction>.
-    - Nếu giá món đồ cao bất thường (gấp 3 lần trung bình): Bạn PHẢI mắng Bảo và hỏi xác nhận. 
+    1. PHÁT HIỆN BẤT THƯỜNG: So sánh món đồ ${currentUserName} vừa nhập với "5 giao dịch gần nhất". Nếu giá cao gấp 3 lần trung bình, hãy dừng lại, mắng ${currentUserName} một trận và yêu cầu ${currentUserName} xác nhận: "Có thực sự muốn đốt tiền không?" mới được nhả thẻ <transaction>.
+    - Nếu giá món đồ cao bất thường (gấp 3 lần trung bình): Bạn PHẢI mắng ${currentUserName} và hỏi xác nhận. 
     - TUYỆT ĐỐI KHÔNG được in thẻ <transaction> trong câu hỏi xác nhận này.
-    - CHỈ KHI NÀO Bảo trả lời "Đúng rồi", "Lưu đi", "Xác nhận" thì bạn mới được in thẻ <transaction> ở câu trả lời sau đó.
-    - NHƯNG: Nếu Bảo đã trả lời "Đúng rồi", "Lưu đi", "Xác nhận", "Ghi đi" hoặc các từ tương tự: 
+    - CHỈ KHI NÀO ${currentUserName} trả lời "Đúng rồi", "Lưu đi", "Xác nhận" thì bạn mới được in thẻ <transaction> ở câu trả lời sau đó.
+    - NHƯNG: Nếu ${currentUserName} đã trả lời "Đúng rồi", "Lưu đi", "Xác nhận", "Ghi đi" hoặc các từ tương tự: 
     => BẠN PHẢI DỪNG VIỆC HỎI LẠI. 
     => BẠN PHẢI IN THẺ <transaction> NGAY LẬP TỨC ở cuối câu trả lời. 
     => Không được chần chừ, không được hỏi thêm lần 2, lần 3.
 
-    2. KIỂM TRA TƯƠNG LAI: Nếu Bảo nhập ngày là tương lai (ví dụ hôm nay 31 mà nhập cho ngày 01 tháng sau), hãy hỏi: "Bảo đang tính trước tương lai à? Chắc chắn thì Money Guard mới ghi sổ nhé".
+    2. KIỂM TRA TƯƠNG LAI: Nếu ${currentUserName} nhập ngày là tương lai (ví dụ hôm nay 31 mà nhập cho ngày 01 tháng sau), hãy hỏi: "${currentUserName} đang tính trước tương lai à? Chắc chắn thì Money Guard mới ghi sổ nhé".
 
     3. TRUY VẤN DỮ LIỆU (NLP QUERY): 
-       - Nếu Bảo hỏi ví dụ "Tháng này uống Cafe bao nhiêu lần và bao nhiêu tiền?", hãy lục lại [Báo cáo hạng mục] và [5 giao dịch gần nhất] để trả lời chính xác. Nếu thông tin không đủ, hãy dựa vào dữ liệu đã có để ước tính.
+       - Nếu ${currentUserName} hỏi ví dụ "Tháng này uống Cafe bao nhiêu lần và bao nhiêu tiền?", hãy lục lại [Báo cáo hạng mục] và [5 giao dịch gần nhất] để trả lời chính xác. Nếu thông tin không đủ, hãy dựa vào dữ liệu đã có để ước tính.
 
     4. DỰ BÁO TÀI CHÍNH: Dựa vào tốc độ chi tiêu ${
       stats.avg
-    }/ngày, hãy dự báo nếu cứ tiếp tục thế này thì cuối tháng Bảo sẽ thâm hụt bao nhiêu lúa.
+    }/ngày, hãy dự báo nếu cứ tiếp tục thế này thì cuối tháng ${currentUserName} sẽ thâm hụt bao nhiêu lúa.
 
     5. NLP CRUD (ĐIỀU KHIỂN CSDL QUA GIỌNG NÓI):
-       - XÓA: Nếu Bảo nói "Xóa món...", hãy tìm ID trong danh sách gần nhất và trả về thẻ: <delete_transaction>{"id": ID}</delete_transaction>
-       - SỬA: Nếu Bảo nói "Sửa món ID... thành...", trả về thẻ: <update_transaction>{"id": ID, "amount": SỐ_TIỀN_MỚI}</update_transaction>. Khi sửa, hãy tự động cập nhật note thành: "Đã điều chỉnh theo yêu cầu của Bảo".
+       - XÓA: Nếu ${currentUserName} nói "Xóa món...", hãy tìm ID trong danh sách gần nhất và trả về thẻ: <delete_transaction>{"id": ID}</delete_transaction>
+       - SỬA: Nếu ${currentUserName} nói "Sửa món ID... thành...", trả về thẻ: <update_transaction>{"id": ID, "amount": SỐ_TIỀN_MỚI}</update_transaction>. Khi sửa, hãy tự động cập nhật note thành: "Đã điều chỉnh theo yêu cầu của ${currentUserName}".
 
-    6. SMART BUDGET: Nếu hạng mục nào ở [Báo cáo hạng mục] ghi "Vượt hạn mức", hãy kích hoạt chế độ "Chửi gắt" ngay lập tức khi Bảo nhắc đến hạng mục đó.
+    6. SMART BUDGET: Nếu hạng mục nào ở [Báo cáo hạng mục] ghi "Vượt hạn mức", hãy kích hoạt chế độ "Chửi gắt" ngay lập tức khi ${currentUserName} nhắc đến hạng mục đó.
 
     7. DỰ BÁO TÀI CHÍNH (PREDICTIVE AI): 
-       - Khi Bảo hỏi "Dự báo", "Tháng này ổn không?", hãy dùng con số dự báo ${projectedTotal.toLocaleString()}đ để phân tích. 
+       - Khi ${currentUserName} hỏi "Dự báo", "Tháng này ổn không?", hãy dùng con số dự báo ${projectedTotal.toLocaleString()}đ để phân tích. 
        - Nếu số này lớn hơn Thu nhập (${
          stats.income
-       }), hãy "dọa" Bảo về việc cuối tháng sẽ hết sạch tiền.
+       }), hãy "dọa" ${currentUserName} về việc cuối tháng sẽ hết sạch tiền.
 
     8. SMART BUDGET (QUẢN LÝ NGÂN SÁCH): 
        - Nhìn vào [Báo cáo hạng mục], nếu thấy hạng mục nào có ghi "🚨 [VƯỢT HẠN MỨC]":
-       - Mỗi khi Bảo nhắc đến hoặc nhập thêm món vào hạng mục đó, bạn PHẢI mắng Bảo thật gắt trước khi làm bất cứ việc gì khác. 
-       - Dùng giọng điệu "sát thủ tài chính" để ngăn chặn Bảo tiêu thêm.
+       - Mỗi khi ${currentUserName} nhắc đến hoặc nhập thêm món vào hạng mục đó, bạn PHẢI mắng ${currentUserName} thật gắt trước khi làm bất cứ việc gì khác. 
+       - Dùng giọng điệu "sát thủ tài chính" để ngăn chặn ${currentUserName} tiêu thêm.
    
     9. ĐỐI VỚI THÁNG NÀY: Dữ liệu ĐÃ CÓ SẴN ở [DỮ LIỆU THẬT THÁNG ${
       stats.month
-    }]. Khi Bảo hỏi "Tháng này tiêu bao nhiêu?", "Còn dư bao nhiêu?" -> HÃY ĐỌC DỮ LIỆU ĐÓ VÀ TRẢ LỜI LUÔN. TUYỆT ĐỐI KHÔNG dùng thẻ <query_db>.
+    }]. Khi ${currentUserName} hỏi "Tháng này tiêu bao nhiêu?", "Còn dư bao nhiêu?" -> HÃY ĐỌC DỮ LIỆU ĐÓ VÀ TRẢ LỜI LUÔN. TUYỆT ĐỐI KHÔNG dùng thẻ <query_db>.
     10. CHỈ DÙNG thẻ <query_db> KHI hỏi quá khứ hoặc chi tiết:
          - "Tháng trước tiêu bao nhiêu?" -> <query_db>{"type": "total_spending", "month": ${
            currentMonth - 1
          }, "year": ${currentYear}}</query_db>
          - "Tháng này ăn uống mấy lần?" -> <query_db>{"type": "category_spending", "category": "ăn uống", "month": ${currentMonth}, "year": ${currentYear}}</query_db>
 
-    Nếu Bảo vừa nhập một món đồ mà trong 7 ngày qua Bảo đã mua món đó hơn 3 lần (ví dụ Trà sữa), bạn PHẢI khịa Bảo về việc nghiện món này và tính tổng tiền Bảo đã 'cúng' cho món đó trong tuần.
+    Nếu ${currentUserName} vừa nhập một món đồ mà trong 7 ngày qua ${currentUserName} đã mua món đó hơn 3 lần (ví dụ Trà sữa), bạn PHẢI khịa ${currentUserName} về việc nghiện món này và tính tổng tiền ${currentUserName} đã 'cúng' cho món đó trong tuần.
     
     Dựa vào số dư ${
       health.balance
-    }đ, Money Guard dự báo Bảo chỉ còn trụ được đến ngày X tháng này. Nếu muốn sống sót đến ngày 30, từ mai Bảo chỉ được tiêu tối đa Y đồng/ngày thôi!
+    }đ, Money Guard dự báo ${currentUserName} chỉ còn trụ được đến ngày X tháng này. Nếu muốn sống sót đến ngày 30, từ mai ${currentUserName} chỉ được tiêu tối đa Y đồng/ngày thôi!
     
-    [CÂU HỎI CỦA BẢO]: "${message}"
+    [CÂU HỎI CỦA ${currentUserName.toUpperCase()}]: "${message}"
 
     [QUY TẮC PHẢN HỒI]: Trình bày theo phong cách hiện đại, sử dụng icon 🚨, 💸, 🛡️, 📈. Tuyệt đối không để lộ mã JSON rác ra ngoài các thẻ quy định.
   `;
@@ -1216,13 +1235,8 @@ app.post('/chat', upload.single('image'), async (req, res) => {
     // Chỗ gọi genAI.getGenerativeModel...
     const model = genAI.getGenerativeModel({
       model: modelToUse,
-      systemInstruction: MONEY_GUARD_RULES,
+      systemInstruction: getMoneyGuardRules(currentUserName),
     });
-
-    // const model = genAI.getGenerativeModel({
-    //   model: 'gemini-robotics-er-1.5-preview', // quota free tier thường cao hơn một chút (khoảng 50-1500/ngày tùy thời điểm) // ← dùng cái này, ổn định hơn 2.0, ít lỗi hơn nếu không overload
-    //   systemInstruction: MONEY_GUARD_RULES, // Gọi biến từ file rules vào đây
-    // });
 
     // --- BẮT ĐẦU ĐOẠN FIX LỊCH SỬ ---
     const chat = model.startChat({
@@ -1240,7 +1254,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
           1. Đọc tên cửa hàng, ngày tháng và DANH SÁCH CHI TIẾT TỪNG MÓN.
           2. Với mỗi món trong bill, xuất một thẻ <transaction> riêng.
           Ví dụ: Bill 100k gồm Phở 60k, Cafe 40k -> Xuất 2 thẻ <transaction>.
-          3. Nếu ảnh mờ, hãy báo Bảo chụp lại.
+          3. Nếu ảnh mờ, hãy báo ${currentUserName} chụp lại.
         `,
       });
       promptParts.push({
@@ -1402,7 +1416,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
 
                   dbResult += `- Chi tiêu tuần này (đến hiện tại): ${thisW.toLocaleString()}đ\n`;
                   dbResult += `- Chi tiêu cả tuần trước: ${lastW.toLocaleString()}đ\n`;
-                  dbResult += `- Chênh lệch: Tuần này Bảo đang tiêu ${status} ${Math.abs(
+                  dbResult += `- Chênh lệch: Tuần này ${currentUserName} đang tiêu ${status} ${Math.abs(
                     diff,
                   ).toLocaleString()}đ so với tuần trước.`;
                 }
@@ -1428,7 +1442,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
                 }
               } else {
                 dbResult +=
-                  'Money Guard đã lục tung sổ sách nhưng không tìm thấy dữ liệu nào cho yêu cầu này của Bảo cả! 🕵️‍♂️';
+                  `Money Guard đã lục tung sổ sách nhưng không tìm thấy dữ liệu nào cho yêu cầu này của ${currentUserName} cả! 🕵️‍♂️`;
               }
               // --- KẾT THÚC GOM CHUNG ---
 
@@ -1455,7 +1469,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
             if (anomaly.isAnomaly && !message.includes('xác nhận') && !message.includes('Lưu đi')) {
               // Nếu bất thường, yêu cầu AI hỏi lại trước khi lưu
               const warnResult = await chat.sendMessage(
-                `[CẢNH BÁO]: Món này cao gấp ${anomaly.factor} lần bình thường. Hãy dừng lại hỏi Bảo xem có nhầm không, KHÔNG được lưu lúc này.`,
+                `[CẢNH BÁO]: Món này cao gấp ${anomaly.factor} lần bình thường. Hãy dừng lại hỏi ${currentUserName} xem có nhầm không, KHÔNG được lưu lúc này.`,
               );
               return res.json({ reply: warnResult.response.text() });
             }
@@ -1552,7 +1566,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
                 );
                 console.log(`✨ Đã tạo danh mục mới: ${catName}`);
               } else {
-                console.log(`🟡 Danh mục "${catName}" đã tồn tại rồi Bảo ơi.`);
+                console.log(`🟡 Danh mục "${catName}" đã tồn tại rồi.`);
               }
             }
           } catch (e) {
@@ -1671,11 +1685,11 @@ app.post('/chat', upload.single('image'), async (req, res) => {
 
               // 2. LƯU GIAO DỊCH
               const insertQuery = `
-                INSERT INTO transaction_service.transactions (account_id, category_id, amount, transaction_type, description, date, note)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                INSERT INTO transaction_service.transactions (user_id, account_id, category_id, amount, transaction_type, description, date, note)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
               `;
               const values = [
-                // data.account_id || 'd4ffbef0-8bcc-445e-9ea3-7bc854e2ad76',
+                currentUserId,
                 'd4ffbef0-8bcc-445e-9ea3-7bc854e2ad76',
                 categoryId,
                 finalAmount,
@@ -1714,7 +1728,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
           }
         }
 
-        await addNotification('Money Guard đã ghi sổ xong giao dịch của bạn! 🛡️');
+        await addNotification('Money Guard đã ghi sổ xong giao dịch của bạn! 🛡️', currentUserId);
 
         // Trả về reply cho client
         return res.json({ reply });
@@ -1757,6 +1771,9 @@ app.post('/chat', upload.single('image'), async (req, res) => {
 //
 app.get('/api/ai-deep-scan', async (req, res) => {
   try {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
     console.log(`🔍 [SCAN] Bắt đầu quét cho User ID: ${userId}`);
 
     const result = await pool.query(
@@ -1779,7 +1796,7 @@ app.get('/api/ai-deep-scan', async (req, res) => {
         score: 100,
         disease: 'Ví tiền sạch sẽ tuyệt đối',
         symptoms: ['Không có chi tiêu nào'],
-        advice: 'Bảo chưa tiêu gì nên không có bệnh để khám!',
+        advice: 'Bạn chưa tiêu gì nên không có bệnh để khám!',
         future: 'Giàu sang phú quý',
       });
     }
@@ -1818,6 +1835,7 @@ app.post('/chat-stream', async (req, res) => {
   if (!currentUserId) {
     return;
   }
+  const currentUserName = await getUserName(currentUserId);
   // Set headers cho SSE
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -1826,11 +1844,11 @@ app.post('/chat-stream', async (req, res) => {
   try {
     const model = genAI.getGenerativeModel({
       model: 'gemini-robotics-er-1.5-preview',
-      systemInstruction: MONEY_GUARD_RULES,
+      systemInstruction: getMoneyGuardRules(currentUserName),
     });
 
     const chat = model.startChat({
-      history: manageChatHistory(currentUserId, message, ''),
+      history: chatHistory.slice(-10),
     });
 
     // Stream response

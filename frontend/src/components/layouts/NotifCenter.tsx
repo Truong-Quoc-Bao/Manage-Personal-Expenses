@@ -150,32 +150,33 @@ export const NotificationCenter: React.FC = () => {
     registerPush();
     enableAudioAfterInteraction();
 
-    const socket = socketService.getSocket();
-    if (socket) {
-      socket.on('bank_notification', (data: any) => {
-        console.log('🏦 Nhận thông báo ngân hàng:', data);
-        addMessage(data.message, false); // Hàm này thuộc ChatBox nên tạm comment log
-        playNotificationSound();
-        updateDashboard(); // Logic Dashboard bên ngoài
-        loadNotifications();
-        showToast('💰 Có giao dịch mới từ ngân hàng!', 'success');
-      });
+    socketService.connect();
 
-      socket.on('connect', () => {
-        console.log('✅ Socket.IO đã kết nối!');
-      });
+    const handleBankNotification = (data: any) => {
+      console.log('🏦 Nhận thông báo ngân hàng:', data);
+      addMessage(data.message, false);
+      playNotificationSound();
+      updateDashboard();
+      loadNotifications();
+      showToast('💰 Có giao dịch mới từ ngân hàng!', 'success');
+    };
 
-      socket.on('disconnect', () => {
-        console.log('⚠️ Socket.IO đã ngắt kết nối');
-      });
+    const handleNewNotification = (data: any) => {
+      console.log('🔔 Nhận thông báo mới từ socket:', data);
+      const notif = {
+        id: data.id || Date.now(),
+        message: data.message,
+        is_read: false,
+        created_at: data.time || new Date().toISOString(),
+      };
+      setUnreadCount((prev) => prev + 1);
+      setNotifications((prev) => [notif, ...prev]);
+      playNotificationSound();
+      showToast('🔔 Bạn có thông báo mới!', 'success');
+    };
 
-      socket.on('new_notification', (data: any) => {
-        console.log('🔔 Nhận thông báo mới từ socket');
-        setUnreadCount((prev) => prev + 1);
-        setNotifications((prev) => [data, ...prev]);
-        playNotificationSound();
-      });
-    }
+    socketService.on('bank_notification', handleBankNotification);
+    socketService.on('new_notification', handleNewNotification);
 
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -183,13 +184,11 @@ export const NotificationCenter: React.FC = () => {
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
+
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
-      // Đừng quên tắt lắng nghe khi component bị hủy để tránh rác RAM
-      if (socket) {
-        socket.off('bank_notification');
-        socket.off('new_notification');
-      }
+      socketService.off('bank_notification', handleBankNotification);
+      socketService.off('new_notification', handleNewNotification);
     };
   }, []);
 
