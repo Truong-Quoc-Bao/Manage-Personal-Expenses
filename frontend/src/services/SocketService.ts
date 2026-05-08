@@ -1,14 +1,45 @@
 import { io, Socket } from 'socket.io-client';
 
+type EventCallback = (data: any) => void;
+
 class SocketService {
   private socket: Socket | null = null;
   private audio: HTMLAudioElement | null = null;
   private hasInteracted = false;
 
   connect() {
-    this.socket = io(process.env.REACT_APP_SOCKET_URL || '');
+    if (this.socket) return;
+
+    const socketUrl =
+      import.meta.env.VITE_AI_SOCKET_URL ||
+      (window.location.hostname === 'localhost' ? 'http://localhost:4005' : '');
+
+    this.socket = io(socketUrl, {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 2000,
+    });
+
+    this.socket.on('connect', () => {
+      console.log('✅ Socket.IO đã kết nối tới AI Service!');
+    });
+
+    this.socket.on('disconnect', (reason: string) => {
+      console.log('⚠️ Socket.IO ngắt kết nối:', reason);
+    });
+
+    this.socket.on('connect_error', (err: Error) => {
+      console.error('❌ Socket.IO lỗi kết nối:', err.message);
+    });
+
     this.initAudio();
     this.setupInteractionListener();
+  }
+
+  disconnect() {
+    this.socket?.disconnect();
+    this.socket = null;
   }
 
   private initAudio() {
@@ -30,12 +61,16 @@ class SocketService {
     }
   }
 
-  onBankNotification(callback: (data: any) => void) {
-    this.socket?.on('bank_notification', callback);
+  on(event: string, callback: EventCallback) {
+    this.socket?.on(event, callback);
   }
 
-  onNewNotification(callback: (data: any) => void) {
-    this.socket?.on('new_notification', callback);
+  off(event: string, callback?: EventCallback) {
+    if (callback) {
+      this.socket?.off(event, callback);
+    } else {
+      this.socket?.off(event);
+    }
   }
 
   getSocket() { return this.socket; }

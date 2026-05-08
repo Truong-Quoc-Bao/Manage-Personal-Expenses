@@ -15,7 +15,8 @@ import {
 } from 'lucide-react';
 import { userApi } from '../../api/user.api';
 import { FloatingChat } from './FloatingChat';
-import { NotificationCenter } from './NotifCenter'; // Đã có import sẵn
+import { NotificationCenter } from './NotifCenter';
+import { socketService } from '../../services/SocketService';
 
 type UserProfile = {
   user_id?: string;
@@ -36,6 +37,8 @@ export function MainLayout() {
   const isChatPage = location.pathname === '/chatbox';
 
   useEffect(() => {
+    socketService.connect();
+
     const fetchUserProfile = async () => {
       try {
         const res = await userApi.getProfile();
@@ -47,6 +50,10 @@ export function MainLayout() {
     };
 
     fetchUserProfile();
+
+    return () => {
+      socketService.disconnect();
+    };
   }, []);
 
   const navigation = [
