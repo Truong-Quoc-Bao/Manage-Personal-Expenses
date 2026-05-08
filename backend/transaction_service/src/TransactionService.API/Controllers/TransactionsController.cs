@@ -66,7 +66,7 @@ namespace TransactionService.API.Controllers
         public async Task<IActionResult> DeleteTransaction([FromRoute] Guid id)
         {
             var userId = Guid.Parse("4f4b144d-e3f8-4e6b-9e32-408030a85698");
-            var deletedTransaction = await _transactionService.DeleteTransactionByIdAsync(userId, id);
+            var deletedTransaction = await _transactionService.DeleteTransactionAsync(userId, id);
             return Ok(deletedTransaction);
         }
     }
