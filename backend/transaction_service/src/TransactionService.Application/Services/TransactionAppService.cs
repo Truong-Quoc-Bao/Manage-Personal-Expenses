@@ -94,18 +94,29 @@ namespace TransactionService.Application.Services
             {
                 var createdTransaction = await _transactionRepository.CreateTransactionAsync(transactionEntity);
                 var transactionEventDto = _mapper.Map<CreateTransactionEventDto>(createdTransaction);
+                var responseDto = _mapper.Map<TransactionResponseDto>(createdTransaction);
 
                 if (createdTransaction.CategoryId.HasValue)
                 {
                     var catInfo = await _categoryInternalService.GetCategoryDisplayAsync(
                         createdTransaction.CategoryId.Value, userId, createdTransaction.TransactionType.ToString());
-                    if (catInfo.Found) transactionEventDto.CategoryName = catInfo.CategoryName;
+                    if (catInfo.Found)
+                    {
+                        transactionEventDto.CategoryName = catInfo.CategoryName;
+                        responseDto.CategoryName = catInfo.CategoryName;
+                        responseDto.CategoryColor = catInfo.Color;
+                        responseDto.CategoryIconCode = catInfo.IconCode;
+                    }
                 }
                 var accInfo = await _accountInternalService.GetAccountDisplayAsync(createdTransaction.AccountId, userId);
-                if (accInfo.Found) transactionEventDto.AccountName = accInfo.AccountName;
+                if (accInfo.Found)
+                {
+                    transactionEventDto.AccountName = accInfo.AccountName;
+                    responseDto.AccountName = accInfo.AccountName;
+                }
 
                 await _rabbitMQPublisher.PublishAsync(transactionEventDto, "transaction.created");
-                return _mapper.Map<TransactionResponseDto>(createdTransaction);
+                return responseDto;
             }
 
             throw new Exception("Invalid transaction details");

@@ -16,10 +16,13 @@ import {
   Calendar,
   Filter,
   Wallet,
+  Tag,
+  CalendarDays,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { transactionsApi } from '@/api/transaction.api';
 import { accountApi } from '@/api/account.api';
+import { categoryApi } from '@/api/category.api';
 import type { TransactionResponse, PaginatedResult } from '@/types/transaction';
 import { AddTransactionModal } from '@/components/modals/AddTransactionModal';
 import { EditTransactionModal } from '@/components/modals/EditTransactionModal';
@@ -28,6 +31,11 @@ import { DeleteTransactionModal } from '@/components/modals/DeleteTransactionMod
 interface AccountOption {
   account_id: string;
   account_name: string;
+}
+
+interface CategoryOption {
+  category_id: string;
+  category_name: string;
 }
 
 export function Transactions() {
@@ -46,20 +54,28 @@ export function Transactions() {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
-  /** Bộ lọc đang áp dụng lên API */
+
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [filterAccountId, setFilterAccountId] = useState('');
-  /** Nháp trong form; chỉ gửi API khi bấm Áp dụng */
+  const [filterCategoryId, setFilterCategoryId] = useState('');
+
   const [pendingDateFrom, setPendingDateFrom] = useState('');
   const [pendingDateTo, setPendingDateTo] = useState('');
   const [pendingAccountId, setPendingAccountId] = useState('');
+  const [pendingCategoryId, setPendingCategoryId] = useState('');
+
   const [accounts, setAccounts] = useState<AccountOption[]>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
 
   useEffect(() => {
     accountApi.getAccounts().then((res) => {
       const data = res.data?.data ?? res.data ?? [];
       setAccounts(Array.isArray(data) ? data : []);
+    });
+    categoryApi.getCategories().then((res) => {
+      const data = res.data?.data ?? res.data ?? [];
+      setCategories(Array.isArray(data) ? data : []);
     });
   }, []);
 
@@ -73,9 +89,10 @@ export function Transactions() {
       };
 
       if (filterType !== 'all') params.transaction_type = filterType;
-      if (dateFrom) params.date_from = dateFrom;
-      if (dateTo) params.date_to = dateTo;
+      if (dateFrom) params.date_from = `${dateFrom}T00:00:00Z`;
+      if (dateTo) params.date_to = `${dateTo}T23:59:59Z`;
       if (filterAccountId) params.account_id = filterAccountId;
+      if (filterCategoryId) params.category_id = filterCategoryId;
 
       const { data } = await transactionsApi.getTransactions(params);
       setPaginatedData(data);
@@ -86,27 +103,16 @@ export function Transactions() {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, pageSize, filterType, dateFrom, dateTo, filterAccountId]);
+  }, [currentPage, pageSize, filterType, dateFrom, dateTo, filterAccountId, filterCategoryId]);
 
-  // ==========================================
-  // 🔥 NHÚNG ĐỒNG BỘ AI (MONEY GUARD SYNC) - CẢI TIẾN
-  // ==========================================
   useEffect(() => {
     const handleAISync = async () => {
       console.log('📜 Transactions: Nhận lệnh từ AI! Đang đồng bộ...');
-
-      // 1. Hiện thông báo đang nạp dữ liệu từ AI
       const syncToast = toast.loading('Money Guard đang cập nhật giao dịch mới...');
-
-      // 2. Ép các bộ lọc về mặc định để Bảo thấy được giao dịch mới nhất ngay lập tức
       setFilterType('all');
       setSearchQuery('');
-      setCurrentPage(1); // Quan trọng: Về trang 1 vì giao dịch mới nằm ở đầu
-
-      // 3. Gọi API nạp lại dữ liệu
+      setCurrentPage(1);
       await fetchTransactions();
-
-      // 4. Xong xuôi thì báo thành công
       toast.dismiss(syncToast);
       toast.success('Dữ liệu đã được AI ghi sổ!', {
         icon: (
@@ -128,21 +134,24 @@ export function Transactions() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterType, dateFrom, dateTo, filterAccountId]);
+  }, [filterType, dateFrom, dateTo, filterAccountId, filterCategoryId]);
 
   const handleTransactionCreated = () => {
     setShowAddTransaction(false);
     fetchTransactions();
+    toast.success('Tạo giao dịch thành công!', { duration: 3000 });
   };
 
   const handleTransactionUpdated = () => {
     setEditingTransaction(null);
     fetchTransactions();
+    toast.success('Cập nhật giao dịch thành công!', { duration: 3000 });
   };
 
   const handleTransactionDeleted = () => {
     setDeletingTransaction(null);
     fetchTransactions();
+    toast.success('Xóa giao dịch thành công!', { duration: 3000 });
   };
 
   const formatCurrency = (amount: number) => {
@@ -167,14 +176,6 @@ export function Transactions() {
     );
   });
 
-  const totalIncome = displayedTransactions
-    .filter((t) => t.transactionType === 'Income')
-    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
-  const totalExpense = displayedTransactions
-    .filter((t) => t.transactionType === 'Expense')
-    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
   const filterButtonClass = (active: boolean, type?: 'Income' | 'Expense') => {
     if (active && type === 'Income') return '!bg-green-500 text-white shadow-md';
     if (active && type === 'Expense') return '!bg-red-500 text-white shadow-md';
@@ -187,9 +188,11 @@ export function Transactions() {
     setDateFrom('');
     setDateTo('');
     setFilterAccountId('');
+    setFilterCategoryId('');
     setPendingDateFrom('');
     setPendingDateTo('');
     setPendingAccountId('');
+    setPendingCategoryId('');
     setSearchQuery('');
     setCurrentPage(1);
   };
@@ -198,15 +201,37 @@ export function Transactions() {
     setDateFrom(pendingDateFrom);
     setDateTo(pendingDateTo);
     setFilterAccountId(pendingAccountId);
+    setFilterCategoryId(pendingCategoryId);
     setCurrentPage(1);
+  };
+
+  const setDatePreset = (preset: 'today' | 'week' | 'month') => {
+    const now = new Date();
+    const to = now.toISOString().split('T')[0];
+    let from: string;
+    if (preset === 'today') {
+      from = to;
+    } else if (preset === 'week') {
+      const d = new Date(now);
+      d.setDate(d.getDate() - 7);
+      from = d.toISOString().split('T')[0];
+    } else {
+      from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    }
+    setPendingDateFrom(from);
+    setPendingDateTo(to);
+    setDateFrom(from);
+    setDateTo(to);
   };
 
   const filtersDirty =
     pendingDateFrom !== dateFrom ||
     pendingDateTo !== dateTo ||
-    pendingAccountId !== filterAccountId;
+    pendingAccountId !== filterAccountId ||
+    pendingCategoryId !== filterCategoryId;
 
-  const hasActiveFilters = filterType !== 'all' || dateFrom || dateTo || filterAccountId;
+  const hasActiveFilters =
+    filterType !== 'all' || dateFrom || dateTo || filterAccountId || filterCategoryId;
 
   if (loading && !paginatedData) {
     return (
@@ -248,7 +273,6 @@ export function Transactions() {
           <div>
             <h1 className="mb-1 text-4xl font-bold text-gray-900 flex items-center gap-3">
               Giao dịch
-              {/* 🔥 Hiện icon xoay khi AI hoặc hệ thống đang nạp dữ liệu */}
               {loading && <RefreshCw className="h-6 w-6 text-orange-500 animate-spin" />}
             </h1>
             <p className="text-gray-600">Quản lý tất cả các giao dịch thu chi của bạn</p>
@@ -275,47 +299,47 @@ export function Transactions() {
             </button>
           </div>
         </div>
-        <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-3">
-          {/* Thẻ Thu Nhập */}
-          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-lg border-t-4 border-t-green-500">
-            <div className="mb-2 flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-green-500" />
-              <p className="text-sm text-gray-600 font-bold uppercase tracking-tighter">
-                Tổng thu bộ lọc
-              </p>
-            </div>
-            <p className="text-2xl font-black text-green-600">{formatCurrency(totalIncome)}</p>
-          </div>
 
-          {/* Thẻ Chi Tiêu */}
-          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-lg border-t-4 border-t-red-500">
-            <div className="mb-2 flex items-center gap-2">
-              <TrendingDown className="h-5 w-5 text-red-500" />
-              <p className="text-sm text-gray-600 font-bold uppercase tracking-tighter">
-                Tổng chi bộ lọc
-              </p>
+        {/* Quick overview banner with date presets */}
+        <div className="mb-6 overflow-hidden rounded-2xl bg-gradient-to-r from-orange-400 to-rose-400 shadow-lg">
+          <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/20">
+                <Wallet className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-white/80">Tổng cộng</p>
+                <p className="text-xl font-bold text-white">{totalCount} giao dịch</p>
+              </div>
             </div>
-            <p className="text-2xl font-black text-red-600">{formatCurrency(totalExpense)}</p>
-          </div>
-
-          {/* Thẻ Số Dư */}
-          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-lg border-t-4 border-t-orange-400">
-            <div className="mb-2 flex items-center gap-2">
-              <Wallet className="h-5 w-5 text-orange-500" />
-              <p className="text-sm text-gray-600 font-bold uppercase tracking-tighter">
-                Số dư ròng
-              </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <CalendarDays className="h-4 w-4 text-white/70" />
+              <button
+                type="button"
+                onClick={() => setDatePreset('today')}
+                className="rounded-lg bg-white/20 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-white/30"
+              >
+                Hôm nay
+              </button>
+              <button
+                type="button"
+                onClick={() => setDatePreset('week')}
+                className="rounded-lg bg-white/20 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-white/30"
+              >
+                7 ngày qua
+              </button>
+              <button
+                type="button"
+                onClick={() => setDatePreset('month')}
+                className="rounded-lg bg-white/20 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-white/30"
+              >
+                Tháng này
+              </button>
             </div>
-            <p
-              className={`text-2xl font-black ${
-                totalIncome - totalExpense >= 0 ? 'text-green-600' : 'text-red-600'
-              }`}
-            >
-              {formatCurrency(totalIncome - totalExpense)}
-            </p>
           </div>
         </div>
-        ;{/* Filter & Search */}
+
+        {/* Filter & Search */}
         <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-lg">
           <div className="flex flex-col gap-4">
             {/* Row 1: Search + type filter */}
@@ -366,7 +390,7 @@ export function Transactions() {
               </div>
             </div>
 
-            {/* Row 2: Date filter + Account filter */}
+            {/* Row 2: Date filter + Account + Category filter */}
             <div className="flex flex-col gap-4 md:flex-row md:items-center">
               <div className="flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-gray-400" />
@@ -375,7 +399,6 @@ export function Transactions() {
                   value={pendingDateFrom}
                   onChange={(e) => setPendingDateFrom(e.target.value)}
                   className="h-10 rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                  placeholder="Từ ngày"
                 />
                 <span className="text-gray-400">—</span>
                 <input
@@ -383,7 +406,6 @@ export function Transactions() {
                   value={pendingDateTo}
                   onChange={(e) => setPendingDateTo(e.target.value)}
                   className="h-10 rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                  placeholder="Đến ngày"
                 />
               </div>
 
@@ -392,12 +414,26 @@ export function Transactions() {
                 <select
                   value={pendingAccountId}
                   onChange={(e) => setPendingAccountId(e.target.value)}
-                  className="h-10 min-w-[180px] rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                  className="h-10 min-w-[160px] rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                 >
                   <option value="">Tất cả tài khoản</option>
                   {accounts.map((acc) => (
                     <option key={acc.account_id} value={acc.account_id}>
                       {acc.account_name}
+                    </option>
+                  ))}
+                </select>
+
+                <Tag className="h-5 w-5 shrink-0 text-gray-400" />
+                <select
+                  value={pendingCategoryId}
+                  onChange={(e) => setPendingCategoryId(e.target.value)}
+                  className="h-10 min-w-[160px] rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                >
+                  <option value="">Tất cả danh mục</option>
+                  {categories.map((cat) => (
+                    <option key={cat.category_id} value={cat.category_id}>
+                      {cat.category_name}
                     </option>
                   ))}
                 </select>
@@ -425,6 +461,7 @@ export function Transactions() {
             </div>
           </div>
         </div>
+
         {/* Transaction table */}
         <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-lg">
           {displayedTransactions.length === 0 ? (
@@ -462,7 +499,7 @@ export function Transactions() {
                     <th className="px-6 py-4 text-right text-xs uppercase tracking-wider text-gray-600">
                       Số tiền
                     </th>
-                    <th className="min-w-[148px] px-6 py-4 text-center text-xs uppercase tracking-wider text-gray-600">
+                    <th className="px-6 py-4 text-center text-xs uppercase tracking-wider text-gray-600">
                       Thao tác
                     </th>
                   </tr>
@@ -528,33 +565,36 @@ export function Transactions() {
                         </span>
                       </td>
 
-                      <td className="min-w-[148px] whitespace-nowrap px-6 py-4 text-center">
-                        <div className="flex shrink-0 items-center justify-center gap-1.5">
+                      <td className="whitespace-nowrap px-6 py-4 text-center">
+                        <div className="flex shrink-0 items-center justify-center gap-2">
                           <button
                             type="button"
                             onClick={() => navigate(`/transactions/${transaction.transId}`)}
-                            className="flex h-9 w-9 items-center justify-center rounded-xl !bg-blue-50 text-blue-500 transition hover:!bg-blue-100 hover:text-blue-700"
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-100 px-2.5 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-200"
                             title="Xem chi tiết"
                           >
-                            <Eye className="h-4 w-4" />
+                            <Eye className="h-3.5 w-3.5" />
+                            <span>Xem</span>
                           </button>
 
                           <button
                             type="button"
                             onClick={() => setEditingTransaction(transaction)}
-                            className="flex h-9 w-9 items-center justify-center rounded-xl !bg-amber-50 text-amber-500 transition hover:!bg-amber-100 hover:text-amber-700"
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-amber-100 px-2.5 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-200"
                             title="Chỉnh sửa"
                           >
-                            <Pencil className="h-4 w-4" />
+                            <Pencil className="h-3.5 w-3.5" />
+                            <span>Sửa</span>
                           </button>
 
                           <button
                             type="button"
                             onClick={() => setDeletingTransaction(transaction)}
-                            className="flex h-9 w-9 items-center justify-center rounded-xl !bg-red-50 text-red-400 transition hover:!bg-red-100 hover:text-red-600"
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-red-100 px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-200"
                             title="Xóa"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3.5 w-3.5" />
+                            <span>Xóa</span>
                           </button>
                         </div>
                       </td>

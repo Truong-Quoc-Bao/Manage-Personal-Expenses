@@ -15,9 +15,18 @@ function requireUserId(req, res) {
   return String(userId);
 }
 
+function resolveUserId(req) {
+  const paramId = req.params.userId;
+  if (paramId && paramId !== 'me') return paramId;
+  return req.headers['x-user-id'] || null;
+}
+
 const getUserAnalytics = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = resolveUserId(req);
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
     const data = await service.getUserAnalytics(userId);
     return res.status(200).json({ success: true, data });
   } catch (err) {
@@ -62,7 +71,8 @@ const createUserAnalytics = async (req, res) => {
 
 const updateUserAnalytics = async (req, res) => {
   try {
-    const userId = "4f4b144d-e3f8-4e6b-9e32-408030a85698";
+    const userId = requireUserId(req, res);
+    if (!userId) return;
     const data = req.body;
 
     const result = await service.updateUserAnalytics(userId, data);

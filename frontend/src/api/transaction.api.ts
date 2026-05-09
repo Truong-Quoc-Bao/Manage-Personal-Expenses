@@ -77,6 +77,20 @@ function mapPaginatedTransactions(
   };
 }
 
+function toSnakeCaseRequest(
+  data: CreateTransactionRequest | UpdateTransactionRequest
+): Record<string, unknown> {
+  return {
+    account_id: data.accountId,
+    category_id: data.categoryId ?? null,
+    amount: data.amount,
+    transaction_type: data.transactionType,
+    description: data.description,
+    date: data.date,
+    note: data.note,
+  };
+}
+
 export const transactionsApi = {
   getTransactions: (params?: TransactionListParams) =>
     axiosInstance
@@ -103,7 +117,7 @@ export const transactionsApi = {
       ),
 
   createTransaction: (data: CreateTransactionRequest) =>
-    axiosInstance.post("/api/transactions", data).then(
+    axiosInstance.post("/api/transactions", toSnakeCaseRequest(data)).then(
       (res): AxiosResponse<TransactionResponse> => ({
         ...res,
         data: mapTransactionResponse(res.data as Record<string, unknown>),
@@ -111,7 +125,7 @@ export const transactionsApi = {
     ),
 
   updateTransaction: (id: string, data: UpdateTransactionRequest) =>
-    axiosInstance.put(`/api/transactions/${id}`, data).then(
+    axiosInstance.put(`/api/transactions/${id}`, toSnakeCaseRequest(data)).then(
       (res): AxiosResponse<TransactionResponse> => ({
         ...res,
         data: mapTransactionResponse(res.data as Record<string, unknown>),

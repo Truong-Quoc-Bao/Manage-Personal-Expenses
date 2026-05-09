@@ -1,11 +1,23 @@
-import React, { useState } from "react";
-import { X } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { X, Wallet, Tag } from "lucide-react";
 import { toast } from "sonner";
 import { transactionsApi } from "@/api/transaction.api";
+import { accountApi } from "@/api/account.api";
+import { categoryApi } from "@/api/category.api";
 import type {
   TransactionType,
   CreateTransactionRequest,
 } from "@/types/transaction";
+
+interface AccountOption {
+  account_id: string;
+  account_name: string;
+}
+
+interface CategoryOption {
+  category_id: string;
+  category_name: string;
+}
 
 interface AddTransactionModalProps {
   onClose: () => void;
@@ -20,6 +32,9 @@ export function AddTransactionModal({
   const [transactionType, setTransactionType] =
     useState<TransactionType>("Expense");
 
+  const [accounts, setAccounts] = useState<AccountOption[]>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+
   const [formData, setFormData] = useState({
     accountId: "",
     categoryId: "",
@@ -29,14 +44,32 @@ export function AddTransactionModal({
     note: "",
   });
 
+  useEffect(() => {
+    accountApi.getAccounts().then((res) => {
+      const data = res.data?.data ?? res.data ?? [];
+      const list = Array.isArray(data) ? data : [];
+      setAccounts(list);
+      if (list.length === 1) {
+        setFormData((prev) => ({ ...prev, accountId: list[0].account_id }));
+      }
+    });
+    categoryApi.getCategories().then((res) => {
+      const data = res.data?.data ?? res.data ?? [];
+      setCategories(Array.isArray(data) ? data : []);
+    });
+  }, []);
+
   const fieldClass =
     "h-14 w-full rounded-2xl border border-gray-300 bg-white px-4 text-base text-gray-900 placeholder:text-gray-400 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100";
+
+  const selectClass =
+    "h-14 w-full rounded-2xl border border-gray-300 bg-white px-4 text-base text-gray-900 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100 appearance-none cursor-pointer";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.accountId.trim()) {
-      toast.error("Vui lòng nhập Account ID");
+    if (!formData.accountId) {
+      toast.error("Vui lòng chọn tài khoản");
       return;
     }
 
@@ -55,12 +88,12 @@ export function AddTransactionModal({
 
     try {
       const request: CreateTransactionRequest = {
-        accountId: formData.accountId.trim(),
-        categoryId: formData.categoryId.trim() || null,
+        accountId: formData.accountId,
+        categoryId: formData.categoryId || null,
         amount,
         transactionType,
         description: formData.description.trim() || undefined,
-        date: formData.date,
+        date: `${formData.date}T12:00:00Z`,
         note: formData.note.trim() || undefined,
       };
 
@@ -129,37 +162,53 @@ export function AddTransactionModal({
             </div>
           </div>
 
-          {/* Account ID */}
+          {/* Account Select */}
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-700">
-              Tài khoản (Account ID) <span className="text-red-500">*</span>
+              <span className="inline-flex items-center gap-1.5">
+                <Wallet className="h-4 w-4 text-blue-500" />
+                Tài khoản <span className="text-red-500">*</span>
+              </span>
             </label>
-            <input
-              type="text"
+            <select
               value={formData.accountId}
               onChange={(e) =>
                 setFormData({ ...formData, accountId: e.target.value })
               }
-              className={fieldClass}
-              placeholder="VD: 550e8400-e29b-41d4-a716-446655440000"
+              className={selectClass}
               required
-            />
+            >
+              <option value="">— Chọn tài khoản —</option>
+              {accounts.map((acc) => (
+                <option key={acc.account_id} value={acc.account_id}>
+                  {acc.account_name}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* Category ID */}
+          {/* Category Select */}
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-700">
-              Danh mục (Category ID)
+              <span className="inline-flex items-center gap-1.5">
+                <Tag className="h-4 w-4 text-purple-500" />
+                Danh mục
+              </span>
             </label>
-            <input
-              type="text"
+            <select
               value={formData.categoryId}
               onChange={(e) =>
                 setFormData({ ...formData, categoryId: e.target.value })
               }
-              className={fieldClass}
-              placeholder="Để trống nếu không có danh mục"
-            />
+              className={selectClass}
+            >
+              <option value="">— Không chọn danh mục —</option>
+              {categories.map((cat) => (
+                <option key={cat.category_id} value={cat.category_id}>
+                  {cat.category_name}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Amount */}

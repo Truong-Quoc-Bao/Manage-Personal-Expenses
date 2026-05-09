@@ -71,7 +71,7 @@ export function Budgets() {
 
       // Đổi thông báo sang thành công
       toast.dismiss(loader);
-      toast.success('Ngân sách của Bảo đã được cập nhật!', {
+      toast.success('Ngân sách đã được cập nhật!', {
         icon: '📊',
         description: 'AI đã tính toán lại các hạn mức chi tiêu.',
       });

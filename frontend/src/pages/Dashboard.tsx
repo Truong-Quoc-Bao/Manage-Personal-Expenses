@@ -205,9 +205,9 @@ export function Dashboard() {
                 )}
               </h1>
               <p className="text-lg text-gray-600">
-                Chào Bảo!{' '}
+                Xin chào!{' '}
                 {stats
-                  ? `Tháng ${stats.month} này Bảo đã chi ${formatCurrency(stats.expense)}`
+                  ? `Tháng ${stats.month} này bạn đã chi ${formatCurrency(stats.expense)}`
                   : 'Đây là tổng quan tài chính của bạn.'}
               </p>
             </div>
@@ -346,7 +346,7 @@ export function Dashboard() {
             </section>
 
             <section className="rounded-3xl border border-gray-100 bg-white p-8 shadow-lg">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Ví của Bảo</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Ví của bạn</h2>
               <div className="space-y-4">
                 {accounts.map((acc) => (
                   <div key={acc.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100">

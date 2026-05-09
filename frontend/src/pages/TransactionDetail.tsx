@@ -13,6 +13,7 @@ import {
   AlertCircle,
   Pencil,
   Trash2,
+  Hash,
 } from "lucide-react";
 import { toast } from "sonner";
 import { transactionsApi } from "@/api/transaction.api";
@@ -57,6 +58,7 @@ export function TransactionDetail() {
   const handleUpdated = () => {
     setEditingTransaction(null);
     fetchTransaction();
+    toast.success("Cập nhật giao dịch thành công!");
   };
 
   const handleDeleted = () => {
@@ -114,30 +116,49 @@ export function TransactionDetail() {
     <>
       <div className="mx-auto max-w-3xl">
         {/* Header */}
-        <div className="mb-8">
-          <button
-            type="button"
-            onClick={() => navigate("/transactions")}
-            className="mb-4 inline-flex items-center gap-2 rounded-xl !bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 transition hover:!bg-gray-200"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Quay lại danh sách
-          </button>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Chi tiết giao dịch
-          </h1>
+        <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <div>
+            <button
+              type="button"
+              onClick={() => navigate("/transactions")}
+              className="mb-3 inline-flex items-center gap-2 rounded-xl !bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 transition hover:!bg-gray-200"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Quay lại
+            </button>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Chi tiết giao dịch
+            </h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setEditingTransaction(transaction)}
+              className="inline-flex items-center gap-2 rounded-xl !bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700 transition hover:!bg-amber-100"
+            >
+              <Pencil className="h-4 w-4" />
+              Chỉnh sửa
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeletingTransaction(transaction)}
+              className="inline-flex items-center gap-2 rounded-xl !bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:!bg-red-100"
+            >
+              <Trash2 className="h-4 w-4" />
+              Xóa
+            </button>
+          </div>
         </div>
 
-        {/* Main card */}
-        <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-lg">
-          {/* Amount header */}
-          <div
-            className={`px-8 py-8 ${
-              isIncome
-                ? "bg-gradient-to-r from-green-500 to-emerald-500"
-                : "bg-gradient-to-r from-red-500 to-rose-500"
-            }`}
-          >
+        {/* Amount Banner */}
+        <div
+          className={`mb-6 overflow-hidden rounded-2xl shadow-lg ${
+            isIncome
+              ? "bg-gradient-to-r from-green-500 to-emerald-500"
+              : "bg-gradient-to-r from-orange-400 to-rose-400"
+          }`}
+        >
+          <div className="px-8 py-8">
             <div className="flex items-center gap-3 mb-2">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
                 {isIncome ? (
@@ -146,17 +167,19 @@ export function TransactionDetail() {
                   <TrendingDown className="h-5 w-5 text-white" />
                 )}
               </div>
-              <span className="text-lg font-medium text-white/80">
+              <span className="rounded-full bg-white/20 px-3 py-1 text-sm font-medium text-white">
                 {isIncome ? "Thu nhập" : "Chi tiêu"}
               </span>
             </div>
             <p className="text-4xl font-bold text-white">
               {isIncome ? "+" : "-"}
-              {formatCurrency(transaction.amount)}
+              {formatCurrency(Math.abs(transaction.amount))}
             </p>
           </div>
+        </div>
 
-          {/* Details */}
+        {/* Details Card */}
+        <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-lg">
           <div className="divide-y divide-gray-100 px-8">
             <DetailRow
               icon={<Calendar className="h-5 w-5 text-orange-500" />}
@@ -220,26 +243,16 @@ export function TransactionDetail() {
                 )
               }
             />
-          </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-8 py-5">
-            <button
-              type="button"
-              onClick={() => setEditingTransaction(transaction)}
-              className="inline-flex items-center gap-2 rounded-xl !bg-amber-50 px-5 py-2.5 text-sm font-semibold text-amber-700 transition hover:!bg-amber-100"
-            >
-              <Pencil className="h-4 w-4" />
-              Chỉnh sửa
-            </button>
-            <button
-              type="button"
-              onClick={() => setDeletingTransaction(transaction)}
-              className="inline-flex items-center gap-2 rounded-xl !bg-red-50 px-5 py-2.5 text-sm font-semibold text-red-600 transition hover:!bg-red-100"
-            >
-              <Trash2 className="h-4 w-4" />
-              Xóa giao dịch
-            </button>
+            <DetailRow
+              icon={<Hash className="h-5 w-5 text-gray-400" />}
+              label="Mã giao dịch"
+              value={
+                <span className="font-mono text-sm text-gray-500">
+                  {transaction.transId}
+                </span>
+              }
+            />
           </div>
         </div>
       </div>

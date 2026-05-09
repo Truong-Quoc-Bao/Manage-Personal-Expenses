@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthLayout } from './components/layouts/AuthLayout';
 import { MainLayout } from './components/layouts/MainLayout';
 
@@ -16,6 +16,14 @@ import { ChatBox } from "./pages/ChatBox";
 import { NotFound } from "./pages/NotFound";
 import ApiTestPage from './pages/ApiTestPage';
 
+function ProtectedRoute() {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    return <Navigate to="/" replace />;
+  }
+  return <Outlet />;
+}
+
 export default function AppRoutes() {
   return (
     <BrowserRouter>
@@ -27,15 +35,16 @@ export default function AppRoutes() {
           <Route path="/reset-password" element={<ResetPassword />} />
         </Route>
 
-        <Route element={<MainLayout />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/accounts" element={<Accounts />} />
-          <Route path="/transactions" element={<Transactions />} />
-          {/* <Route path="/budgets" element={<Budgets />} /> */}
-          <Route path="/transactions/:id" element={<TransactionDetail />} />
-          <Route path="/budgets" element={<Budgets />} />
-          <Route path="/statistics" element={<Statistics />} />
-          <Route path="/chatbox" element={<ChatBox />} />
+        <Route element={<ProtectedRoute />}>
+          <Route element={<MainLayout />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/accounts" element={<Accounts />} />
+            <Route path="/transactions" element={<Transactions />} />
+            <Route path="/transactions/:id" element={<TransactionDetail />} />
+            <Route path="/budgets" element={<Budgets />} />
+            <Route path="/statistics" element={<Statistics />} />
+            <Route path="/chatbox" element={<ChatBox />} />
+          </Route>
         </Route>
 
         <Route path="/test-api" element={<ApiTestPage />} />

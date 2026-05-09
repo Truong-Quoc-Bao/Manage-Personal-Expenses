@@ -184,7 +184,7 @@ export function FloatingChat() {
           : [
               {
                 role: 'model',
-                content: 'Chào Bảo! Money Guard đây, hôm nay Bảo muốn ghi sổ món gì nào?',
+                content: 'Xin chào! Money Guard đây, hôm nay bạn muốn ghi sổ món gì nào?',
               },
             ],
       );
@@ -983,7 +983,7 @@ export function FloatingChat() {
     // 2. Hiển thị tin nhắn người dùng (Optimistic UI)
     const userMsg: Message = {
       role: 'user',
-      content: message || (file ? '🖼️ Phân tích hình ảnh này giúp Bảo...' : ''),
+      content: message || (file ? '🖼️ Phân tích hình ảnh này giúp mình...' : ''),
       image: imagePreview || undefined,
     };
     setMessages((prev) => [...prev, userMsg]);
@@ -1074,7 +1074,7 @@ export function FloatingChat() {
         ...prev,
         {
           role: 'model',
-          content: `🚨 Lỗi: ${err.message || 'Server bận'}. Bảo thử lại nhé!`,
+          content: `🚨 Lỗi: ${err.message || 'Server bận'}. Bạn thử lại nhé!`,
         },
       ]);
     } finally {
