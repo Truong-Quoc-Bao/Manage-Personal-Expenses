@@ -109,10 +109,9 @@ const userNameCache = new Map();
 async function getUserName(userId) {
   if (userNameCache.has(userId)) return userNameCache.get(userId);
   try {
-    const result = await pool.query(
-      'SELECT user_name FROM user_service.users WHERE user_id = $1',
-      [userId],
-    );
+    const result = await pool.query('SELECT user_name FROM user_service.users WHERE user_id = $1', [
+      userId,
+    ]);
     const name = result.rows[0]?.user_name || 'Người dùng';
     userNameCache.set(userId, name);
     setTimeout(() => userNameCache.delete(userId), 10 * 60 * 1000);
@@ -130,16 +129,219 @@ webpush.setVapidDetails(
   process.env.PRIVATE_VAPID_KEY,
 );
 
-app.post('/login', (req, res) => {
-  // ... logic kiểm tra đăng nhập ...
-  // Trả về ID để frontend sử dụng
-  res.json({
-    success: true,
-    user: {
-      id: userFromDb.user_id, // Đây chính là cái ID n8n cần
-      name: userFromDb.user_name,
-    },
-  });
+const WEBHOOK_SECRET = 'my_super_secret_123';
+// --- LOG QUÁ TRÌNH XỬ LÝ GIAO DỊCH (BANK) ---
+app.post('/webhook/bank-transfer', async (req, res) => {
+  console.log('\n--- 🚀 [BẮT ĐẦU NHẬN WEBHOOK TỪ SEPAY] ---');
+  console.log('🔥 ĐÃ CHẠM VÀO WEBHOOK! Headers:', req.headers['x-api-key']);
+  try {
+    const {
+      content,
+      transferAmount,
+      transfer_amount,
+      amount_out,
+      amount_in,
+      transferType,
+      gateway,
+    } = req.body;
+
+    const apiKey = req.headers['x-api-key'];
+    const dynamicUserId = req.headers['x-user-id']; // ID lấy từ n8n gửi sang
+    let userId = null;
+
+    // 1. ƯU TIÊN KIỂM TRA API KEY (Dành cho n8n)
+    if (apiKey === 'my_super_secret_123') {
+      userId = dynamicUserId; // Lấy ID linh động n8n gửi
+      console.log('✅ n8n xác thực thành công. User:', userId);
+    }
+    // 2. NẾU KHÔNG CÓ KEY -> MỚI KIỂM TRA TOKEN (Dành cho Dashboard)
+    else {
+      userId = requireUserId(req, res);
+      if (!userId) return;
+    }
+
+    // 🕵️‍♂️ ĐÂY LÀ "CHỐT CHẶN" - PHẢI ĐƯA LÊN TRÊN CÙNG
+    if (gateway === 'Chatbot AI') {
+      console.log(
+        '🔇 [CHATBOT]: Giao dịch này đến từ Chatbot, n8n đã check hạn mức xong. Không lưu trùng vào DB.',
+      );
+      return res.status(200).json({ status: 'Success', message: 'Ignored duplicate save for AI' });
+    }
+
+    // --- NẾU LÀ NGÂN HÀNG THẬT THÌ MỚI CHẠY TIẾP XUỐNG DƯỚI ---
+
+    const finalAmount = parseFloat(
+      transferAmount || transfer_amount || amount_out || amount_in || 0,
+    );
+
+    // 1. PHÂN BIỆT LOẠI GIAO DỊCH (VÀO hay RA)
+    // SePay gửi "in" là tiền vào, "out" là tiền ra
+    const isIncome = transferType === 'in';
+    const transactionType = isIncome ? 'income' : 'expense';
+
+    if (finalAmount === 0) return res.status(200).send('No amount');
+
+    console.log(`💰 [${transactionType.toUpperCase()}] Số tiền: ${finalAmount}đ`);
+
+    // 2. NHỜ AI PHÂN LOẠI (Gửi thêm ngữ cảnh là Tiền vào hay Tiền ra)
+    const model = genAI.getGenerativeModel({ model: 'gemini-flash-lite-latest' });
+
+    const promptBankAI = `
+      Bạn là hệ thống AI phân tích giao dịch ngân hàng thông minh của app Money Guard.
+      Dưới đây là thông tin giao dịch nhận được từ ngân hàng:
+      - Nội dung chuyển khoản gốc: "${content}"
+      - Chiều giao dịch: ${
+        isIncome ? 'TIỀN VÀO (Bạn nhận được tiền)' : 'TIỀN RA (Bạn chuyển tiền đi)'
+      }
+
+      [NHIỆM VỤ CỦA BẠN]:
+      Hãy phân tích và trả về định dạng JSON theo đúng 2 yêu cầu sau:
+      
+      1. "clean_name": Làm sạch nội dung chuyển khoản cho dễ đọc. Lược bỏ các mã số giao dịch rác của ngân hàng (VD: MBBANK, FT230..., IBFT...). 
+        (Ví dụ: "NGUYEN VAN A CHUYEN TIEN 123456" -> "${
+          isIncome ? 'Nguyễn Văn A chuyển tiền' : 'Chuyển tiền cho Nguyễn Văn A'
+        }")
+2. "category_name": Phân loại danh mục tự động. Dựa vào chiều giao dịch, hãy áp dụng quy tắc:
+        ${
+          isIncome
+            ? '=> Đây là TIỀN VÀO: Hãy phân loại vào một trong các danh mục: "Lương", "Người khác chuyển", "Tiền thưởng", "Thu nhập khác".'
+            : '=> Đây là TIỀN RA: Nếu thấy tên người, hãy xếp vào "Chuyển cho người khác". Nếu thấy tên cửa hàng/dịch vụ, hãy xếp vào "Ăn uống", "Mua sắm", "Hóa đơn", v.v...'
+        }
+
+      [RÀNG BUỘC BẮT BUỘC]:
+      Tuyệt đối CHỈ xuất ra một chuỗi JSON duy nhất, KHÔNG có markdown, KHÔNG có thẻ \`\`\`json, KHÔNG giải thích thêm.
+      Định dạng chuẩn: {"category_name": "...", "clean_name": "..."}
+    `;
+
+    let aiData;
+
+    try {
+      const aiResponse = await model.generateContent(promptBankAI);
+      const text = aiResponse.response.text();
+
+      // Dùng Regex tìm đúng khối JSON (Phòng hờ AI bị điên vẫn nhả markdown)
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        aiData = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error('AI không trả về JSON hợp lệ');
+      }
+    } catch (e) {
+      console.error('⚠️ Lỗi Parse JSON AI (Dùng dữ liệu gốc):', e.message);
+      // Fallback: Nếu AI lỗi thì vẫn lưu DB bình thường với tên gốc
+      aiData = {
+        category_name: isIncome ? 'Thu nhập' : 'Khác',
+        clean_name: content,
+      };
+    }
+
+    // 3. LƯU DATABASE (Dùng đúng transactionType)
+    let catRes = await pool.query(
+      `SELECT category_id FROM category_service.categories WHERE category_name ILIKE $1 AND user_id = $2 LIMIT 1`,
+      [aiData.category_name, userId],
+    );
+
+    let categoryId;
+    if (catRes.rows.length > 0) {
+      categoryId = catRes.rows[0].category_id;
+    } else {
+      const newCat = await pool.query(
+        "INSERT INTO category_service.categories (user_id, category_name, type, icon, color) VALUES ($1, $2, $3, '🏦', 'blue') RETURNING category_id",
+        [userId, aiData.category_name, transactionType],
+      );
+      categoryId = newCat.rows[0].category_id;
+    }
+
+    const nowICT = new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' });
+
+    await pool.query(
+      `INSERT INTO transaction_service.transactions (account_id, category_id, amount, transaction_type, description, date, note, user_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        // 1,
+        'd4ffbef0-8bcc-445e-9ea3-7bc854e2ad76',
+        // targetAccountId,
+        categoryId,
+        finalAmount,
+        transactionType,
+        aiData.clean_name,
+        nowICT,
+        `Nguồn: ${gateway || 'Bank'}`,
+        userId,
+      ],
+    );
+
+    // 4. THÔNG BÁO THÔNG MINH (Thay đổi câu chữ dựa trên isIncome)
+    let notificationMsg = '';
+    if (isIncome) {
+      notificationMsg = `💰 **Ting ting!** Money Guard thấy Bảo vừa **nhận được** **${finalAmount.toLocaleString()}đ** từ "${
+        aiData.clean_name
+      }". Chúc mừng Bảo có thêm thu nhập! 🥳`;
+    } else {
+      notificationMsg = `💸 **Ting ting!** Money Guard thấy Bảo vừa **chuyển đi** **${finalAmount.toLocaleString()}đ** cho "${
+        aiData.clean_name
+      }". Đã ghi vào sổ rồi nhé!`;
+    }
+
+    // ============================================================
+    // 🔥 CHIẾN THUẬT SIÊU CHỦ ĐỘNG (PROACTIVE AI)
+    // ============================================================
+
+    // 1. Lấy sức khỏe tài chính thực tế từ Database
+    const health = await getProactiveContext(userId);
+
+    // 2. Moni tự động "soi" dữ liệu để đưa ra lời khuyên "đanh đá"
+    let proactiveMsg = '';
+    if (health.status.includes('🔴')) {
+      proactiveMsg = `\n\n🚨 **TỔNG BÁO ĐỘNG**: Bảo ơi, hiện tại Bảo đang TIÊU VƯỢT THU NHẬP rồi! Cất ngay cái thẻ đi trước khi cái ví "đăng xuất" khỏi trái đất! 😤`;
+    } else if (health.daysToEmpty <= 5 && health.balance > 0) {
+      proactiveMsg = `\n\n⚠️ **CẢNH BÁO ĐÓI KÉM**: Với đà này Bảo chỉ còn đủ tiền sống trong **${health.daysToEmpty} ngày** nữa thôi. Chuẩn bị tinh thần ăn mì tôm cả tháng nhé! 🍜`;
+    } else if (finalAmount > 1000000 && transactionType === 'expense') {
+      proactiveMsg = `\n\n💸 **XÀI SANG QUÁ**: Món này tận **${finalAmount.toLocaleString()}đ**, Bảo có thực sự cần nó không hay chỉ là nhất thời? Suy nghĩ kỹ đi nhé! 🤔`;
+    } else {
+      proactiveMsg = `\n\n✅ **TỐT LẮM**: Duy trì phong độ này nhé Bảo, hiện Bảo vẫn còn sống sót được thêm **${health.daysToEmpty} ngày** nữa. Tiết kiệm là quốc sách! 💎`;
+    }
+
+    // 3. Gộp nội dung thông báo gốc + Lời cảnh báo chủ động của AI
+    const finalMsg = notificationMsg + proactiveMsg;
+
+    // 5.MỚI: LƯU VÀO LỊCH SỬ CHAT (Để khi F5 web nó vẫn hiện ra)
+    try {
+      await pool.query(
+        'INSERT INTO ai_service.message_history (user_id, role, message) VALUES ($1, $2, $3)',
+        [userId, 'model', finalMsg],
+      );
+      console.log('💾 Đã lưu thông báo ngân hàng vào lịch sử chat');
+    } catch (chatErr) {
+      console.error('❌ Lỗi lưu lịch sử chat ngân hàng:', chatErr.message);
+    }
+
+    // 6.Bắn socket và push thông báo
+    // io.emit('bank_notification', { message: notificationMsg });
+    io.emit('bank_notification', { message: finalMsg });
+    console.log('📡 [PROACTIVE]: Đã bắn Socket cảnh báo về Web.');
+
+    await addNotification(finalMsg, userId);
+
+    // Test xem client có đang lắng nghe không
+    socket.on('new_notification', (data) => {
+      console.log('🔥 Đã nhận được dữ liệu qua Socket:', data);
+    });
+    if (typeof sendPushNotification === 'function') {
+      sendPushNotification(notificationMsg);
+    }
+
+    console.log(`✅ Thành công: ${notificationMsg}`);
+    res.status(200).json({ status: 'Success' });
+  } catch (err) {
+    console.error('❌ LỖI CHI TIẾT:', err);
+    // Trả về lỗi chi tiết thay vì chữ "Error" chung chung để debug
+    res.status(500).json({
+      status: 'Error',
+      message: err.message,
+      stack: err.stack,
+    });
+  }
 });
 
 function requireUserId(req, res) {
@@ -639,224 +841,6 @@ app.get('/api/create-bank', async (req, res) => {
       error: 'Lỗi API',
       message: err.message,
       detail: err.response?.body || null,
-    });
-  }
-});
-
-const WEBHOOK_SECRET = 'my_super_secret_123';
-// --- LOG QUÁ TRÌNH XỬ LÝ GIAO DỊCH (BANK) ---
-app.post('/webhook/bank-transfer', async (req, res) => {
-  console.log('\n--- 🚀 [BẮT ĐẦU NHẬN WEBHOOK TỪ SEPAY] ---');
-
-  try {
-    const {
-      content,
-      transferAmount,
-      transfer_amount,
-      amount_out,
-      amount_in,
-      transferType,
-      gateway,
-    } = req.body;
-
-    // 🕵️‍♂️ ĐÂY LÀ "CHỐT CHẶN" - PHẢI ĐƯA LÊN TRÊN CÙNG
-    if (gateway === 'Chatbot AI') {
-      console.log(
-        '🔇 [CHATBOT]: Giao dịch này đến từ Chatbot, n8n đã check hạn mức xong. Không lưu trùng vào DB.',
-      );
-      return res.status(200).json({ status: 'Success', message: 'Ignored duplicate save for AI' });
-    }
-
-    // --- NẾU LÀ NGÂN HÀNG THẬT THÌ MỚI CHẠY TIẾP XUỐNG DƯỚI ---
-
-    const finalAmount = parseFloat(
-      transferAmount || transfer_amount || amount_out || amount_in || 0,
-    );
-
-    // const userId = requireUserId(req, res);
-    // console.log('trả user webhook', userId);
-    // if (!userId) {
-    //   return;
-    // }
-    const apiKey = req.headers['x-api-key']; // Kiểm tra header mới
-    let userId;
-
-    if (apiKey === WEBHOOK_SECRET) {
-      // Nếu n8n gửi đúng mã bí mật, cho qua luôn và gán ID admin
-      userId = 'd4ffbef0-8bcc-445e-9ea3-7bc854e2ad76';
-    } else {
-      // Nếu không có mã bí mật, mới check JWT (cho việc test từ Dashboard)
-      userId = requireUserId(req, res);
-      if (!userId) return;
-    }
-    const userName = await getUserName(userId);
-
-    // 1. PHÂN BIỆT LOẠI GIAO DỊCH (VÀO hay RA)
-    // SePay gửi "in" là tiền vào, "out" là tiền ra
-    const isIncome = transferType === 'in';
-    const transactionType = isIncome ? 'income' : 'expense';
-
-    if (finalAmount === 0) return res.status(200).send('No amount');
-
-    console.log(`💰 [${transactionType.toUpperCase()}] Số tiền: ${finalAmount}đ`);
-
-    // 2. NHỜ AI PHÂN LOẠI (Gửi thêm ngữ cảnh là Tiền vào hay Tiền ra)
-    const model = genAI.getGenerativeModel({ model: 'gemini-flash-lite-latest' });
-
-    const promptBankAI = `
-      Bạn là hệ thống AI phân tích giao dịch ngân hàng thông minh của app Money Guard.
-      Dưới đây là thông tin giao dịch nhận được từ ngân hàng:
-      - Nội dung chuyển khoản gốc: "${content}"
-      - Chiều giao dịch: ${
-        isIncome ? 'TIỀN VÀO (Bạn nhận được tiền)' : 'TIỀN RA (Bạn chuyển tiền đi)'
-      }
-
-      [NHIỆM VỤ CỦA BẠN]:
-      Hãy phân tích và trả về định dạng JSON theo đúng 2 yêu cầu sau:
-      
-      1. "clean_name": Làm sạch nội dung chuyển khoản cho dễ đọc. Lược bỏ các mã số giao dịch rác của ngân hàng (VD: MBBANK, FT230..., IBFT...). 
-        (Ví dụ: "NGUYEN VAN A CHUYEN TIEN 123456" -> "${
-          isIncome ? 'Nguyễn Văn A chuyển tiền' : 'Chuyển tiền cho Nguyễn Văn A'
-        }")
-      
-      2. "category_name": Phân loại danh mục tự động. Dựa vào chiều giao dịch, hãy áp dụng quy tắc:
-        ${
-          isIncome
-            ? '=> Đây là TIỀN VÀO: Hãy phân loại vào một trong các danh mục: "Lương", "Người khác chuyển", "Tiền thưởng", "Thu nhập khác".'
-            : '=> Đây là TIỀN RA: Nếu thấy tên người, hãy xếp vào "Chuyển cho người khác". Nếu thấy tên cửa hàng/dịch vụ, hãy xếp vào "Ăn uống", "Mua sắm", "Hóa đơn", v.v...'
-        }
-
-      [RÀNG BUỘC BẮT BUỘC]:
-      Tuyệt đối CHỈ xuất ra một chuỗi JSON duy nhất, KHÔNG có markdown, KHÔNG có thẻ \`\`\`json, KHÔNG giải thích thêm.
-      Định dạng chuẩn: {"category_name": "...", "clean_name": "..."}
-    `;
-
-    let aiData;
-
-    try {
-      const aiResponse = await model.generateContent(promptBankAI);
-      const text = aiResponse.response.text();
-
-      // Dùng Regex tìm đúng khối JSON (Phòng hờ AI bị điên vẫn nhả markdown)
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        aiData = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error('AI không trả về JSON hợp lệ');
-      }
-    } catch (e) {
-      console.error('⚠️ Lỗi Parse JSON AI (Dùng dữ liệu gốc):', e.message);
-      // Fallback: Nếu AI lỗi thì vẫn lưu DB bình thường với tên gốc
-      aiData = {
-        category_name: isIncome ? 'Thu nhập' : 'Khác',
-        clean_name: content,
-      };
-    }
-
-    // 3. LƯU DATABASE (Dùng đúng transactionType)
-    let catRes = await pool.query(
-      `SELECT category_id FROM category_service.categories WHERE category_name ILIKE $1 AND user_id = $2 LIMIT 1`,
-      [aiData.category_name, userId],
-    );
-
-    let categoryId;
-    if (catRes.rows.length > 0) {
-      categoryId = catRes.rows[0].category_id;
-    } else {
-      const newCat = await pool.query(
-        "INSERT INTO category_service.categories (user_id, category_name, type, icon, color) VALUES ($1, $2, $3, '🏦', 'blue') RETURNING category_id",
-        [userId, aiData.category_name, transactionType],
-      );
-      categoryId = newCat.rows[0].category_id;
-    }
-
-    const nowICT = new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' });
-
-    await pool.query(
-      `INSERT INTO transaction_service.transactions (user_id, account_id, category_id, amount, transaction_type, description, date, note)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [
-        userId,
-        'd4ffbef0-8bcc-445e-9ea3-7bc854e2ad76',
-        categoryId,
-        finalAmount,
-        transactionType,
-        aiData.clean_name,
-        nowICT,
-        `Nguồn: ${gateway || 'Bank'}`,
-      ],
-    );
-
-    // 4. THÔNG BÁO THÔNG MINH (Thay đổi câu chữ dựa trên isIncome)
-    let notificationMsg = '';
-    if (isIncome) {
-      notificationMsg = `💰 **Ting ting!** Money Guard thấy ${userName} vừa **nhận được** **${finalAmount.toLocaleString()}đ** từ "${
-        aiData.clean_name
-      }". Chúc mừng ${userName} có thêm thu nhập! 🥳`;
-    } else {
-      notificationMsg = `💸 **Ting ting!** Money Guard thấy ${userName} vừa **chuyển đi** **${finalAmount.toLocaleString()}đ** cho "${
-        aiData.clean_name
-      }". Đã ghi vào sổ rồi nhé!`;
-    }
-
-    // ============================================================
-    // 🔥 CHIẾN THUẬT SIÊU CHỦ ĐỘNG (PROACTIVE AI)
-    // ============================================================
-
-    // 1. Lấy sức khỏe tài chính thực tế từ Database
-    const health = await getProactiveContext(userId);
-
-    // 2. Moni tự động "soi" dữ liệu để đưa ra lời khuyên "đanh đá"
-    let proactiveMsg = '';
-    if (health.status.includes('🔴')) {
-      proactiveMsg = `\n\n🚨 **TỔNG BÁO ĐỘNG**: ${userName} ơi, hiện tại ${userName} đang TIÊU VƯỢT THU NHẬP rồi! Cất ngay cái thẻ đi trước khi cái ví "đăng xuất" khỏi trái đất! 😤`;
-    } else if (health.daysToEmpty <= 5 && health.balance > 0) {
-      proactiveMsg = `\n\n⚠️ **CẢNH BÁO ĐÓI KÉM**: Với đà này ${userName} chỉ còn đủ tiền sống trong **${health.daysToEmpty} ngày** nữa thôi. Chuẩn bị tinh thần ăn mì tôm cả tháng nhé! 🍜`;
-    } else if (finalAmount > 1000000 && transactionType === 'expense') {
-      proactiveMsg = `\n\n💸 **XÀI SANG QUÁ**: Món này tận **${finalAmount.toLocaleString()}đ**, ${userName} có thực sự cần nó không hay chỉ là nhất thời? Suy nghĩ kỹ đi nhé! 🤔`;
-    } else {
-      proactiveMsg = `\n\n✅ **TỐT LẮM**: Duy trì phong độ này nhé ${userName}, hiện ${userName} vẫn còn sống sót được thêm **${health.daysToEmpty} ngày** nữa. Tiết kiệm là quốc sách! 💎`;
-    }
-
-    // 3. Gộp nội dung thông báo gốc + Lời cảnh báo chủ động của AI
-    const finalMsg = notificationMsg + proactiveMsg;
-
-    // 5.MỚI: LƯU VÀO LỊCH SỬ CHAT (Để khi F5 web nó vẫn hiện ra)
-    try {
-      await pool.query(
-        'INSERT INTO ai_service.message_history (user_id, role, message) VALUES ($1, $2, $3)',
-        [userId, 'model', finalMsg],
-      );
-      console.log('💾 Đã lưu thông báo ngân hàng vào lịch sử chat');
-    } catch (chatErr) {
-      console.error('❌ Lỗi lưu lịch sử chat ngân hàng:', chatErr.message);
-    }
-
-    // 6.Bắn socket và push thông báo
-    // io.emit('bank_notification', { message: notificationMsg });
-    io.emit('bank_notification', { message: finalMsg });
-    console.log('📡 [PROACTIVE]: Đã bắn Socket cảnh báo về Web.');
-
-    await addNotification(finalMsg, userId);
-
-    // Test xem client có đang lắng nghe không
-    socket.on('new_notification', (data) => {
-      console.log('🔥 Đã nhận được dữ liệu qua Socket:', data);
-    });
-
-    if (typeof sendPushNotification === 'function') {
-      sendPushNotification(notificationMsg);
-    }
-
-    console.log(`✅ Thành công: ${notificationMsg}`);
-    res.status(200).json({ status: 'Success' });
-  } catch (err) {
-    console.error('❌ LỖI CHI TIẾT:', err);
-    // Trả về lỗi chi tiết thay vì chữ "Error" chung chung để debug
-    res.status(500).json({
-      status: 'Error',
-      message: err.message,
-      stack: err.stack,
     });
   }
 });
@@ -1441,8 +1425,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
                   dbResult += `- Số giao dịch tìm thấy: ${dataFound.count || 0}`;
                 }
               } else {
-                dbResult +=
-                  `Money Guard đã lục tung sổ sách nhưng không tìm thấy dữ liệu nào cho yêu cầu này của ${currentUserName} cả! 🕵️‍♂️`;
+                dbResult += `Money Guard đã lục tung sổ sách nhưng không tìm thấy dữ liệu nào cho yêu cầu này của ${currentUserName} cả! 🕵️‍♂️`;
               }
               // --- KẾT THÚC GOM CHUNG ---
 
