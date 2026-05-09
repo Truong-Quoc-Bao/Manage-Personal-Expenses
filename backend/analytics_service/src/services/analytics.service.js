@@ -1132,6 +1132,7 @@ const service = {
         topCategories.push({
           category_id: transaction.category_id,
           category_name: transaction.category_name || '',
+          // category_name: transaction.category_name || '',
           total_amount: amt
         });
       }
@@ -1388,7 +1389,7 @@ const service = {
         const categoryInfo = await repo.findCategoryById(category_id).catch(() => null);
         catArray.push({
           category_id,
-          category_name: categoryInfo?.category_name || transaction.category_name || '',
+          category_name: transaction.category_name || categoryInfo?.category_name || 'Unknown',
           amount: amt
         });
       }
@@ -1493,29 +1494,19 @@ const service = {
   },
 
   handleTransactionUpdated: async function (message) {
-    // Message format từ RabbitMQ:
-    // {
-    //   trans_id, user_id,         ← từ message metadata
-    //   account_id, category_id,
-    //   amount,                    ← giá trị CŨ
-    //   amount_update,             ← giá trị MỚI
-    //   transaction_type,          ← type CŨ
-    //   transaction_type_update,   ← type MỚI
-    //   description, date, note
-    // }
     const {
       trans_id, user_id, account_id,
       account_id_update,
       category_id,
       amount, amount_update,
       transaction_type, transaction_type_update,
+      category_name, account_name,
       description, date, note,
     } = message;
 
     console.log(`[handleTransactionUpdated] Processing trans_id: ${trans_id}, user_id: ${user_id}`);
 
     try {
-      // Tạo old_transaction (giá trị cũ để reverse)
       const oldTransaction = {
         trans_id,
         user_id,
@@ -1523,12 +1514,13 @@ const service = {
         category_id,
         amount: Number(amount),
         transaction_type,
+        category_name,
+        account_name,
         description,
         date,
         note,
       };
 
-      // Tạo new_transaction (giá trị mới để apply)
       const newTransaction = {
         trans_id,
         user_id,
@@ -1536,13 +1528,13 @@ const service = {
         category_id,
         amount: Number(amount_update ?? amount),
         transaction_type: transaction_type_update ?? transaction_type,
+        category_name,
+        account_name,
         description,
         date,
         note,
       };
 
-      // Tạo reverse transaction: đảo ngược effect của old
-      // Income cũ → dùng Expense để trừ lại, Expense cũ → dùng Income để cộng lại
       const reverseTransaction = {
         ...oldTransaction,
         transaction_type: transaction_type === 'Income' ? 'Expense' : 'Income',
@@ -1583,23 +1575,16 @@ const service = {
   },
 
   handleTransactionDeleted: async function (message) {
-    // Message format từ RabbitMQ:
-    // {
-    //   trans_id, user_id,         ← từ message metadata
-    //   account_id, category_id,
-    //   amount, transaction_type,
-    //   description, date, note
-    // }
     const {
       trans_id, user_id, account_id,
       category_id, amount, transaction_type,
+      category_name, account_name,
       description, date, note,
     } = message;
 
     console.log(`[handleTransactionDeleted] Processing trans_id: ${trans_id}, user_id: ${user_id}`);
 
     try {
-      // Tạo reverse transaction: đảo ngược effect của transaction đã xóa
       const reverseTransaction = {
         trans_id,
         user_id,
@@ -1607,6 +1592,8 @@ const service = {
         category_id,
         amount: Number(amount),
         transaction_type: transaction_type === 'Income' ? 'Expense' : 'Income',
+        category_name,
+        account_name,
         description,
         date,
         note,

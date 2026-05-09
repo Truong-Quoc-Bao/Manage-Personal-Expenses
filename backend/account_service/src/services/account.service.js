@@ -11,6 +11,7 @@ const {
 } = require("../repositories/account.repository");
 
 const accountRepository = require("../repositories/account.repository");
+const rabbitMQClient = require("../../../shared/rabbitmq-client");
 
 const getTotalBalanceService = async ({ userId }) => {
   if (!userId) {
@@ -39,7 +40,20 @@ const deleteAccountServices = async ({ accountId }) => {
     throw error;
   }
 
+  const accountInfo = await findAccountByAccountId({ accountId });
   const deleteAccount = await deleteAccountRepo({ accountId });
+
+  if (accountInfo) {
+    try {
+      await rabbitMQClient.publish("account.deleted", {
+        account_id: accountId,
+        user_id: accountInfo.user_id,
+        account_name: accountInfo.account_name,
+      });
+    } catch (err) {
+      console.error("[Account] Failed to publish account.deleted:", err.message);
+    }
+  }
 
   return deleteAccount;
 };
@@ -201,6 +215,19 @@ const createNewAccount = async ({
     balance,
     currency,
   });
+
+  try {
+    await rabbitMQClient.publish("account.created", {
+      account_id: create.account_id,
+      user_id: userId,
+      account_name: accountName,
+      type,
+      balance,
+      currency,
+    });
+  } catch (err) {
+    console.error("[Account] Failed to publish account.created:", err.message);
+  }
 
   return create;
 };

@@ -23,7 +23,7 @@ setDefaultResultOrder('ipv4first');
 import pg from 'pg';
 const { Pool } = pg;
 
-// Cấu hình kết nối (thay thông tin đúng với máy Bảo)
+// Cấu hình kết nối PostgreSQL
 // const pool = new Pool({
 //   user: process.env.DB_USER,
 //   host: process.env.DB_HOST,
@@ -61,7 +61,7 @@ pool.connect((err, client, release) => {
     console.log(`📝 URL đang dùng: "${cleanUrl.substring(0, 30)}..."`);
     console.error('❌ Lỗi kết nối Postgres:', err.message);
   } else {
-    console.log(`✅ CHÚC MỪNG BẢO! Đã thông suốt tới Schema: ${SCHEMA_NAME}`);
+    console.log(`✅ Kết nối thành công tới Schema: ${SCHEMA_NAME}`);
 
     // Test thử xem có đọc được bảng trong schema đó không
     client.query('SELECT current_schema()', (err, res) => {
@@ -317,16 +317,11 @@ app.post('/webhook/bank-transfer', async (req, res) => {
     }
 
     // 6.Bắn socket và push thông báo
-    // io.emit('bank_notification', { message: notificationMsg });
     io.emit('bank_notification', { message: finalMsg });
     console.log('📡 [PROACTIVE]: Đã bắn Socket cảnh báo về Web.');
 
     await addNotification(finalMsg, userId);
 
-    // Test xem client có đang lắng nghe không
-    socket.on('new_notification', (data) => {
-      console.log('🔥 Đã nhận được dữ liệu qua Socket:', data);
-    });
     if (typeof sendPushNotification === 'function') {
       sendPushNotification(notificationMsg);
     }
@@ -903,7 +898,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
         'INSERT INTO ai_service.message_history (user_id, role, message) VALUES ($1, $2, $3)',
         [currentUserId, 'user', message || '[Gửi ảnh]'],
       );
-      console.log('💾 Đã lưu tin nhắn của Bảo vào DB');
+      console.log('💾 Đã lưu tin nhắn user vào DB');
     } catch (err) {
       console.error('❌ Lỗi lưu tin nhắn user:', err.message);
     }
@@ -986,7 +981,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const daysPassed = now.getDate();
     const daysLeft = daysInMonth - daysPassed;
-    const projectedTotal = totalExpense + dailyAvg * daysLeft; // dailyAvg Bảo đã có ở trên rồi
+    const projectedTotal = totalExpense + dailyAvg * daysLeft;
 
     const totalLimit = parseFloat(budgetRes.rows[0].total_limit);
     const remainingBudget = totalLimit - totalExpense;
@@ -1063,7 +1058,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
     console.log(
       `📊 Stats nạp cho Money Guard: [${stats.count} GD] | Chi: ${stats.expense} | Thu: ${stats.income}`,
     );
-    // 3. Logic: Chỉ hiện số liệu nếu Bảo hỏi về chi tiêu/tiền bạc
+    // 3. Logic: Chỉ hiện số liệu nếu user hỏi về chi tiêu/tiền bạc
     const isAskingAboutMoney = /tiền|chi tiêu|báo cáo|bao nhiêu|tổng|tháng/i.test(message);
 
     let contextData = '';
@@ -1655,7 +1650,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
                 const finalIconId =
                   iconLookup.rows.length > 0
                     ? iconLookup.rows[0].icon_id
-                    : 'f1995874-297d-460c-882d-136585918831'; // Mã UUID mặc định của Bảo
+                    : 'f1995874-297d-460c-882d-136585918831'; // UUID icon mặc định (Bills)
 
                 // Nếu tạo danh mục mới, phải tạo đúng loại (income/expense)
                 const newCat = await pool.query(

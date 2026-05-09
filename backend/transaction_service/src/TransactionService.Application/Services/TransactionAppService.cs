@@ -94,9 +94,29 @@ namespace TransactionService.Application.Services
             {
                 var createdTransaction = await _transactionRepository.CreateTransactionAsync(transactionEntity);
                 var transactionEventDto = _mapper.Map<CreateTransactionEventDto>(createdTransaction);
+                var responseDto = _mapper.Map<TransactionResponseDto>(createdTransaction);
+
+                if (createdTransaction.CategoryId.HasValue)
+                {
+                    var catInfo = await _categoryInternalService.GetCategoryDisplayAsync(
+                        createdTransaction.CategoryId.Value, userId, createdTransaction.TransactionType.ToString());
+                    if (catInfo.Found)
+                    {
+                        transactionEventDto.CategoryName = catInfo.CategoryName;
+                        responseDto.CategoryName = catInfo.CategoryName;
+                        responseDto.CategoryColor = catInfo.Color;
+                        responseDto.CategoryIconCode = catInfo.IconCode;
+                    }
+                }
+                var accInfo = await _accountInternalService.GetAccountDisplayAsync(createdTransaction.AccountId, userId);
+                if (accInfo.Found)
+                {
+                    transactionEventDto.AccountName = accInfo.AccountName;
+                    responseDto.AccountName = accInfo.AccountName;
+                }
 
                 await _rabbitMQPublisher.PublishAsync(transactionEventDto, "transaction.created");
-                return _mapper.Map<TransactionResponseDto>(createdTransaction);
+                return responseDto;
             }
 
             throw new Exception("Invalid transaction details");
@@ -157,6 +177,15 @@ namespace TransactionService.Application.Services
                         Note = transactionEntity.Note
                     };
 
+                    if (transactionEntity.CategoryId.HasValue)
+                    {
+                        var catInfo = await _categoryInternalService.GetCategoryDisplayAsync(
+                            transactionEntity.CategoryId.Value, userId, transactionEntity.TransactionType.ToString());
+                        if (catInfo.Found) updateEventDto.CategoryName = catInfo.CategoryName;
+                    }
+                    var accInfo = await _accountInternalService.GetAccountDisplayAsync(transactionEntity.AccountId, userId);
+                    if (accInfo.Found) updateEventDto.AccountName = accInfo.AccountName;
+
                     await _rabbitMQPublisher.PublishAsync(updateEventDto, "transaction.updated");
                 }
 
@@ -171,6 +200,16 @@ namespace TransactionService.Application.Services
             var transactionEntity = await _transactionRepository.DeleteTransactionAsync(userId, transactionId);
 
             var deleteEventDto = _mapper.Map<DeleteTransactionEventDto>(transactionEntity);
+
+            if (transactionEntity.CategoryId.HasValue)
+            {
+                var catInfo = await _categoryInternalService.GetCategoryDisplayAsync(
+                    transactionEntity.CategoryId.Value, userId, transactionEntity.TransactionType.ToString());
+                if (catInfo.Found) deleteEventDto.CategoryName = catInfo.CategoryName;
+            }
+            var accInfo = await _accountInternalService.GetAccountDisplayAsync(transactionEntity.AccountId, userId);
+            if (accInfo.Found) deleteEventDto.AccountName = accInfo.AccountName;
+
             await _rabbitMQPublisher.PublishAsync(deleteEventDto, "transaction.deleted");
 
             return _mapper.Map<TransactionResponseDto>(transactionEntity);

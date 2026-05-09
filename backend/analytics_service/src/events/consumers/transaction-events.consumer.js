@@ -1,47 +1,54 @@
 const service = require('../../services/analytics.service.js');
 
 async function handleTransactionCreated(content, msg) {
-    console.log(`Handled transaction created event for transaction_id: ${content.trans_id}`);
-    const user_id = "4f4b144d-e3f8-4e6b-9e32-408030a85698";
-    const result = await service.handleTransactionCreated({ ...content, user_id });
-    if (result) {
-        console.log(`Updated account balance for account_id: ${result.account_id}, new balance: ${result.balance}`);
-    }
-    else {
-        console.error(`Failed to update account balance for transaction_id: ${content.transaction_id}`);
+    console.log(`[Analytics][transaction.created] Received event for trans_id: ${content.trans_id}`);
+    console.log(`[Analytics][transaction.created] Payload:`, JSON.stringify(content, null, 2));
+    try {
+        const result = await service.handleTransactionCreated(content);
+        if (result) {
+            console.log(`[Analytics][transaction.created] SUCCESS | trans_id: ${result.trans_id}, account_id: ${result.account_id}`);
+        } else {
+            console.error(`[Analytics][transaction.created] FAILED (returned null) | trans_id: ${content.trans_id}`);
+        }
+    } catch (err) {
+        console.error(`[Analytics][transaction.created] ERROR | trans_id: ${content.trans_id}`, err.message, err.stack);
     }
 }
 
 async function handleTransactionUpdated(content, msg) {
-    console.log(`Handled transaction updated event for transaction_id: ${content.trans_id}`);
-    const user_id = "4f4b144d-e3f8-4e6b-9e32-408030a85698";
-    const result = await service.handleTransactionUpdated({ ...content, user_id });
-    if (result) {
-        console.log(`Updated account balance for account_id: ${result.account_id}, new balance: ${result.balance}`);
-    }
-    else {
-        console.error(`Failed to update account balance for transaction_id: ${content.transaction_id}`);
+    console.log(`[Analytics][transaction.updated] Received event for trans_id: ${content.trans_id}`);
+    console.log(`[Analytics][transaction.updated] Payload:`, JSON.stringify(content, null, 2));
+    try {
+        const result = await service.handleTransactionUpdated(content);
+        if (result) {
+            console.log(`[Analytics][transaction.updated] SUCCESS | trans_id: ${result.trans_id}, account_id: ${result.account_id}`);
+        } else {
+            console.error(`[Analytics][transaction.updated] FAILED (returned null) | trans_id: ${content.trans_id}`);
+        }
+    } catch (err) {
+        console.error(`[Analytics][transaction.updated] ERROR | trans_id: ${content.trans_id}`, err.message, err.stack);
     }
 }
 
 async function handleTransactionDeleted(content, msg) {
-     content.trans_id = "7887d351-6ce1-4e2b-9c14-8190d3db9710";
-
-    console.log(`Handled transaction deleted event for transaction_id: ${content.trans_id}`);
-
-    const user_id = "4f4b144d-e3f8-4e6b-9e32-408030a85698";
-    const result = await service.handleTransactionDeleted({ ...content, user_id });
-    if (result) {
-        console.log(`Updated account balance for account_id: ${result.account_id}, new balance: ${result.balance}`);
-    }
-    else {
-        console.error(`Failed to update account balance for transaction_id: ${content.transaction_id}`);
+    console.log(`[Analytics][transaction.deleted] Received event for trans_id: ${content.trans_id}`);
+    console.log(`[Analytics][transaction.deleted] Payload:`, JSON.stringify(content, null, 2));
+    try {
+        const result = await service.handleTransactionDeleted(content);
+        if (result) {
+            console.log(`[Analytics][transaction.deleted] SUCCESS | trans_id: ${result.trans_id}, account_id: ${result.account_id}`);
+        } else {
+            console.error(`[Analytics][transaction.deleted] FAILED (returned null) | trans_id: ${content.trans_id}`);
+        }
+    } catch (err) {
+        console.error(`[Analytics][transaction.deleted] ERROR | trans_id: ${content.trans_id}`, err.message, err.stack);
     }
 }
 
 module.exports = {
     handleTransactionCreated,
-    handleTransactionUpdated
+    handleTransactionUpdated,
+    handleTransactionDeleted,
 };
 
 

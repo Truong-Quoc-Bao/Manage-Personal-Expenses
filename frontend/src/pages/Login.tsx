@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
@@ -13,6 +13,15 @@ export function Login() {
     email: "",
     password: "",
   });
+
+  useEffect(() => {
+    const hadToken = !!localStorage.getItem("token");
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    if (hadToken) {
+      toast.success("Đã đăng xuất thành công!", { duration: 3000 });
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,26 +57,16 @@ export function Login() {
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-[480px]">
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-18 h-18 rounded-2xl bg-gradient-to-r from-orange-400 to-rose-400 shadow-lg flex items-center justify-center text-white text-3xl mb-4">
-            💰
-          </div>
-          <h1 className="text-5xl font-semibold text-gray-800 mb-2 text-center">
-            Quản Lý Tài Chính
-          </h1>
-          <p className="text-gray-600 text-center">
-            Kiểm soát chi tiêu, nắm bắt tài chính
-          </p>
-        </div>
-        
-
         <div className="bg-white rounded-3xl shadow-xl p-8 md:p-9">
-          <div className="mb-6">
-            <h2 className="text-3xl font-semibold text-gray-800 mb-2">
+          <div className="mb-6 text-center">
+            <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-r from-orange-400 to-rose-400 shadow-lg flex items-center justify-center text-white text-3xl mb-4">
+              💰
+            </div>
+            <h1 className="text-3xl font-semibold text-gray-800 mb-1">
               Đăng nhập
-            </h2>
+            </h1>
             <p className="text-base text-gray-600">
-              Chào mừng bạn quay trở lại!
+              Kiểm soát chi tiêu, nắm bắt tài chính
             </p>
           </div>
 
