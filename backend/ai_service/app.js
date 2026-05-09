@@ -317,16 +317,11 @@ app.post('/webhook/bank-transfer', async (req, res) => {
     }
 
     // 6.Bắn socket và push thông báo
-    // io.emit('bank_notification', { message: notificationMsg });
     io.emit('bank_notification', { message: finalMsg });
     console.log('📡 [PROACTIVE]: Đã bắn Socket cảnh báo về Web.');
 
     await addNotification(finalMsg, userId);
 
-    // Test xem client có đang lắng nghe không
-    socket.on('new_notification', (data) => {
-      console.log('🔥 Đã nhận được dữ liệu qua Socket:', data);
-    });
     if (typeof sendPushNotification === 'function') {
       sendPushNotification(notificationMsg);
     }
