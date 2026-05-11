@@ -740,6 +740,87 @@ AUTH_SERVICE_URL=http://auth-service:3006
 TRANSACTION_SERVICE_URL=http://transaction-service:3007
 BUDGET_SERVICE_URL=http://budget-service:3008
 AI_SERVICE_URL=http://finance-ai-service:4005
+
+# ==========================================
+# Ports
+# ==========================================
+
+GATEWAY_PORT=3000
+USER_SERVICE_PORT=3001
+ACCOUNT_SERVICE_PORT=3002
+CATEGORY_SERVICE_PORT=3003
+ANALYTICS_SERVICE_PORT=3004
+NOTIFICATION_SERVICE_PORT=3005
+AUTH_SERVICE_PORT=3006
+TRANSACTION_SERVICE_PORT=3007
+BUDGET_SERVICE_PORT=3008
+AI_PORT=4005
+FRONTEND_PORT=5173
+N8N_PORT=5678
+
+# ==========================================
+# gRPC Hosts
+# ==========================================
+
+GRPC_ACCOUNT_SERVICE_HOST=account-service
+GRPC_CATEGORY_SERVICE_HOST=category-service
+GRPC_BUDGET_SERVICE_HOST=budget-service
+GRPC_USER_SERVICE_HOST=user-service
+
+# ==========================================
+# gRPC Ports
+# ==========================================
+
+GRPC_ACCOUNT_SERVICE_PORT=50051
+GRPC_CATEGORY_SERVICE_PORT=50052
+GRPC_BUDGET_SERVICE_PORT=50053
+GRPC_USER_SERVICE_PORT=50054
+
+# ==========================================
+# Infrastructure Ports
+# ==========================================
+
+MONGODB_PORT=27017
+RABBITMQ_PORT=5672
+RABBITMQ_MANAGEMENT_PORT=15672
+REDIS_PORT=6379
+
+# ==========================================
+# Database Config
+# ==========================================
+
+DB_USER=postgres
+DB_HOST=db.your-project.supabase.co
+DB_NAME=postgres
+DB_PASSWORD=your_password
+DB_PORT=5432
+
+# ==========================================
+# Google Gemini AI
+# ==========================================
+
+GEMINI_API_KEY=your_gemini_api_key
+
+# ==========================================
+# Push Notification
+# ==========================================
+
+PUBLIC_VAPID_KEY=your_public_vapid_key
+PRIVATE_VAPID_KEY=your_private_vapid_key
+
+# ==========================================
+# SePay / BankHub
+# ==========================================
+
+SEPAY_API_TOKEN=your_sepay_api_token
+
+BANKHUB_BASE_URL=https://bankhub-api.sepay.vn
+
+BANKHUB_REDIRECT_URI=https://your-ngrok-domain.ngrok-free.app/api/callback
+
+BANKHUB_CLIENT_ID=your_bankhub_client_id
+BANKHUB_CLIENT_SECRET=your_bankhub_client_secret
+BANKHUB_COMPANY_XID=your_company_xid
 ```
 
 ---
