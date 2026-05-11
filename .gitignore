@@ -121,5 +121,5 @@ CLAUDE.md
 .claude/
 _bmad
 .agents/
-_bmad_output/
+_bmad-output/
 docs/
