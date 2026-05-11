@@ -18,15 +18,13 @@ const GRPC_OPTIONS = {
     oneofs: true,
 };
 
-// ─── Load proto definitions ───────────────────────────────────────────────────
-
+ 
 const accountProto   = grpc.loadPackageDefinition(protoLoader.loadSync(ACCOUNT_PROTO_PATH,   GRPC_OPTIONS)).AccountProtoService;
 const categoryProto  = grpc.loadPackageDefinition(protoLoader.loadSync(CATEGORY_PROTO_PATH,  GRPC_OPTIONS)).CategoryProtoService;
 const budgetProto    = grpc.loadPackageDefinition(protoLoader.loadSync(BUDGET_PROTO_PATH,    GRPC_OPTIONS)).BudgetProtoService;
 const analyticsProto = grpc.loadPackageDefinition(protoLoader.loadSync(ANALYTICS_PROTO_PATH, GRPC_OPTIONS)).AnalyticsProtoService;
 
-// ─── Khởi tạo clients ─────────────────────────────────────────────────────────
-
+ 
 const accountClient = new accountProto(
     `${process.env.GRPC_ACCOUNT_SERVICE_HOST || 'localhost'}:${process.env.GRPC_ACCOUNT_SERVICE_PORT}`,
     grpc.credentials.createInsecure()
@@ -42,8 +40,7 @@ const budgetClient = new budgetProto(
     grpc.credentials.createInsecure()
 );
 
-// ─── Helper: callback → Promise ───────────────────────────────────────────────
-
+ 
 const grpcCall = (client, method, payload) =>
     new Promise((resolve, reject) => {
         client[method](payload, (err, response) => {
@@ -52,8 +49,7 @@ const grpcCall = (client, method, payload) =>
         });
     });
 
-// ─── Các hàm gọi từng service ─────────────────────────────────────────────────
-
+ 
 /**
  * Gọi account_service → account.grpc.js → getAccountStatus
  * @returns {{ exists: boolean, message: string }}
@@ -117,22 +113,6 @@ const getAnalyticsSummary = async (call, callback) => {
         });
     }
 };
-
-// ─── Khởi động gRPC Server ────────────────────────────────────────────────────
-
-// const startGrpcServer = () => {
-//     const server = new grpc.Server();
-//     server.addService(analyticsProto.service, { getAnalyticsSummary });
-
-//     server.bindAsync(`0.0.0.0:${ANALYTICS_PROTO_PORT}`, grpc.ServerCredentials.createInsecure(), (err, port) => {
-//         if (err) {
-//             console.error(`Error starting gRPC: ${err.message}`);
-//             return;
-//         }
-//         console.log(`Analytics gRPC Server running at 0.0.0.0:${port}`);
-//         server.start();
-//     });
-// };
 
 module.exports = {
     getAccountStatus,

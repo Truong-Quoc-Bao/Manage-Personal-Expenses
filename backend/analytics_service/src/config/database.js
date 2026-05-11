@@ -20,30 +20,12 @@ const connectDB = async () => {
         console.error("Name:", error.name);
         console.error("Stack:", error.stack);
 
-        // log full object (rất hữu ích)
-        console.error("Full error:", error);
+         console.error("Full error:", error);
 
-        // retry sau 5s
-        setTimeout(connectDB, 5000);
+         setTimeout(connectDB, 5000);
 
     }
 };
 
 module.exports = connectDB;
-
-// const mongoose = require('mongoose');
-
-// const connectDB = async () => {
-//     try {
-//         const conn = await mongoose.connect(process.env.MONGODB_URL);
-
-//         console.log(`MongoDB Connected: ${conn.connection.host}`);
-//     } catch (error) {
-//         console.error('MongoDB connection error:', error.message);
-
-//         // retry sau 5s (rất cần khi dùng Docker)
-//         setTimeout(connectDB, 5000);
-//     }
-// };
-
-// module.exports = connectDB;
+ 

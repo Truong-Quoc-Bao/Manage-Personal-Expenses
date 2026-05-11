@@ -1,15 +1,6 @@
 db.user_analytics.insertMany([
 
-  // ============================================================
-  // USER 1: Lê Tấn Đạt
-  // user_id : 4f4b144d-e3f8-4e6b-9e32-408030a85698
-  // accounts: Tiền mặt | TP Bank | MB Bank | MB bank (new) | Le bank (new)
-  // Kỳ dữ liệu: 2025-01 → 2026-03 (15 tháng, tháng nào cũng tiết kiệm dương)
-  // total_income : 163,580,000 ₫
-  // total_expense: 102,920,000 ₫  →  balance: +60,660,000 ₫
-  // 2026-03: income 13,828,000 | expense 8,168,000 | savings 5,660,000 (40.93%)
-  // top expense categories: Entertainment > Ăn uống > Di chuyển
-  // ============================================================
+ 
   {
     "user_id": "4f4b144d-e3f8-4e6b-9e32-408030a85698",
     "display_name": "Lê Tấn Đạt",
@@ -106,18 +97,7 @@ db.user_analytics.insertMany([
     "created_at": { "$date": "2026-03-27T17:23:02.000Z" },
     "updated_at": { "$date": "2026-03-30T23:59:00.000Z" }
   },
-
-  // ============================================================
-  // USER 2: Trương Gia Phúc
-  // user_id : a9ae67d2-5615-488c-b56b-b9e425ca5a7b
-  // accounts: Tiền mặt | ViettinBank
-  // Kỳ dữ liệu: 2025-01 → 2026-03 (15 tháng, nhiều tháng âm)
-  // total_income : 170,976,000 ₫
-  // total_expense: 174,316,000 ₫  →  balance: -3,340,000 ₫ (thâm hụt)
-  // 2026-03: income 11,811,000 | expense 9,588,000 | savings 2,223,000 (18.82%)
-  // streak: 3 tháng liên tiếp tiết kiệm dương (2026-01/02/03)
-  // top expense categories: Mua sắm > Du lịch > Food
-  // ============================================================
+ 
   {
     "user_id": "a9ae67d2-5615-488c-b56b-b9e425ca5a7b",
     "display_name": "Trương Gia Phúc",

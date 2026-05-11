@@ -6,8 +6,7 @@ const SpendingTrend = require('../../model/spendingTrend.model');
 async function handleCategoryCreated(content, msg) {
   const { category_id, user_id, category_name, type } = content;
   console.log(`[Analytics] Handling category.created | category_id: ${category_id}, user_id: ${user_id}`);
-  // category_summary docs are created on first transaction, no action needed here
-}
+ }
 
 async function handleCategoryUpdated(content, msg) {
   const { category_id, user_id, category_name, type, old_category_name } = content;
@@ -19,22 +18,19 @@ async function handleCategoryUpdated(content, msg) {
   }
 
   try {
-    // Update category_summary
-    await CategorySummary.updateMany(
+     await CategorySummary.updateMany(
       { category_id, user_id },
       { $set: { category_name, category_type: type, updated_at: new Date() } }
     );
     console.log(`[Analytics] Updated category_summary for category ${category_id}`);
 
-    // Update dashboard_cache top_categories
-    await DashboardCache.updateMany(
+     await DashboardCache.updateMany(
       { user_id, "top_categories.category_id": category_id },
       { $set: { "top_categories.$.category_name": category_name } }
     );
     console.log(`[Analytics] Updated dashboard_cache top_categories for category ${category_id}`);
 
-    // Update monthly_report income_by_category and expense_by_category
-    await MonthlyReport.updateMany(
+     await MonthlyReport.updateMany(
       { user_id, "income_by_category.category_id": category_id },
       { $set: { "income_by_category.$.category_name": category_name } }
     );
@@ -44,8 +40,7 @@ async function handleCategoryUpdated(content, msg) {
     );
     console.log(`[Analytics] Updated monthly_report for category ${category_id}`);
 
-    // Update spending_trends
-    await SpendingTrend.updateMany(
+     await SpendingTrend.updateMany(
       { user_id, category_id },
       { $set: { category_name, category_type: type, updated_at: new Date() } }
     );
@@ -66,19 +61,16 @@ async function handleCategoryDeleted(content, msg) {
   }
 
   try {
-    // Remove from category_summary
-    await CategorySummary.deleteMany({ category_id, user_id });
+     await CategorySummary.deleteMany({ category_id, user_id });
     console.log(`[Analytics] Deleted category_summary docs for category ${category_id}`);
 
-    // Remove from dashboard_cache top_categories
-    await DashboardCache.updateMany(
+     await DashboardCache.updateMany(
       { user_id },
       { $pull: { top_categories: { category_id } } }
     );
     console.log(`[Analytics] Removed category ${category_id} from dashboard_cache top_categories`);
 
-    // Remove from monthly_report
-    await MonthlyReport.updateMany(
+     await MonthlyReport.updateMany(
       { user_id },
       {
         $pull: {
@@ -89,8 +81,7 @@ async function handleCategoryDeleted(content, msg) {
     );
     console.log(`[Analytics] Removed category ${category_id} from monthly_report`);
 
-    // Remove from spending_trends
-    await SpendingTrend.deleteMany({ user_id, category_id });
+     await SpendingTrend.deleteMany({ user_id, category_id });
     console.log(`[Analytics] Deleted spending_trends for category ${category_id}`);
 
   } catch (err) {

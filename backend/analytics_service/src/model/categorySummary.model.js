@@ -1,14 +1,7 @@
-// ============================================================
-// categorySummary.model.js
-// Collection: category_summary
-// Database  : finance_db
-// ============================================================
-
 const mongoose = require("mongoose");
 const { Schema } = mongoose;
 
-// ── Sub-schemas ───────────────────────────────────────────────
-const dailyBreakdownSchema = new Schema(
+ const dailyBreakdownSchema = new Schema(
   {
     day: {
       type: Number,
@@ -32,8 +25,7 @@ const dailyBreakdownSchema = new Schema(
   { _id: false }
 );
 
-// ── Main Schema ───────────────────────────────────────────────
-const category_summary = new Schema(
+ const category_summary = new Schema(
   {
     user_id: {
       type: String,
@@ -132,8 +124,7 @@ const category_summary = new Schema(
   }
 );
 
-// ── Indexes ───────────────────────────────────────────────────
-category_summary.index({ user_id: 1 }, { name: "idx_cat_summary_user_id" });
+ category_summary.index({ user_id: 1 }, { name: "idx_cat_summary_user_id" });
 category_summary.index({ account_id: 1 }, { name: "idx_cat_summary_account_id" });
 category_summary.index({ category_id: 1 }, { name: "idx_cat_summary_category_id" });
 category_summary.index(
@@ -145,7 +136,6 @@ category_summary.index(
   { name: "idx_cat_summary_user_ym" }
 );
 
-// ── Model ─────────────────────────────────────────────────────
-const CategorySummary = mongoose.model("CategorySummary", category_summary);
+ const CategorySummary = mongoose.model("CategorySummary", category_summary);
 
 module.exports = CategorySummary;

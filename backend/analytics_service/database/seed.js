@@ -1,23 +1,4 @@
-// ============================================================
-// seed.js
-// Load toàn bộ dữ liệu mẫu vào database 'finance_db'
-// Chạy sau init_mongo.js:
-//   mongosh finance_db init_mongo.js
-//   mongosh finance_db seed.js
-//
-// Users:
-//   - Lê Tấn Đạt    (4f4b144d-e3f8-4e6b-9e32-408030a85698)
-//   - Trương Gia Phúc (a9ae67d2-5615-488c-b56b-b9e425ca5a7b)
-// Period: 2025-01 → 2026-03 (15 tháng)
-// ============================================================
-
-const db = db.getSiblingDB("finance_db");
-
-
-// ============================================================
-// 1. TRANSACTIONS — Toàn bộ giao dịch của 2 user (2025-01 → 2026-03)
-// ============================================================
-
+ const db = db.getSiblingDB("finance_db");
 db.transactions.insertMany([
   {"trans_id": "81e4682b-b5b2-40f7-98e2-1d4e4b2b08a7", "account_id": "d722044d-7259-4a95-9a9f-930935073828", "category_id": "c6e31bec-9e96-4981-832d-e8a38feaa9e6", "amount": 56000.0, "transaction_type": "expense", "description": "Taxi", "date": "2025-01-04", "note": null, "created_at": "2025-01-04 09:46:08+00", "updated_at": "2025-01-04 09:46:08+00", "user_id": "4f4b144d-e3f8-4e6b-9e32-408030a85698"},
   {"trans_id": "a4deb2ba-dcae-4be5-90b9-920e98174a6f", "account_id": "d722044d-7259-4a95-9a9f-930935073828", "category_id": "c6e31bec-9e96-4981-832d-e8a38feaa9e6", "amount": 41000.0, "transaction_type": "expense", "description": "Taxi", "date": "2025-05-16", "note": null, "created_at": "2025-05-16 11:01:57+00", "updated_at": "2025-05-16 11:01:57+00", "user_id": "4f4b144d-e3f8-4e6b-9e32-408030a85698"},

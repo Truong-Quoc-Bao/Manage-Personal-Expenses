@@ -1,16 +1,5 @@
-// ============================================================
-// init_mongo.js
-// Khởi tạo database MongoDB: tạo collections + indexes
-// Database: finance_db
-// Collections: transactions, category_summary, monthly_reports,
-//              dashboard_cache, spending_trends, anomaly_logs, user_analytics
-// ============================================================
-
 const db = db.getSiblingDB("finance_db");
 
-// ============================================================
-// 1. TRANSACTIONS
-// ============================================================
 db.createCollection("transactions");
 
 db.transactions.createIndex({ trans_id: 1 }, { unique: true, name: "idx_trans_id_unique" });
@@ -33,10 +22,7 @@ db.transactions.createIndex(
 );
 
 print("✓ Collection 'transactions' created with indexes");
-
-// ============================================================
-// 2. CATEGORY SUMMARY
-// ============================================================
+ 
 db.createCollection("category_summary");
 
 db.category_summary.createIndex({ user_id: 1 }, { name: "idx_cat_summary_user_id" });
@@ -52,10 +38,7 @@ db.category_summary.createIndex(
 );
 
 print("✓ Collection 'category_summary' created with indexes");
-
-// ============================================================
-// 3. MONTHLY REPORTS
-// ============================================================
+ 
 db.createCollection("monthly_reports");
 
 db.monthly_reports.createIndex({ user_id: 1 }, { name: "idx_monthly_reports_user_id" });
@@ -65,14 +48,11 @@ db.monthly_reports.createIndex(
 );
 db.monthly_reports.createIndex(
   { user_id: 1, year: -1, month: -1 },
-  { name: "idx_monthly_reports_user_ym_desc" }
+  { name: "idx_monthly_reports_user_ym_desc" } 
 );
 
 print("✓ Collection 'monthly_reports' created with indexes");
-
-// ============================================================
-// 4. DASHBOARD CACHE
-// ============================================================
+ 
 db.createCollection("dashboard_cache");
 
 db.dashboard_cache.createIndex({ user_id: 1 }, { name: "idx_dashboard_user_id" });
@@ -87,9 +67,6 @@ db.dashboard_cache.createIndex(
 
 print("✓ Collection 'dashboard_cache' created with indexes");
 
-// ============================================================
-// 5. SPENDING TRENDS
-// ============================================================
 db.createCollection("spending_trends");
 
 db.spending_trends.createIndex({ user_id: 1 }, { name: "idx_spending_trends_user_id" });
@@ -105,9 +82,6 @@ db.spending_trends.createIndex(
 
 print("✓ Collection 'spending_trends' created with indexes");
 
-// ============================================================
-// 6. ANOMALY LOGS
-// ============================================================
 db.createCollection("anomaly_logs");
 
 db.anomaly_logs.createIndex({ user_id: 1 }, { name: "idx_anomaly_user_id" });
@@ -128,10 +102,7 @@ db.anomaly_logs.createIndex(
 );
 
 print("✓ Collection 'anomaly_logs' created with indexes");
-
-// ============================================================
-// 7. USER ANALYTICS
-// ============================================================
+ 
 db.createCollection("user_analytics");
 
 db.user_analytics.createIndex(

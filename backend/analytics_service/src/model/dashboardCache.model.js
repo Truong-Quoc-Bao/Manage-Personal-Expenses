@@ -1,16 +1,7 @@
-// ============================================================
-// dashboardCache.model.js
-// Collection: dashboard_cache
-// Database  : finance_db
-// Note      : TTL index on `expires_at` automatically removes
-//             stale cache documents (expireAfterSeconds: 0).
-// ============================================================
-
 const mongoose = require("mongoose");
 const { Schema } = mongoose;
 
-// ── Sub-schemas ───────────────────────────────────────────────
-const summarySchema = new Schema(
+ const summarySchema = new Schema(
   {
     current_balance: { type: Number, default: 0, comment: "Current balance of the account (VND)" },
     monthly_income: { type: Number, default: 0, min: 0, comment: "Total income this month (VND)" },
@@ -50,8 +41,7 @@ const streakSchema = new Schema(
   { _id: false }
 );
 
-// ── Main Schema ───────────────────────────────────────────────
-const dashboard_cache = new Schema(
+ const dashboard_cache = new Schema(
   {
     user_id: {
       type: String,
@@ -112,19 +102,16 @@ const dashboard_cache = new Schema(
   }
 );
 
-// ── Indexes ───────────────────────────────────────────────────
-dashboard_cache.index({ user_id: 1 }, { name: "idx_dashboard_user_id" });
+ dashboard_cache.index({ user_id: 1 }, { name: "idx_dashboard_user_id" });
 dashboard_cache.index(
   { account_id: 1 },
   { unique: true, name: "idx_dashboard_account_unique" }
 );
-// TTL index — document is auto-deleted when expires_at <= current time
-dashboard_cache.index(
+ dashboard_cache.index(
   { expires_at: 1 },
   { expireAfterSeconds: 0, name: "idx_dashboard_ttl" }
 );
 
-// ── Model ─────────────────────────────────────────────────────
-const DashboardCache = mongoose.model("DashboardCache", dashboard_cache);
+ const DashboardCache = mongoose.model("DashboardCache", dashboard_cache);
 
 module.exports = DashboardCache;

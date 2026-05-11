@@ -1,15 +1,6 @@
-// ============================================================
-// userAnalytics.model.js
-// Collection: user_analytics
-// Database  : finance_db
-// ============================================================
-
 const mongoose = require("mongoose");
 const { Schema } = mongoose;
 
-// ── Sub-schemas ───────────────────────────────────────────────
-
-/** Aggregated category spend for the all-time top-category list */
 const topCategorySchema = new Schema(
   {
     category_id: { type: String, required: true, trim: true },
@@ -19,8 +10,7 @@ const topCategorySchema = new Schema(
   { _id: false }
 );
 
-/** Current-month income / expense / savings snapshot */
-const currentMonthSchema = new Schema(
+ const currentMonthSchema = new Schema(
   {
     year: { type: Number, required: true },
     month: { type: Number, required: true, min: 1, max: 12 },
@@ -32,8 +22,7 @@ const currentMonthSchema = new Schema(
   { _id: false }
 );
 
-/** AI-generated insights block */
-const aiInsightsSchema = new Schema(
+ const aiInsightsSchema = new Schema(
   {
     generated: { type: Boolean, default: false },
     content: { type: String, default: null },
@@ -42,8 +31,7 @@ const aiInsightsSchema = new Schema(
   { _id: false }
 );
 
-/** Individual budget alert for a single category */
-const budgetAlertItemSchema = new Schema(
+ const budgetAlertItemSchema = new Schema(
   {
     category_id: { type: String, required: true, trim: true },
     category_name: { type: String, required: true, trim: true },
@@ -61,8 +49,7 @@ const budgetAlertItemSchema = new Schema(
   { _id: false }
 );
 
-/** Budget alert container */
-const budgetAlertSchema = new Schema(
+ const budgetAlertSchema = new Schema(
   {
     enabled: { type: Boolean, default: true },
     alerts: { type: [budgetAlertItemSchema], default: [] },
@@ -71,8 +58,7 @@ const budgetAlertSchema = new Schema(
   { _id: false }
 );
 
-/** Single savings / spending goal */
-const goalSchema = new Schema(
+ const goalSchema = new Schema(
   {
     goal_id: { type: String, required: true, trim: true },
     title: { type: String, required: true, trim: true },
@@ -90,16 +76,14 @@ const goalSchema = new Schema(
   { _id: false }
 );
 
-/** Goal-tracking container */
-const goalTrackingSchema = new Schema(
+ const goalTrackingSchema = new Schema(
   {
     goals: { type: [goalSchema], default: [] },
   },
   { _id: false }
 );
 
-/** Saving-streak badge */
-const streakSchema = new Schema(
+ const streakSchema = new Schema(
   {
     saving_months: { type: Number, default: 0, min: 0 },
     unit: { type: String, default: "months" },
@@ -107,8 +91,7 @@ const streakSchema = new Schema(
   { _id: false }
 );
 
-// ── Main Schema ───────────────────────────────────────────────
-const user_analytics = new Schema(
+ const user_analytics = new Schema(
   {
     user_id: {
       type: String,
@@ -194,8 +177,7 @@ const user_analytics = new Schema(
   }
 );
 
-// ── Indexes ───────────────────────────────────────────────────
-user_analytics.index(
+ user_analytics.index(
   { user_id: 1 },
   { unique: true, name: "idx_user_analytics_user_id_unique" }
 );
@@ -204,7 +186,6 @@ user_analytics.index(
   { name: "idx_user_analytics_streak" }
 );
 
-// ── Model ─────────────────────────────────────────────────────
-const UserAnalytics = mongoose.model("UserAnalytics", user_analytics);
+ const UserAnalytics = mongoose.model("UserAnalytics", user_analytics);
 
 module.exports = UserAnalytics;

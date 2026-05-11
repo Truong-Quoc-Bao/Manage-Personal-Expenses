@@ -1,16 +1,6 @@
-// ============================================================
-// transaction.model.js
-// Collection: transactions
-// Database  : finance_db
-// ============================================================
-
 const mongoose = require("mongoose");
 const { Schema } = mongoose;
 
-// ── Sub-schema ────────────────────────────────────────────────
-// (none — flat document)
-
-// ── Main Schema ───────────────────────────────────────────────
 const transactions = new Schema(
   {
     trans_id: {
@@ -83,7 +73,6 @@ const transactions = new Schema(
   }
 );
 
-// ── Indexes ───────────────────────────────────────────────────
 transactions.index({ trans_id: 1 }, { unique: true, name: "idx_trans_id_unique" });
 transactions.index({ user_id: 1 }, { name: "idx_transactions_user_id" });
 transactions.index({ account_id: 1 }, { name: "idx_transactions_account_id" });
@@ -100,7 +89,6 @@ transactions.index(
   { name: "idx_transactions_account_cat_date" }
 );
 
-// ── Model ─────────────────────────────────────────────────────
 const Transaction = mongoose.model("Transaction", transactions);
 
 module.exports = Transaction;
