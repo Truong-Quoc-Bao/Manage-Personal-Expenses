@@ -1,25 +1,6 @@
-/**
- * ============================================================
- * init.mongo.js
- * MongoDB initialization script for Analytics Service.
- *
- * Usage (mongosh / Docker entrypoint):
- *   mongosh --username $MONGO_INITDB_ROOT_USERNAME \
- *           --password $MONGO_INITDB_ROOT_PASSWORD \
- *           --authenticationDatabase admin \
- *           analytics_db init.mongo.js
- *
- * Or via Docker Compose volume mount to:
- *   /docker-entrypoint-initdb.d/init.mongo.js
- * ============================================================
- */
-
-// ── Switch to / create the analytics database ────────────────
+ 
 db = db.getSiblingDB('analytics_db');
-
-// ─────────────────────────────────────────────────────────────
-// 1. user_analytics
-// ─────────────────────────────────────────────────────────────
+ 
 db.createCollection('user_analytics', {
   validator: {
     $jsonSchema: {
@@ -49,7 +30,7 @@ db.createCollection('user_analytics', {
       },
     },
   },
-  validationAction: 'warn',   // warn instead of reject — friendlier for dev
+  validationAction: 'warn',  
 });
 
 db.user_analytics.createIndex({ user_id: 1 }, { unique: true, name: 'idx_user_id_unique' });
@@ -60,10 +41,7 @@ db.user_analytics.createIndex(
 db.user_analytics.createIndex({ updated_at: -1 }, { name: 'idx_updated_at' });
 
 print('[init] ✅  user_analytics — collection + indexes created');
-
-// ─────────────────────────────────────────────────────────────
-// 2. category_summary
-// ─────────────────────────────────────────────────────────────
+ 
 db.createCollection('category_summary', {
   validator: {
     $jsonSchema: {
@@ -109,10 +87,7 @@ db.category_summary.createIndex(
 );
 
 print('[init] ✅  category_summary — collection + indexes created');
-
-// ─────────────────────────────────────────────────────────────
-// 3. monthly_reports
-// ─────────────────────────────────────────────────────────────
+ 
 db.createCollection('monthly_reports', {
   validator: {
     $jsonSchema: {
@@ -150,27 +125,20 @@ db.monthly_reports.createIndex({ generated_at: -1 }, { name: 'idx_generated_at' 
 db.monthly_reports.createIndex({ status: 1, user_id: 1 }, { name: 'idx_status_user' });
 
 print('[init] ✅  monthly_reports — collection + indexes created');
-
-// ─────────────────────────────────────────────────────────────
-// 4. dashboard_cache  (TTL: 15 minutes)
-// ─────────────────────────────────────────────────────────────
+ 
 db.createCollection('dashboard_cache');
 
 db.dashboard_cache.createIndex(
   { user_id: 1 },
   { unique: true, name: 'idx_user_id_unique' }
 );
-// TTL index — MongoDB removes document automatically when expires_at <= now
-db.dashboard_cache.createIndex(
+ db.dashboard_cache.createIndex(
   { expires_at: 1 },
   { expireAfterSeconds: 0, name: 'ttl_expires_at' }
 );
 
 print('[init] ✅  dashboard_cache — collection + TTL index created (15 min)');
-
-// ─────────────────────────────────────────────────────────────
-// 5. spending_trends
-// ─────────────────────────────────────────────────────────────
+ 
 db.createCollection('spending_trends');
 
 db.spending_trends.createIndex(
@@ -183,10 +151,7 @@ db.spending_trends.createIndex(
 );
 
 print('[init] ✅  spending_trends — collection + indexes created');
-
-// ─────────────────────────────────────────────────────────────
-// 6. anomaly_logs  (TTL: 1 year)
-// ─────────────────────────────────────────────────────────────
+ 
 db.createCollection('anomaly_logs', {
   validator: {
     $jsonSchema: {
@@ -234,17 +199,13 @@ db.anomaly_logs.createIndex(
   { user_id: 1, severity: 1, detected_at: -1 },
   { name: 'idx_user_severity' }
 );
-// TTL index — auto-delete logs older than 365 days
-db.anomaly_logs.createIndex(
+ db.anomaly_logs.createIndex(
   { detected_at: 1 },
   { expireAfterSeconds: 31536000, name: 'ttl_anomaly_1yr' }
 );
 
 print('[init] ✅  anomaly_logs — collection + indexes + TTL (1 yr) created');
-
-// ─────────────────────────────────────────────────────────────
-// Done
-// ─────────────────────────────────────────────────────────────
+ 
 print('');
 print('═══════════════════════════════════════════════════════');
 print(' Analytics Service — MongoDB init complete ✅');

@@ -8,8 +8,7 @@ async function startRabbitMQ() {
         await rabbitMQClient.connect();
         console.log("[Analytics] Connected to RabbitMQ");
 
-        // Transaction events
-        await rabbitMQClient.consume(
+         await rabbitMQClient.consume(
             "analytics.transaction.created.queue",
             "transaction.created",
             transactionConsumer.handleTransactionCreated
@@ -25,8 +24,7 @@ async function startRabbitMQ() {
             transactionConsumer.handleTransactionDeleted
         );
 
-        // Account events
-        await rabbitMQClient.consume(
+         await rabbitMQClient.consume(
             "analytics.account.created.queue",
             "account.created",
             accountConsumer.handleAccountCreated
@@ -37,8 +35,7 @@ async function startRabbitMQ() {
             accountConsumer.handleAccountDeleted
         );
 
-        // Category events
-        await rabbitMQClient.consume(
+         await rabbitMQClient.consume(
             "analytics.category.created.queue",
             "category.created",
             categoryConsumer.handleCategoryCreated

@@ -4,14 +4,12 @@ const express = require('express');
 const router = express.Router();
 
 const {   
-// User Analytics
-  getUserAnalytics,
+   getUserAnalytics,
   getAllUserAnalytics,
   createUserAnalytics,
   updateUserAnalytics,
   deleteUserAnalytics,
-  // Anomaly Logs
-  getAnomalyLogs,
+   getAnomalyLogs,
   getAnomalyLogById,
   getUnreadAnomalyLogs,
   countUnreadAnomalyLogs,
@@ -21,8 +19,7 @@ const {
   dismissAnomalyLog,
   deleteAnomalyLog,
   deleteAllAnomalyLogs,
-  // Category Summary
-  getCategorySummary,
+   getCategorySummary,
   getCategorySummaryByMonth,
   getCategorySummaryById,
   getOverBudgetCategories,
@@ -31,13 +28,11 @@ const {
   updateCategorySummary,
   deleteCategorySummary,
   deleteAllCategorySummary,
-  // Dashboard Cache
-  getDashboardCache,
+   getDashboardCache,
   getDashboardCachebyAccount,
   upsertDashboardCache,
   invalidateDashboardCache,
-  // Monthly Report
-  getMonthlyReport,
+   getMonthlyReport,
   getMonthlyReportByMonth,
   getRecentMonthlyReports,
   getMonthlyReportById,
@@ -46,8 +41,7 @@ const {
   updateMonthlyReport,
   deleteMonthlyReport,
   deleteAllMonthlyReports,
-  // Spending Trend
-  getSpendingTrend,
+   getSpendingTrend,
   getSpendingTrendByCategory,
   getSpendingTrendById,
   createSpendingTrend,
@@ -55,8 +49,7 @@ const {
   updateSpendingTrend,
   deleteSpendingTrend,
   deleteAllSpendingTrends,
-  // Transaction
-  getTransactions,
+   getTransactions,
   getTransactionByTransId,
   getTransactionsByDateRange,
   getTransactionsByCategory,

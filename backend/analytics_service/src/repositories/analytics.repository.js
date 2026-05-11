@@ -12,17 +12,11 @@ const transaction = require('../model/transaction.model.js');
 
 
 const repo = {
-
-  // ================================================================
-  // ACCOUNT
-  // ================================================================
+ 
   findAccountByuserId: async (userId) => {
     return await accounts.findOne({ user_id: userId }).lean();
   },
-
-  // ================================================================
-  // USER ANALYTICS
-  // ================================================================
+ 
   findUserAnalyticsByuserId: async (userId) => {
     return await user_analytics.findOne({ user_id: userId }).lean();
   },
@@ -34,14 +28,7 @@ const repo = {
   createUserAnalytics: async (data) => {
     return await user_analytics.create(data);
   },
-
-  // updateUserAnalyticsByuserId: async (userId, updateData) => {
-  //   return await user_analytics.findOneAndUpdate(
-  //     { user_id: userId },
-  //     { $set: updateData },
-  //     { new: true, runValidators: true }
-  //   ).lean();
-  // },
+ 
   updateUserAnalyticsByuserId: async (userId, updateData, options = {}) => {
     return await user_analytics.findOneAndUpdate(
       { user_id: userId },
@@ -53,10 +40,7 @@ const repo = {
   deleteUserAnalyticsByuserId: async (userId) => {
     return await user_analytics.findOneAndDelete({ user_id: userId }).lean();
   },
-
-  // ================================================================
-  // ANOMALY LOGS
-  // ================================================================
+ 
   findAnomalyLogsByuserId: async (userId) => {
     return await anomaly_logs.find({ user_id: userId })
       .sort({ detected_at: -1 })
@@ -120,9 +104,6 @@ const repo = {
     return await anomaly_logs.deleteMany({ user_id: userId });
   },
 
-  // ================================================================
-  // CATEGORY SUMMARY
-  // ================================================================
   findCategorySummaryByuserId: async (userId) => {
     return await category_summary.find({ user_id: userId })
       .sort({ year: -1, month: -1 })
@@ -188,9 +169,6 @@ const repo = {
     return await category_summary.insertMany(dataArray);
   },
 
-  // ================================================================
-  // DASHBOARD CACHE
-  // ================================================================
   findDashboardCacheByuserId: async (userId) => {
     return await dashboard_cache.findOne({
       user_id: userId,
@@ -218,9 +196,6 @@ const repo = {
     return await dashboard_cache.deleteOne({ user_id: userId });
   },
 
-  // ================================================================
-  // MONTHLY REPORT
-  // ================================================================
   findMonthlyReportByuserId: async (userId) => {
     return await monthly_reports.find({ user_id: userId })
       .sort({ year: -1, month: -1 })
@@ -273,9 +248,6 @@ const repo = {
     return await monthly_reports.insertMany(dataArray);
   },
 
-  // ================================================================
-  // SPENDING TREND
-  // ================================================================
   findSpendingTrendByuserId: async (userId) => {
     return await spending_trends.find({ user_id: userId })
       .sort({ category_type: 1, category_name: 1 })
@@ -318,9 +290,6 @@ const repo = {
     return await spending_trends.deleteMany({ user_id: userId });
   },
 
-  // ================================================================
-  // TRANSACTION
-  // ================================================================
   findTransactionsByuserId: async (userId, { limit = 20, skip = 0 } = {}) => {
     return await transaction.find({ user_id: userId })
       .sort({ date: -1 })
@@ -363,94 +332,6 @@ const repo = {
   deleteTransactionByTransId: async (transId) => {
     return await transaction.findOneAndDelete({ trans_id: transId }).lean();
   },
-
-
-
-  // findUserAnomalyLogsByUserId: async (userId) => {
-  //   return await anomaly_logs.find({ user_id: userId }).lean();
-  // },
-
-  // findUserCategorySummaryByUserId: async (userId) => {
-  //   return await category_summary.find({ user_id: userId }).lean();
-  // },
-
-  // findUserDashboardCacheByUserId: async (userId) => {
-  //   return await dashboard_cache.find({ user_id: userId }).lean();
-  // },
-
-  // findUserMonthlyReportByUserId: async (userId) => {
-  //   return await monthly_reports.find({ user_id: userId }).lean();
-  // },
-
-  // findUserSpendingTrendByUserId: async (userId) => {
-  //   return await spending_trends.find({ user_id: userId }).lean();
-  // },
-
-  // findUserAnalyticsByUserId: async (userId) => {
-  //   return await user_analytics.findOne({ user_id: userId }).lean();
-  // },
-  // // Lấy tất cả (optional)
-  // findAll: async () => {
-  //   return await user_analytics.find().lean();
-  // },
-
-  // createUserAnalytics: async (userId, formattedData) => {
-  //   return await user_analytics.create({ ...formattedData, user_id: userId });
-  // },
-
-  // createAnomalyLog: async (userId, formattedData) => {
-  //   return await anomaly_logs.create({ ...formattedData, user_id: userId });
-  // },
-
-  // createCategorySummary: async (userId, formattedData) => {
-  //       console.log('=== userId:', userId);
-  //   console.log("=== data repository nhận được:", JSON.stringify(formattedData, null, 2));
-
-  //   return await category_summary.create({ ...formattedData, user_id: userId });
-  // },
-
-  // createDashboardCache: async (userId, formattedData) => {
-  //   return await dashboard_cache.create({ ...formattedData, user_id: userId });
-  // },
-
-  // createMonthlyReport: async (userId, formattedData) => {
-  //   return await monthly_reports.create({ ...formattedData, user_id: userId });
-  // },
-
-  // // createSpendingTrend: async (userId, formattedData) => {
-  // //   return await spending_trends.create({ ...formattedData, user_id: userId });
-  // // },
-
-  // createSpendingTrend: async (userId, formattedData) => {
-  //   console.log('=== Spending Trend - Upsert for user:', userId);
-  //   console.log("=== data repository nhận được:", JSON.stringify(formattedData, null, 2));
-
-  //   return await spending_trends.findOneAndUpdate(
-  //     { 
-  //       user_id: userId, 
-  //       category_id: formattedData.category_id 
-  //     },
-  //     { 
-  //       ...formattedData,
-  //       user_id: userId,
-  //       last_updated: new Date()
-  //     },
-  //     { 
-  //       upsert: true, 
-  //       new: true,
-  //       runValidators: true 
-  //     }
-  //   );
-  // },
-
-  // // Tạo nhiều bản ghi cùng lúc (optional)
-  // createManyCategorySummary: async (dataArray) => {
-  //   return await category_summary.insertMany(dataArray);
-  // },
-
-  // createManyMonthlyReport: async (dataArray) => {
-  //   return await monthly_reports.insertMany(dataArray);
-  // }
 };
 
 

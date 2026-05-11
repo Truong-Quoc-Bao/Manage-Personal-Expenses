@@ -1,14 +1,7 @@
-// ============================================================
-// spendingTrend.model.js
-// Collection: spending_trends
-// Database  : finance_db
-// ============================================================
-
 const mongoose = require("mongoose");
 const { Schema } = mongoose;
 
-// ── Sub-schemas ───────────────────────────────────────────────
-const monthlyDataSchema = new Schema(
+ const monthlyDataSchema = new Schema(
   {
     year: { type: Number, required: true, comment: "4-digit year" },
     month: { type: Number, required: true, min: 1, max: 12, comment: "Month 1–12" },
@@ -17,8 +10,7 @@ const monthlyDataSchema = new Schema(
   { _id: false }
 );
 
-// ── Main Schema ───────────────────────────────────────────────
-const spending_trends = new Schema(
+ const spending_trends = new Schema(
   {
     user_id: {
       type: String,
@@ -102,8 +94,7 @@ const spending_trends = new Schema(
   }
 );
 
-// ── Indexes ───────────────────────────────────────────────────
-spending_trends.index({ user_id: 1 }, { name: "idx_spending_trends_user_id" });
+ spending_trends.index({ user_id: 1 }, { name: "idx_spending_trends_user_id" });
 spending_trends.index({ account_id: 1 }, { name: "idx_spending_trends_account_id" });
 spending_trends.index(
   { account_id: 1, category_id: 1 },
@@ -114,7 +105,6 @@ spending_trends.index(
   { name: "idx_spending_trends_user_cat" }
 );
 
-// ── Model ─────────────────────────────────────────────────────
-const SpendingTrend = mongoose.model("SpendingTrend", spending_trends);
+ const SpendingTrend = mongoose.model("SpendingTrend", spending_trends);
 
 module.exports = SpendingTrend;

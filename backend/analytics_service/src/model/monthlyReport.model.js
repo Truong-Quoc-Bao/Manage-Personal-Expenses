@@ -1,14 +1,8 @@
-// ============================================================
-// monthlyReport.model.js
-// Collection: monthly_reports
-// Database  : finance_db
-// ============================================================
 
 const mongoose = require("mongoose");
 const { Schema } = mongoose;
 
-// ── Sub-schemas ───────────────────────────────────────────────
-const summarySchema = new Schema(
+ const summarySchema = new Schema(
   {
     total_income: { type: Number, default: 0, min: 0, comment: "Total income for the month (VND)" },
     total_expense: { type: Number, default: 0, min: 0, comment: "Total expense for the month (VND)" },
@@ -64,8 +58,7 @@ const aiReportSchema = new Schema(
   { _id: false }
 );
 
-// ── Main Schema ───────────────────────────────────────────────
-const monthly_reports = new Schema(
+ const monthly_reports = new Schema(
   {
     user_id: {
       type: String,
@@ -178,7 +171,6 @@ monthly_reports.index(
   { name: "idx_monthly_reports_status" }
 );
 
-// ── Model ─────────────────────────────────────────────────────
-const MonthlyReport = mongoose.model("MonthlyReport", monthly_reports);
+ const MonthlyReport = mongoose.model("MonthlyReport", monthly_reports);
 
 module.exports = MonthlyReport;

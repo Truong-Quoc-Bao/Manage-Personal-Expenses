@@ -1,14 +1,7 @@
-// ============================================================
-// anomalyLog.model.js
-// Collection: anomaly_logs
-// Database  : finance_db
-// ============================================================
-
 const mongoose = require("mongoose");
 const { Schema } = mongoose;
 
-// ── Sub-schemas ───────────────────────────────────────────────
-const expectedRangeSchema = new Schema(
+ const expectedRangeSchema = new Schema(
   {
     min: { type: Number, required: true, min: 0, comment: "Lower bound of the normal spending range (VND)" },
     max: { type: Number, required: true, min: 0, comment: "Upper bound of the normal spending range (VND)" },
@@ -16,8 +9,7 @@ const expectedRangeSchema = new Schema(
   { _id: false }
 );
 
-// ── Main Schema ───────────────────────────────────────────────
-const anomaly_logs = new Schema(
+ const anomaly_logs = new Schema(
   {
     user_id: {
       type: String,
@@ -107,7 +99,6 @@ const anomaly_logs = new Schema(
   }
 );
 
-// ── Indexes ───────────────────────────────────────────────────
 anomaly_logs.index({ user_id: 1 }, { name: "idx_anomaly_user_id" });
 anomaly_logs.index({ account_id: 1 }, { name: "idx_anomaly_account_id" });
 anomaly_logs.index({ category_id: 1 }, { name: "idx_anomaly_category_id" });
@@ -122,7 +113,6 @@ anomaly_logs.index(
   { name: "idx_anomaly_user_severity" }
 );
 
-// ── Model ─────────────────────────────────────────────────────
 const AnomalyLog = mongoose.model("AnomalyLog", anomaly_logs);
 
 module.exports = AnomalyLog;

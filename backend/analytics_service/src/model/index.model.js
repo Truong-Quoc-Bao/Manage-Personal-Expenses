@@ -1,10 +1,3 @@
-// ============================================================
-// index.model.js
-// Re-exports all Mongoose models for finance_db
-// Usage:
-//   const { Transaction, UserAnalytics, ... } = require("./models");
-// ============================================================
-
 const AnomalyLog      = require("./anomalyLog.model");
 const CategorySummary = require("./categorySummary.model");
 const DashboardCache  = require("./dashboardCache.model");

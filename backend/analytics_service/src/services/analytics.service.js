@@ -3,10 +3,6 @@
 const repo = require('../repositories/analytics.repository.js');
 
 const service = {
-
-  // ================================================================
-  // USER ANALYTICS
-  // ================================================================
   getUserAnalytics: async (userId) => {
     return await repo.findUserAnalyticsByuserId(userId);
   },
@@ -48,27 +44,6 @@ const service = {
     return await repo.createUserAnalytics(formattedData);
   },
 
-  // flattenObject: function (obj, parent = '', res = {}) {
-  //   for (let key in obj) {
-  //     const value = obj[key];
-  //     const newKey = parent ? `${parent}.${key}` : key;
-
-  //     if (
-  //       value &&
-  //       typeof value === 'object' &&
-  //       !Array.isArray(value) &&
-  //       !(value instanceof Date)
-  //     ) {
-  //       this.flattenObject(value, newKey, res); // ✅ đúng
-  //     } else if (Array.isArray(value)) {
-  //       res[newKey] = value; // giữ nguyên array
-  //     }
-  //     else {
-  //       res[newKey] = value;
-  //     }
-  //   }
-  //   return res;
-  // },
   flattenObject: function (obj, parent = '', res = {}) {
     for (let key in obj) {
       const value = obj[key];
@@ -89,78 +64,6 @@ const service = {
     return res;
   },
 
-  // updateUserAnalytics: async function (userId, data) {
-  //   if (!userId) throw new Error('userId is required');
-  //   if (!data) throw new Error('Data is required');
-
-  //   const blockedFields = ['_id', 'user_id', 'created_at', 'updated_at'];
-
-  //   // ✅ validate month
-  //   if (
-  //     data.current_month?.month &&
-  //     (data.current_month.month < 1 || data.current_month.month > 12)
-  //   ) {
-  //     throw new Error('Invalid month');
-  //   }
-
-  //   // =========================
-  //   // 🚀 1. HANDLE GOAL UPDATE
-  //   // =========================
-  //   if (data.goal_update) {
-  //     const { goal_id, update } = data.goal_update;
-
-  //     if (!goal_id || !update) {
-  //       throw new Error('goal_id and update are required');
-  //     }
-
-  //     const setData = {};
-
-  //     for (const key in update) {
-  //       setData[`goal_tracking.goals.$[elem].${key}`] = update[key];
-  //     }
-
-  //     return await repo.updateUserAnalyticsByuserId(
-  //       userId,
-  //       {
-  //         $set: setData,
-  //         $currentDate: { updated_at: true }
-  //       },
-  //       {
-  //         arrayFilters: [{ 'elem.goal_id': goal_id }]
-  //       }
-  //     );
-  //   }
-  //   // =========================
-  //   // 🧠 NORMAL UPDATE (OBJECT)
-  //   // =========================
-
-  //   const safeData = {};
-
-  //   for (const key in data) {
-  //     if (!blockedFields.includes(key)) {
-  //       safeData[key] = data[key];
-  //     }
-  //   }
-
-  //   const updateData = this.flattenObject(safeData);
-
-  //   if (Object.keys(updateData).length === 0) {
-  //     throw new Error('No valid fields to update');
-  //   }
-
-  //   // ❗ chặn nested hack
-  //   for (const key in updateData) {
-  //     if (key.includes('_id') || key.includes('created_at')) {
-  //       throw new Error(`Forbidden field: ${key}`);
-  //     }
-  //   }
-
-  //   return await repo.updateUserAnalyticsByuserId(userId, {
-  //     $set: updateData,
-  //     $currentDate: { updated_at: true }
-  //   });
-  // },
-
   updateUserAnalytics: async function (userId, data) {
     if (!userId) throw new Error('userId is required');
     if (!data) throw new Error('Data is required');
@@ -175,9 +78,6 @@ const service = {
       throw new Error('Invalid month');
     }
 
-    // =========================
-    // 🚀 1. HANDLE GOAL UPDATE (partial)
-    // =========================
     if (data.goal_update) {
       const { goal_id, update } = data.goal_update;
 
@@ -203,10 +103,6 @@ const service = {
       );
     }
 
-    // =========================
-    // 🚀 2. SPECIAL REPLACE FIELDS
-    // =========================
-
     const specialSet = {};
 
     // replace account_id
@@ -217,30 +113,24 @@ const service = {
       specialSet['account_id'] = data.account_id;
     }
 
-    // replace top_categories
-    if (data.top_categories) {
+     if (data.top_categories) {
       if (!Array.isArray(data.top_categories)) {
         throw new Error('top_categories must be array');
       }
       specialSet['top_categories'] = data.top_categories;
     }
 
-    // replace whole goal_tracking.goals
-    if (data.goal_tracking?.goals) {
+     if (data.goal_tracking?.goals) {
       if (!Array.isArray(data.goal_tracking.goals)) {
         throw new Error('goals must be array');
       }
       specialSet['goal_tracking.goals'] = data.goal_tracking.goals;
     }
 
-    // replace budget_alert
-    if (data.budget_alert) {
+     if (data.budget_alert) {
       specialSet['budget_alert'] = data.budget_alert;
     }
-
-    // =========================
-    // 🧠 3. NORMAL UPDATE
-    // =========================
+ 
 
     const safeData = {};
 
@@ -254,10 +144,6 @@ const service = {
     }
 
     const normalSet = this.flattenObject(safeData);
-
-    // =========================
-    // 🔒 VALIDATE
-    // =========================
 
     const finalSet = {
       ...normalSet,
@@ -273,11 +159,6 @@ const service = {
         throw new Error(`Forbidden field: ${key}`);
       }
     }
-
-    // =========================
-    // 🚀 FINAL UPDATE
-    // =========================
-
     return await repo.updateUserAnalyticsByuserId(userId, {
       $set: finalSet,
       $currentDate: { updated_at: true }
@@ -291,10 +172,7 @@ const service = {
     if (!result) throw new Error('User analytics not found');
     return result;
   },
-
-  // ================================================================
-  // ANOMALY LOGS
-  // ================================================================
+ 
   getAnomalyLogs: async (userId) => {
     return await repo.findAnomalyLogsByuserId(userId);
   },
@@ -383,10 +261,7 @@ const service = {
     if (!userId) throw new Error('userId is required');
     return await repo.deleteAllAnomalyLogsByuserId(userId);
   },
-
-  // ================================================================
-  // CATEGORY SUMMARY
-  // ================================================================
+ 
   getCategorySummary: async (userId) => {
     return await repo.findCategorySummaryByuserId(userId);
   },
@@ -430,32 +305,7 @@ const service = {
 
     return await repo.createCategorySummary(formattedData);
   },
-
-  // upsertCategorySummary: async (userId, data) => {
-  //   if (!userId) throw new Error('userId is required');
-
-  //   if (!data.category_id) throw new Error('category_id is required');
-  //   if (!data.year) throw new Error('year is required');
-  //   if (!data.month) throw new Error('month is required');
-
-  //   const formattedData = {
-  //     user_id: userId,
-  //     category_id: data.category_id,
-  //     category_name: data.category_name || null,
-  //     category_type: data.category_type || 'expense',
-  //     year: Number(data.year),
-  //     month: Number(data.month),
-  //     total_amount: Number(data.total_amount) || 0,
-  //     transaction_count: Number(data.transaction_count) || 0,
-  //     budget_limit: Number(data.budget_limit) || 0,
-  //     is_over_budget: Boolean(data.is_over_budget) || false,
-  //     daily_breakdown: data.daily_breakdown || [],
-  //   };
-
-  //   return await repo.upsertCategorySummary(
-  //     userId, data.category_id, Number(data.year), Number(data.month), formattedData
-  //   );
-  // },
+ 
   upsertCategorySummary: async function (userId, data) {
     if (!userId) throw new Error('userId is required');
 
@@ -465,25 +315,16 @@ const service = {
 
     const blockedFields = ['_id', 'user_id', 'created_at', 'updated_at'];
 
-    // =========================
-    // 🚀 1. SPECIAL FIELD (ARRAY)
-    // =========================
-
     const specialSet = {};
 
-    // replace daily_breakdown
-    if (data.daily_breakdown) {
+     if (data.daily_breakdown) {
       if (!Array.isArray(data.daily_breakdown)) {
         throw new Error('daily_breakdown must be array');
       }
 
       specialSet['daily_breakdown'] = data.daily_breakdown;
     }
-
-    // =========================
-    // 🧠 2. NORMAL UPDATE
-    // =========================
-
+ 
     const safeData = {};
 
     for (const key in data) {
@@ -496,10 +337,6 @@ const service = {
     }
 
     const normalSet = this.flattenObject(safeData);
-
-    // =========================
-    // 🔒 VALIDATE + FORMAT
-    // =========================
 
     const finalSet = {
       ...normalSet,
@@ -516,7 +353,6 @@ const service = {
       }
     }
 
-    // convert number fields (optional nhưng nên có)
     if (finalSet.total_amount !== undefined) {
       finalSet.total_amount = Number(finalSet.total_amount);
     }
@@ -533,10 +369,6 @@ const service = {
       finalSet.is_over_budget = Boolean(finalSet.is_over_budget);
     }
 
-    // =========================
-    // 🚀 FINAL UPDATE
-    // =========================
-
     return await repo.upsertCategorySummary(
       userId,
       data.category_id,
@@ -548,24 +380,7 @@ const service = {
       }
     );
   },
-  // updateCategorySummary: async (id, data) => {
-  //   if (!id) throw new Error('id is required');
-  //   if (!data) throw new Error('Data is required');
-
-  //   const allowedFields = [
-  //     'category_name', 'category_type', 'total_amount',
-  //     'transaction_count', 'budget_limit', 'is_over_budget', 'daily_breakdown',
-  //   ];
-  //   const updateData = {};
-  //   for (const key of allowedFields) {
-  //     if (data[key] !== undefined) updateData[key] = data[key];
-  //   }
-
-  //   const result = await repo.updateCategorySummaryById(id, updateData);
-  //   if (!result) throw new Error('Category summary not found');
-  //   return result;
-  // },
-
+  
   deleteCategorySummary: async (id) => {
     if (!id) throw new Error('id is required');
     const result = await repo.deleteCategorySummaryById(id);
@@ -585,9 +400,6 @@ const service = {
     return await repo.createManyCategorySummary(dataArray);
   },
 
-  // ================================================================
-  // DASHBOARD CACHE
-  // ================================================================
   getDashboardCache: async (userId) => {
     return await repo.findDashboardCacheByuserId(userId);
   },
@@ -604,14 +416,9 @@ const service = {
 
     const blockedFields = ['_id', 'user_id', 'expires_at'];
 
-    // =========================
-    // 🚀 1. SPECIAL REPLACE
-    // =========================
-
     const specialSet = {};
 
-    // replace whole array
-    if (data.top_categories) {
+     if (data.top_categories) {
       if (!Array.isArray(data.top_categories)) {
         throw new Error('top_categories must be array');
       }
@@ -625,8 +432,7 @@ const service = {
       specialSet['recent_transactions'] = data.recent_transactions;
     }
 
-    // replace object (NOT flatten)
-    if (data.summary) {
+     if (data.summary) {
       specialSet['summary'] = data.summary;
     }
 
@@ -634,14 +440,9 @@ const service = {
       specialSet['streak'] = data.streak;
     }
 
-    // optional field
-    if (data.top_account_id) {
+     if (data.top_account_id) {
       specialSet['top_account_id'] = data.top_account_id;
     }
-
-    // =========================
-    // 🧠 2. NORMAL UPDATE (flatten)
-    // =========================
 
     const safeData = {};
 
@@ -663,9 +464,6 @@ const service = {
 
     const normalSet = this.flattenObject(safeData);
 
-    // =========================
-    // 🔒 VALIDATE
-    // =========================
 
     const finalSet = {
       ...normalSet,
@@ -686,10 +484,6 @@ const service = {
       }
     }
 
-    // =========================
-    // 🚀 FINAL UPSERT
-    // =========================
-
     return await repo.upsertDashboardCache(
       userId,
       finalSet,
@@ -702,9 +496,6 @@ const service = {
     return await repo.invalidateDashboardCache(userId);
   },
 
-  // ================================================================
-  // MONTHLY REPORT
-  // ================================================================
   getMonthlyReport: async (userId) => {
     return await repo.findMonthlyReportByuserId(userId);
   },
@@ -761,10 +552,6 @@ const service = {
 
     const blockedFields = ['_id', 'user_id', 'created_at', 'updated_at'];
 
-    // =========================
-    // 🚀 1. SPECIAL REPLACE
-    // =========================
-
     const specialSet = {};
 
     // replace arrays
@@ -785,31 +572,13 @@ const service = {
       }
     }
 
-    // replace object (NOT flatten)
-    // if (data.summary) {
-    //   specialSet['summary'] = data.summary;
-    // }
-
     if (data.comparison) {
       specialSet['comparison'] = data.comparison;
     }
 
-    // if (data.ai_report) {
-    //   specialSet['ai_report'] = data.ai_report;
-    // }
-
-    // scalar fields
-    // if (data.status) {
-    //   specialSet['status'] = data.status;
-    // }
-
     if (data.generated_at) {
       specialSet['generated_at'] = new Date(data.generated_at);
     }
-
-    // =========================
-    // 🧠 2. NORMAL UPDATE (flatten)
-    // =========================
 
     const safeData = {};
 
@@ -834,9 +603,6 @@ const service = {
     }
 
     const normalSet = this.flattenObject(safeData);
-    // =========================
-    // 🔒 VALIDATE
-    // =========================
 
     const finalSet = {
       ...normalSet,
@@ -853,10 +619,6 @@ const service = {
       }
     }
 
-    // =========================
-    // 🚀 FINAL UPSERT
-    // =========================
-
     return await repo.upsertMonthlyReport(
       userId,
       Number(data.year),
@@ -864,25 +626,6 @@ const service = {
       finalSet
     );
   },
-
-  // updateMonthlyReport: async (id, data) => {
-  //   if (!id) throw new Error('id is required');
-  //   if (!data) throw new Error('Data is required');
-
-  //   const allowedFields = [
-  //     'summary', 'income_by_category', 'expense_by_category',
-  //     'weekly_trend', 'daily_cashflow', 'top_expenses',
-  //     'comparison', 'ai_report', 'status', 'generated_at',
-  //   ];
-  //   const updateData = {};
-  //   for (const key of allowedFields) {
-  //     if (data[key] !== undefined) updateData[key] = data[key];
-  //   }
-
-  //   const result = await repo.updateMonthlyReportById(id, updateData);
-  //   if (!result) throw new Error('Monthly report not found');
-  //   return result;
-  // },
 
   deleteMonthlyReport: async (id) => {
     if (!id) throw new Error('id is required');
@@ -903,9 +646,6 @@ const service = {
     return await repo.createManyMonthlyReport(dataArray);
   },
 
-  // ================================================================
-  // SPENDING TREND
-  // ================================================================
   getSpendingTrend: async (userId) => {
     return await repo.findSpendingTrendByuserId(userId);
   },
@@ -986,9 +726,6 @@ const service = {
     return await repo.deleteAllSpendingTrendsByuserId(userId);
   },
 
-  // ================================================================
-  // TRANSACTION
-  // ================================================================
   getTransactions: async (userId, { limit, skip } = {}) => {
     return await repo.findTransactionsByuserId(userId, { limit, skip });
   },
@@ -1058,13 +795,11 @@ const service = {
     if (!result) throw new Error('Transaction not found');
     return result;
   },
-  //===================================================================================================
-  // HELPER: tính week number (1-5) từ ngày trong tháng
+
   _getWeekNumber: (day) => {
     return Math.ceil(day / 7);
   },
 
-  // HELPER: cập nhật user_analytics khi có transaction mới
   _updateUserAnalytics: async function (transaction) {
     const { user_id, amount, transaction_type, date } = transaction;
     const txDate = date ? new Date(date) : new Date();
@@ -1074,7 +809,6 @@ const service = {
     const isIncome = transaction_type === 'Income';
     const amt = Number(amount);
 
-    // Lấy user_analytics hiện tại, tự tạo nếu chưa có
     let ua = await repo.findUserAnalyticsByuserId(user_id);
     if (!ua) {
       console.log(`[_updateUserAnalytics] user_analytics not found, creating new for user_id: ${user_id}`);
@@ -1103,12 +837,10 @@ const service = {
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1;
 
-    // Tính total_income / total_expense / current_balance mới
     const newTotalIncome = isIncome ? (ua.total_income || 0) + amt : (ua.total_income || 0);
     const newTotalExpense = isExpense ? (ua.total_expense || 0) + amt : (ua.total_expense || 0);
     const newBalance = newTotalIncome - newTotalExpense;
 
-    // Tính current_month (chỉ cập nhật nếu transaction thuộc tháng hiện tại)
     let currentMonthUpdate = { ...ua.current_month };
     if (txYear === currentYear && txMonth === currentMonth) {
       if (isIncome) currentMonthUpdate.income = (ua.current_month?.income || 0) + amt;
@@ -1119,7 +851,6 @@ const service = {
         : 0;
     }
 
-    // Cập nhật top_categories nếu là expense
     let topCategories = ua.top_categories ? [...ua.top_categories] : [];
     if (isExpense && transaction.category_id) {
       const idx = topCategories.findIndex(c => c.category_id === transaction.category_id);
@@ -1132,7 +863,6 @@ const service = {
         topCategories.push({
           category_id: transaction.category_id,
           category_name: transaction.category_name || '',
-          // category_name: transaction.category_name || '',
           total_amount: amt
         });
       }
@@ -1151,7 +881,6 @@ const service = {
     });
   },
 
-  // HELPER: cập nhật category_summary khi có transaction mới
   _updateCategorySummary: async function (transaction) {
     const { user_id, account_id, category_id, amount, transaction_type, date, trans_id } = transaction;
 
@@ -1177,19 +906,16 @@ const service = {
 
     console.log('[_updateCategorySummary] year:', year, 'month:', month); // thêm dòng này
 
-    // Lấy category_summary hiện tại (upsert theo user_id + category_id + year + month)
     const existingArr = await repo.findCategorySummaryByAccountMonth2(user_id, category_id, account_id, year, month)
       .catch(() => null);
     const existing = existingArr?.[0] || null;
 
     if (existing) {
-      // Cập nhật total_amount, transaction_count
       const newTotal = (existing.total_amount || 0) + amt;
       const newCount = (existing.transaction_count || 0) + 1;
       const budgetLimit = existing.budget_limit || 0;
       const isOverBudget = budgetLimit > 0 ? newTotal > budgetLimit : false;
 
-      // Cập nhật daily_breakdown
       const breakdown = existing.daily_breakdown ? [...existing.daily_breakdown] : [];
       const dayIdx = breakdown.findIndex(d => d.day === day);
       if (dayIdx >= 0) {
@@ -1220,7 +946,6 @@ const service = {
         }
       );
     } else {
-      // Tạo mới
       const categoryInfo = await repo.findCategoryById(user_id, category_id).catch(() => null);
       const newDoc = {
         user_id,
@@ -1247,7 +972,6 @@ const service = {
     }
   },
 
-  // HELPER: cập nhật dashboard_cache
   _updateDashboardCache: async function (transaction) {
     const { user_id, account_id, trans_id, amount, transaction_type, description, date, category_id } = transaction;
     if (!account_id) return null;
@@ -1293,7 +1017,6 @@ const service = {
         : 0;
     }
 
-    // Cập nhật recent_transactions (prepend, giữ tối đa 5)
     const newTx = {
       trans_id,
       description: description || '',
@@ -1304,7 +1027,6 @@ const service = {
     };
     const recent = [newTx, ...(cache.recent_transactions || [])].slice(0, 5);
 
-    // TTL 15 phút từ bây giờ
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
     return await repo.upsertDashboardCache(
@@ -1321,7 +1043,6 @@ const service = {
     );
   },
 
-  // HELPER: cập nhật monthly_report
   _updateMonthlyReport: async function (transaction) {
     const { user_id, trans_id, amount, transaction_type, description, date, category_id } = transaction;
     if (!date) return null;
@@ -1340,7 +1061,6 @@ const service = {
 
     const week = Math.ceil(day / 7);
 
-    // Lấy monthly_report hiện tại, tự tạo nếu chưa có
     let report = await repo.findMonthlyReportByAccountMonth(user_id, year, month).catch(() => null);
     if (!report) {
       console.log(`[_updateMonthlyReport] monthly_report not found, creating new for user_id: ${user_id}, ${year}/${month}`);
@@ -1364,7 +1084,6 @@ const service = {
       };
     }
 
-    // --- summary ---
     const summary = { ...(report.summary || {}) };
     if (isIncome) {
       summary.total_income = (summary.total_income || 0) + amt;
@@ -1378,7 +1097,6 @@ const service = {
       : 0;
     summary.transaction_count = (summary.transaction_count || 0) + 1;
 
-    // --- income_by_category / expense_by_category ---
     const targetCatArray = isIncome ? 'income_by_category' : 'expense_by_category';
     const catArray = report[targetCatArray] ? [...report[targetCatArray]] : [];
     if (category_id) {
@@ -1395,7 +1113,6 @@ const service = {
       }
     }
 
-    // --- weekly_trend ---
     const weeklyTrend = report.weekly_trend ? [...report.weekly_trend] : [];
     const wIdx = weeklyTrend.findIndex(w => w.week === week);
     if (wIdx >= 0) {
@@ -1413,7 +1130,6 @@ const service = {
       weeklyTrend.sort((a, b) => a.week - b.week);
     }
 
-    // --- daily_cashflow ---
     const dailyCashflow = report.daily_cashflow ? [...report.daily_cashflow] : [];
     const dIdx = dailyCashflow.findIndex(d => d.day === day);
     if (dIdx >= 0) {
@@ -1431,7 +1147,6 @@ const service = {
       dailyCashflow.sort((a, b) => a.day - b.day);
     }
 
-    // --- top_expenses (chỉ expense, giữ top 5 theo amount) ---
     let topExpenses = report.top_expenses ? [...report.top_expenses] : [];
     if (isExpense && trans_id) {
       topExpenses.push({
@@ -1462,7 +1177,7 @@ const service = {
     );
   },
 
-  //===================================================================================================
+  
   handleTransactionCreated: async function (message) {
     console.log(`[handleTransactionCreated] Received message:`, message);
     const transaction = message;
@@ -1472,7 +1187,6 @@ const service = {
     console.log(`mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm user_id: ${user_id}`);
     try {
 
-      // Cập nhật song song 4 collections
       const [uaResult, csResult, dcResult, mrResult] = await Promise.allSettled([
         this._updateUserAnalytics(transaction),
         this._updateCategorySummary(transaction),
@@ -1540,7 +1254,6 @@ const service = {
         transaction_type: transaction_type === 'Income' ? 'Expense' : 'Income',
       };
 
-      // Bước 1: Reverse old (sequential vì cần đúng thứ tự)
       const [uaReverse, csReverse, dcReverse, mrReverse] = await Promise.allSettled([
         this._updateUserAnalytics(reverseTransaction),
         this._updateCategorySummary(reverseTransaction),
@@ -1553,7 +1266,6 @@ const service = {
       if (dcReverse.status === 'rejected') console.error(`[handleTransactionUpdated] dcReverse error:`, dcReverse.reason);
       if (mrReverse.status === 'rejected') console.error(`[handleTransactionUpdated] mrReverse error:`, mrReverse.reason);
 
-      // Bước 2: Apply new
       const [uaNew, csNew, dcNew, mrNew] = await Promise.allSettled([
         this._updateUserAnalytics(newTransaction),
         this._updateCategorySummary(newTransaction),
@@ -1599,7 +1311,6 @@ const service = {
         note,
       };
 
-      // Reverse effect của transaction đã xóa trên 4 collections
       const [uaResult, csResult, dcResult, mrResult] = await Promise.allSettled([
         this._updateUserAnalytics(reverseTransaction),
         this._updateCategorySummary(reverseTransaction),
@@ -1612,7 +1323,6 @@ const service = {
       if (dcResult.status === 'rejected') console.error(`[handleTransactionDeleted] dashboard_cache error:`, dcResult.reason);
       if (mrResult.status === 'rejected') console.error(`[handleTransactionDeleted] monthly_report error:`, mrResult.reason);
 
-      // Xóa transaction khỏi collection transaction (nếu có lưu)
       await repo.deleteTransactionByTransId(trans_id).catch(err =>
         console.error(`[handleTransactionDeleted] deleteTransaction error:`, err)
       );
