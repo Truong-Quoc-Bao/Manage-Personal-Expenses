@@ -176,7 +176,7 @@ export const NotificationCenter: React.FC = () => {
     };
 
     socketService.on('bank_notification', handleBankNotification);
-    socketService.on('new_notification', handleNewNotification);
+    // socketService.on('new_notification', handleNewNotification);
 
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -188,7 +188,7 @@ export const NotificationCenter: React.FC = () => {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       socketService.off('bank_notification', handleBankNotification);
-      socketService.off('new_notification', handleNewNotification);
+      // socketService.off('new_notification', handleNewNotification);
     };
   }, []);
 
