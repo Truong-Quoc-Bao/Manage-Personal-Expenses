@@ -1,38 +1,42 @@
-app.get('/api/callback/:userId', async (req, res) => {
-  // 1. Lấy dữ liệu từ tham số
-  const { userId } = req.params; // Đây là ID lấy từ URL (ví dụ: 4f4b144d-...)
-  const { link_token, external_id } = req.query; // external_id bây giờ là "user_ID_9999"
+// sw.js - Money Guard Push Notification
+self.addEventListener('push', (event) => {
+  console.log('[SW] Nhận được push event');
 
-  console.log('🚨 ĐÃ NHẬN CALLBACK');
-  console.log('- User ID gốc:', userId);
-  console.log('- External ID nhận từ SePay:', external_id);
-
-  if (!link_token || !userId) {
-    return res.status(400).send('Thiếu thông tin từ SePay');
-  }
-
+  let payload;
   try {
-    // ... (Giữ nguyên đoạn lấy Access Token của em) ...
-    // ... (Giữ nguyên đoạn gọi API link-token/${link_token} của em) ...
-
-    // 2. Lấy thông tin ngân hàng
-    const responseData = accountDetailRes.data.data || accountDetailRes.data;
-    const bankAccount = responseData.bank_account;
-    const accName = `${bankAccount.bank_name} - ${bankAccount.account_number}`;
-
-    // 3. LƯU VÀO DATABASE
-    // QUAN TRỌNG: Dùng chính cái userId từ req.params để lưu
-    await pool.query(
-      `INSERT INTO account_service.accounts (user_id, account_name, balance, type, currency)
-       VALUES ($1, $2, 0, 'bank', 'VND')
-       ON CONFLICT (user_id, account_name) DO UPDATE SET updated_at = NOW()`,
-      [userId, accName], // Lưu đúng ID gốc của Bảo vào DB
-    );
-
-    console.log('✅ THÀNH CÔNG: Đã lưu tài khoản', accName);
-    res.redirect('https://ba-da-fu-ta-food.vercel.app?status=linked_success');
+    payload = event.data.json();
   } catch (err) {
-    console.error('❌ Lỗi:', err.message);
-    res.redirect('https://ba-da-fu-ta-food.vercel.app?status=linked_failed');
+    console.error('[SW] Lỗi parse payload:', err);
+    payload = {
+      title: '🏦 Money Guard',
+      body: 'Có giao dịch mới',
+    };
   }
+
+  const options = {
+    body: payload.body || 'Bạn có một giao dịch mới',
+    icon: payload.icon || 'https://cdn-icons-png.flaticon.com/512/5968/5968890.png',
+    badge: payload.badge || 'https://cdn-icons-png.flaticon.com/512/5968/5968890.png',
+    tag: 'money-guard',
+    renotify: true,
+    vibrate: [200, 100, 200],
+    requireInteraction: true,
+    data: { url: payload.data?.url || '/' },
+  };
+
+  event.waitUntil(
+    self.registration
+      .showNotification(payload.title, options)
+      .then(() => console.log('[SW] Đã hiển thị notification'))
+      .catch((err) => console.error('[SW] Lỗi showNotification:', err)),
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  console.log('[SW] Notification được click');
+  event.notification.close();
+
+  const url = event.notification.data?.url || '/';
+
+  event.waitUntil(clients.openWindow(url));
 });
