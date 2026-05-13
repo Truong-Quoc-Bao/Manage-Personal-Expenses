@@ -13,14 +13,14 @@ export const authApi = {
 // 📊 Dashboard & Thống kê
 // ─────────────────────────────────────────
 export const statsApi = {
-  // BE: /api/stats -> FE gọi qua Gateway: /api/ai/api/stats
-  getStats: () => axiosInstance.get('/api/ai/api/stats'),
+  // BE: /api/stats -> FE gọi qua Gateway: /api/aistats
+  getStats: () => axiosInstance.get('/api/ai/stats'),
 
-  getBudgets: () => axiosInstance.get('/api/ai/api/budgets'),
+  getBudgets: () => axiosInstance.get('/api/ai/budgets'),
 
-  getRecentTransactions: () => axiosInstance.get('/api/ai/api/recent-transactions'),
+  getRecentTransactions: () => axiosInstance.get('/api/ai/recent-transactions'),
 
-  getAllTransactions: () => axiosInstance.get('/api/ai//api/all-transactions'),
+  getAllTransactions: () => axiosInstance.get('/api/ai/all-transactions'),
 };
 
 // ─────────────────────────────────────────
@@ -42,7 +42,7 @@ export const chatApi = {
     });
   },
 
-  getDeepScan: () => axiosInstance.get('/api/ai/api/ai-deep-scan'),
+  getDeepScan: () => axiosInstance.get('/api/ai/ai-deep-scan'),
   getAiHealth: () => axiosInstance.get('/api/ai/ai-health'),
 };
 
@@ -53,16 +53,15 @@ export const notificationApi = {
   // Lưu ý: Nếu Gateway của Bảo đang đẩy /api/notifications sang service khác
   // thì Bảo phải cân nhắc đổi prefix này.
   // Ở đây mình giả định Bảo muốn gọi vào AI Service (4005)
-  getAll: () => axiosInstance.get('/api/ai/api/notifications'),
+  getAll: () => axiosInstance.get('/api/ai/notifications'),
 
-  markRead: (id: number | string) => axiosInstance.post(`/api/ai/api/notifications/read/${id}`),
+  markRead: (id: number | string) => axiosInstance.post(`/api/ai/notifications/read/${id}`),
 
-  markAllRead: () => axiosInstance.post('/api/ai/api/notifications/read-all'),
+  markAllRead: () => axiosInstance.post('/api/ai/notifications/read-all'),
 
-  deleteOne: (id: number | string) =>
-    axiosInstance.delete(`/api/ai/api/notifications/delete/${id}`),
+  deleteOne: (id: number | string) => axiosInstance.delete(`/api/ai/notifications/delete/${id}`),
 
-  deleteAll: () => axiosInstance.delete('/api/ai/api/notifications/delete-all'),
+  deleteAll: () => axiosInstance.delete('/api/ai/notifications/delete-all'),
 };
 
 // ─────────────────────────────────────────
@@ -74,12 +73,15 @@ export const bankApi = {
   subscribe: (subscription: PushSubscription) =>
     axiosInstance.post('/api/ai/subscribe', subscription),
 
-  createBankLink: () => axiosInstance.get('/api/ai/api/create-bank'),
+  createBankLink: () => axiosInstance.get('/api/ai/create-bank'),
 
   receiveBankWebhook: (payload: Record<string, unknown>) =>
     axiosInstance.post('/api/ai/webhook/bank-transfer', payload, {
       headers: { 'x-api-key': 'MY_SUPER_SECRET_KEY' }, // Thêm dòng này để bypass xác thực JWT khi test
     }),
+
+  saveBankAccount: (data: { account_number: string; account_type?: string; bank_name?: string }) =>
+    axiosInstance.post('/api/ai/save-bank-account', data),
 };
 
 export const debugApi = {

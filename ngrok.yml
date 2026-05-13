@@ -1,0 +1,17 @@
+version: '3'
+
+agent:
+  authtoken: 34LWGr8y7rzYMk3qgTzKMv28EPm_5ujJJxk5sDWHFZhk9JPAs
+
+tunnels:
+  n8n:
+    proto: http
+    addr: 5678
+
+  backend:
+    proto: http
+    addr: 4005
+
+  frontend:
+    proto: http
+    addr: 5173

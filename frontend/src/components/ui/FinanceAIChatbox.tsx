@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { marked } from 'marked';
 import { chatApi, statsApi } from '../../api/ai.api';
+import { formatMessageTime } from '../../utils/format';
 
 interface Message {
   id: string | number;
@@ -93,10 +94,10 @@ export function FinanceAIChatbox() {
       ]);
 
       const history = histRes.data.map((m: any, idx: number) => ({
-        id: `hist-${idx}`,
+        id: m.id || `hist-${idx}`, // Nên dùng id từ DB nếu có
         role: m.role === 'user' ? 'user' : 'model',
         content: m.message.replace(/<.*?>[\s\S]*?<\/.*?>/gs, '').trim(),
-        timestamp: new Date(),
+        timestamp: m.created_at ? new Date(m.created_at) : new Date(),
       }));
 
       setMessages(
@@ -262,14 +263,116 @@ export function FinanceAIChatbox() {
     }
   };
 
-  const suggestions = useMemo(() => {
-    if (!stats) return ['Ăn sáng 30k', 'Hôm nay tiêu gì?', 'Ví còn bao nhiêu?'];
+  // HỆ THỐNG GỢI Ý SIÊU CẤP (Bản fix lỗi biến và logic) ---
+  const smartSuggestions = useMemo(() => {
+    // Nếu chưa có dữ liệu stats, trả về mặc định
+    if (!stats) return [{ icon: 'fa-rocket', text: 'Đang tải gợi ý...' }];
+
     const sug = [];
-    const balance = stats.income - stats.expense;
-    if (balance < 0) sug.push('Kế hoạch trả nợ', 'Cắt giảm chi tiêu');
-    else sug.push('Tôi còn bao nhiêu?', 'Ghi sổ cafe 25k');
-    sug.push('So sánh tuần trước');
-    return sug.slice(0, 4);
+    const income = stats.income || 0;
+    const expense = stats.expense || 0;
+    const balance = income - expense;
+
+    // Lấy danh sách category từ expenseCategories (vì gợi ý thường tập trung vào chi tiêu)
+    const categories = stats.expenseCategories || [];
+    const budgets = stats.budgets || [];
+
+    const now = new Date();
+    const day = now.getDate();
+    const hour = now.getHours();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+
+    // --- 1. NHÓM QUẢN LÝ DANH MỤC & NGÂN SÁCH (MỚI) ---
+    sug.push({ icon: 'fa-plus', text: 'Tạo danh mục chi tiêu mới' });
+
+    if (budgets.length === 0) {
+      sug.push({ icon: 'fa-wallet', text: 'Đặt ngân sách tháng này' });
+    } else {
+      sug.push({ icon: 'fa-chart-pie', text: 'Tháng này tôi đã dùng bao nhiêu ngân sách?' });
+    }
+
+    // --- 2. NHÓM: NGƯỜI MỚI (CHƯA CÓ DỮ LIỆU) ---
+    if (income === 0 && expense === 0) {
+      return [
+        { icon: 'fa-rocket', text: 'Bắt đầu hành trình tiết kiệm' },
+        { icon: 'fa-link', text: 'Kết nối ngân hàng tự động' },
+        { icon: 'fa-camera', text: 'Chụp thử 1 hóa đơn cafe' },
+        { icon: 'fa-circle-question', text: 'Money Guard làm được những gì?' },
+        { icon: 'fa-user-shield', text: 'Dữ liệu của tôi có an toàn không?' },
+        { icon: 'fa-plus', text: 'Tạo danh mục chi tiêu đầu tiên' },
+        { icon: 'fa-wallet', text: 'Thiết lập ngân sách tháng' },
+      ].slice(0, 6);
+    }
+
+    // --- 3. NHÓM: CẢNH BÁO TÀI CHÍNH (ÂM TIỀN/SẮP HẾT TIỀN) ---
+    if (balance < 0) {
+      sug.push({ icon: 'fa-skull-crossbones', text: 'Kế hoạch trả nợ khẩn cấp' });
+      sug.push({ icon: 'fa-hand-holding-dollar', text: 'Tìm nguồn thu nhập bổ sung' });
+      sug.push({ icon: 'fa-ban', text: 'Món nào tôi nên ngừng mua ngay?' });
+    } else if (income > 0 && expense / income > 0.9) {
+      sug.push({ icon: 'fa-triangle-exclamation', text: 'Cảnh báo: Sắp chạm đáy ví!' });
+    }
+
+    // --- 4. NHÓM: NGƯỜI GIÀU (DƯ NHIỀU TIỀN) ---
+    if (balance > 10000000) {
+      sug.push({ icon: 'fa-coins', text: 'Gợi ý kênh đầu tư an toàn' });
+      sug.push({ icon: 'fa-gem', text: 'Tôi có thể mua gì tự thưởng cho mình?' });
+      sug.push({ icon: 'fa-arrow-up-right-dots', text: 'Làm sao để tiền đẻ ra tiền?' });
+    }
+
+    // --- 5. NHÓM: THEO THỜI GIAN TRONG NGÀY ---
+    if (hour < 10) {
+      sug.push({ icon: 'fa-mug-saucer', text: 'Kế hoạch chi tiêu hôm nay' });
+    } else if (hour > 21) {
+      sug.push({ icon: 'fa-moon', text: 'Tổng kết chi tiêu ngày hôm nay' });
+      sug.push({ icon: 'fa-bed', text: 'Ngày mai nên tiêu tối đa bao nhiêu?' });
+    }
+
+    // --- 6. NHÓM: THEO CHU KỲ THÁNG (ĐẦU/CUỐI THÁNG) ---
+    const daysInMonth = new Date(year, month, 0).getDate();
+    if (day <= 5) {
+      sug.push({ icon: 'fa-flag', text: `Lập ngân sách cho tháng ${month}` });
+      sug.push({ icon: 'fa-money-bill-transfer', text: 'Tiền lương của tôi đâu rồi?' });
+    } else if (day >= daysInMonth - 5) {
+      sug.push({ icon: 'fa-hourglass-half', text: 'Sống sót qua những ngày cuối tháng' });
+      sug.push({ icon: 'fa-file-invoice-dollar', text: 'Dự báo số dư cuối tháng' });
+    }
+
+    // --- 7. NHÓM: THEO THÓI QUEN (DANH MỤC) ---
+    if (categories.length > 0) {
+      // Tìm hạng mục chi nhiều nhất
+      const topCat = [...categories].sort((a, b) => b.amount - a.amount)[0];
+      const name = (topCat.category_name || '').toLowerCase();
+
+      sug.push({ icon: 'fa-pen', text: `Sửa tên danh mục ${name}` });
+      sug.push({ icon: 'fa-trash', text: `Xóa danh mục không cần thiết` });
+
+      if (name.includes('ăn') || name.includes('food')) {
+        sug.push({ icon: 'fa-utensils', text: 'Cắt giảm tiền ăn uống thế nào?' });
+      }
+      if (name.includes('cafe') || name.includes('nước') || name.includes('coffee')) {
+        sug.push({ icon: 'fa-cup-togo', text: 'Tôi đã đốt bao nhiêu tiền cho Cafe?' });
+      }
+      if (name.includes('mua sắm') || name.includes('shopping')) {
+        sug.push({ icon: 'fa-cart-shopping', text: 'Kiểm soát cơn nghiện mua sắm' });
+      }
+      if (name.includes('game') || name.includes('giải trí')) {
+        sug.push({ icon: 'fa-gamepad', text: 'Cân đối tiền nạp game' });
+      }
+    }
+
+    // --- 8. NHÓM: TRUY VẤN DỮ LIỆU THÔNG MINH ---
+    sug.push({ icon: 'fa-magnifying-glass-chart', text: 'So sánh với tuần trước' });
+    sug.push({ icon: 'fa-bolt', text: 'Khoản chi nào bất thường nhất?' });
+    sug.push({ icon: 'fa-calendar-days', text: 'Thứ mấy tôi tiêu nhiều nhất?' });
+
+    // --- 9. NHÓM: TRUYỀN CẢM HỨNG (MOTIVATION) ---
+    sug.push({ icon: 'fa-quote-left', text: 'Lời khuyên tài chính hôm nay' });
+    sug.push({ icon: 'fa-trophy', text: 'Thử thách 7 ngày không trà sữa' });
+
+    // XÁO TRỘN VÀ LẤY 6 CÁI NGẪU NHIÊN ĐỂ GIAO DIỆN LUÔN MỚI MẺ
+    return sug.sort(() => 0.5 - Math.random()).slice(0, 6);
   }, [stats]);
 
   const onlineCount = aiModels.filter((m) => m.status === 'online').length;
@@ -289,6 +392,7 @@ export function FinanceAIChatbox() {
             </div>
             <div>
               <h3 className="text-white font-bold text-sm tracking-wide">Money Guard</h3>
+              <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
               <p className="text-[10px] text-white/70">
                 {onlineCount > 0 ? `${onlineCount} model online` : 'Đang kết nối...'}
               </p>
@@ -415,7 +519,7 @@ export function FinanceAIChatbox() {
                   <div className="flex justify-between border-b border-gray-700 pb-1 mb-1 opacity-70">
                     <span>MODEL</span>
                     <span className="text-orange-400 font-bold uppercase">
-                      {msg.aiInfo.modelUsed.split('-').pop()}
+                      {msg.aiInfo?.modelUsed?.split('-')?.pop() || 'AI'}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -427,7 +531,8 @@ export function FinanceAIChatbox() {
                 </div>
               )}
               <span className="text-[9px] text-gray-400 mt-1 tracking-tight">
-                {msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                {/* {msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} */}
+                {formatMessageTime(msg.timestamp)}
               </span>
             </div>
           </div>
@@ -471,21 +576,28 @@ export function FinanceAIChatbox() {
       {/* Footer */}
       <div className="p-4 bg-white border-t border-gray-100">
         {/* Suggestion Chips */}
-        <div className="mb-3 flex gap-2 overflow-x-auto scrollbar-hide">
-          {suggestions.map((txt) => (
+        <div className="mb-3 flex gap-2 overflow-x-auto scrollbar-hide py-1">
+          {smartSuggestions.map((item, i) => (
             <button
-              key={txt}
-              onClick={() =>
-                handleSend(
-                  txt.replace(
-                    /[^\w\sàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/gi,
-                    '',
-                  ),
-                )
-              }
-              className="whitespace-nowrap px-3.5 py-1.5 bg-gradient-to-r from-orange-50 to-rose-50 border border-orange-200/80 rounded-full text-[11px] font-semibold text-orange-600 hover:from-orange-400 hover:to-rose-400 hover:text-white hover:border-transparent hover:shadow-md transition-all"
+              key={i}
+              onClick={() => handleSend(item.text)}
+              className="flex items-center justify-center gap-2 whitespace-nowrap px-4 py-2 bg-gradient-to-r from-orange-50 to-rose-50 border border-orange-200/80 rounded-full text-[11px] font-bold text-orange-600 hover:from-orange-400 hover:to-rose-400 hover:text-white hover:border-transparent hover:shadow-md transition-all active:scale-95"
             >
-              {txt}
+              <span className="flex items-center justify-center shrink-0">
+                {item.icon.startsWith('fa-') ? (
+                  // Chỉnh text-[13px] cho icon FA để nó cân đối với chữ 11px
+                  // Thêm transform translate-y để tinh chỉnh vị trí theo pixel nếu cần
+                  <i
+                    className={`fa-solid ${item.icon} text-[13px] transform translate-y-[0.5px]`}
+                  ></i>
+                ) : (
+                  // Nếu là emoji, để to hơn 1 tí nhìn cho rõ
+                  <span className="text-[14px] leading-none">{item.icon}</span>
+                )}
+              </span>
+
+              {/* Text: Dùng leading-none để xóa khoảng trắng thừa của dòng */}
+              <span className="leading-none pt-[1px]">{item.text}</span>
             </button>
           ))}
         </div>
@@ -527,7 +639,7 @@ export function FinanceAIChatbox() {
           />
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="p-2 rounded-lg text-orange-400 hover:bg-orange-50 hover:text-orange-600 transition-all"
+            className="p-2 rounded-lg !bg-gradient-to-r !from-orange-400 !to-rose-400  hover:bg-orange-50 hover:text-orange-600 transition-all"
           >
             <Camera size={20} />
           </button>
@@ -535,13 +647,13 @@ export function FinanceAIChatbox() {
             onClick={() =>
               isRecording ? recognitionRef.current?.stop() : recognitionRef.current?.start()
             }
-            className={`p-2 rounded-lg transition-all ${
+            className={`p-2 !bg-gradient-to-r !from-orange-400 !to-rose-400 rounded-lg transition-all ${
               isRecording
-                ? 'text-red-500 bg-red-50 animate-pulse scale-110'
-                : 'text-orange-400 hover:bg-orange-50 hover:text-orange-600'
+                ? 'text-red-500 animate-pulse scale-125'
+                : 'text-gray-400 hover:text-white'
             }`}
           >
-            <Mic size={20} />
+            <Mic size={20}  className="text-white" />
           </button>
           <input
             type="text"

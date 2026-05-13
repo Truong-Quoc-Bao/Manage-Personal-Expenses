@@ -1,36 +1,26 @@
-// --- 1.2 LẮNG NGHE TIN NHẮN TỪ NGÂN HÀNG (Dán dưới useEffect âm thanh) ---
-useEffect(() => {
-  const handleBankMessage = (event: any) => {
-    const { text, isUser } = event.detail;
+const handleMessage = async (event: MessageEvent) => {
+  console.log('📨 postMessage nhận được:', event.data);
 
-    console.log('📨 FloatingChat nhận được tin nhắn từ hệ thống:', text);
+  if (
+    event.data?.event === 'FINISHED_BANK_ACCOUNT_LINK'
+  ) {
+    window.removeEventListener('message', handleMessage);
+    clearInterval(checkClosed);
+    popup?.close();
 
-    // Thêm tin nhắn mới vào danh sách hiện tại
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: isUser ? 'user' : 'model',
-        content: text,
-      },
-    ]);
+    // ✅ Lấy từ metadata, không phải root
+    const { account_number, account_type, bank_name } = event.data.metadata;
+    console.log('🏦 Data từ SePay:', { account_number, account_type, bank_name });
 
-    // Tự động mở cửa sổ chat nếu đang đóng để Bảo thấy thông báo ngay
-    if (!isOpen) {
-      setIsOpen(true);
+    try {
+      await bankApi.saveBankAccount({ account_number, account_type, bank_name });
+      toast.success('Liên kết ngân hàng thành công!');
+      fetchAccounts();
+    } catch (err) {
+      console.error('Lỗi lưu tài khoản:', err);
+      toast.error('Liên kết thành công nhưng lưu thất bại');
+    } finally {
+      setIsLinkingBank(false);
     }
-
-    // Phát âm thanh báo hiệu
-    playNotificationSound();
-
-    // Yêu cầu Dashboard cập nhật lại số tiền (vì vừa có giao dịch mới)
-    refreshDashboard();
-  };
-
-  // Đăng ký nghe sự kiện 'ai_add_message'
-  window.addEventListener('ai_add_message', handleBankMessage);
-
-  return () => {
-    // Hủy đăng ký khi tắt trang
-    window.removeEventListener('ai_add_message', handleBankMessage);
-  };
-}, [isOpen]); // Thêm isOpen vào để đảm bảo logic mở cửa sổ hoạt động
+  }
+};

@@ -14,57 +14,85 @@ export const formatMoney = (amount: number): string => {
 export const formatDateTime = (dateString: string): string => {
   if (!dateString) return '---';
 
-  // 1. Chuyển đổi an toàn (Xử lý cả SQL format ' ' lẫn ISO 'T')
-  const date = new Date(dateString.replace(' ', 'T'));
-
-  // Kiểm tra nếu ngày bị lỗi (Invalid Date)
-  if (isNaN(date.getTime())) return 'Ngày lỗi';
-
+  // 1. Chuyển đổi sang Date
+  let date = new Date(dateString.replace(' ', 'T'));
   const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
 
-  // 🔥 TRƯỜNG HỢP 1: NGÀY TƯƠNG LAI (Ví dụ: 20/05/2026)
-  if (diffMs < 0) {
-    const dateFormatted = date.toLocaleDateString('vi-VN', {
+  // 2. LOGIC TỰ SỬA LỖI LỆCH 7 TIẾNG
+  // Nếu giờ trong DB mà nhanh hơn hiện tại tận 5-7 tiếng -> Nghĩa là lỗi nhãn UTC
+  if (date.getTime() - now.getTime() > 3600000 * 3) {
+    date = new Date(date.getTime() - 7 * 60 * 60 * 1000);
+  }
+  // Nếu giờ trong DB mà chậm hơn hiện tại tận 5-7 tiếng -> Nghĩa là lỗi thiếu múi giờ
+  else if (now.getTime() - date.getTime() > 3600000 * 5) {
+    // Thử ép nó hiểu là UTC để tự cộng 7
+    const utcDate = new Date(dateString.replace(' ', 'T') + 'Z');
+    if (!isNaN(utcDate.getTime())) date = utcDate;
+  }
+
+  const diffMs = now.getTime() - date.getTime();
+  const absDiffMs = Math.abs(diffMs);
+  const isToday = date.toDateString() === now.toDateString();
+
+  // 3. HIỂN THỊ REAL-TIME
+  if (absDiffMs < 3600000 * 24 && isToday) {
+    // Trong vòng 24h và cùng ngày
+    const diffMins = Math.floor(absDiffMs / 60000);
+    const diffHours = Math.floor(absDiffMs / 3600000);
+
+    if (diffMins < 1) return 'Vừa xong';
+    if (diffMins < 60) return `${diffMins} phút trước`;
+    return `${diffHours} giờ trước`;
+  }
+
+  // 4. QUÁ KHỨ (Hôm qua / Ngày cũ)
+  if (diffMs > 0) {
+    const yesterday = new Date();
+    yesterday.setDate(now.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) return 'Hôm qua';
+  }
+
+  return (
+    date.toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      timeZone: 'Asia/Ho_Chi_Minh',
+    }) +
+    ' ' +
+    date.toLocaleTimeString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'Asia/Ho_Chi_Minh',
+    })
+  );
+};
+//
+// format giờ của lịch sử chat
+export const formatMessageTime = (date: Date) => {
+  const now = new Date();
+
+  // Kiểm tra xem có phải cùng một ngày không
+  const isToday =
+    date.getDate() === now.getDate() &&
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear();
+
+  if (isToday) {
+    // Nếu là hôm nay: chỉ hiện giờ và phút
+    return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  } else {
+    // Nếu quá 1 ngày: hiện giờ, phút, giây, ngày, tháng, năm
+    return date.toLocaleString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
     });
-    return `${dateFormatted} (tương lai)`;
   }
-
-  // TÍNH TOÁN KHOẢNG CÁCH CHO QUÁ KHỨ
-  const diffSecs = Math.floor(diffMs / 1000);
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  // 🔥 TRƯỜNG HỢP 2: QUÁ KHỨ GẦN (Trong vòng 7 ngày)
-  if (diffSecs < 30) return 'Vừa xong';
-  if (diffMins < 60) return `${diffMins} phút trước`;
-  if (diffHours < 24) return `${diffHours} giờ trước`;
-
-  if (diffDays < 7) {
-    if (diffDays === 1) return 'Hôm qua';
-    return `${diffDays} ngày trước`;
-  }
-
-  // 🔥 TRƯỜNG HỢP 3: QUÁ KHỨ XA (Trên 7 ngày)
-  // In ra đầy đủ Ngày/Tháng/Năm Giờ:Phút:Giây thực hiện giao dịch
-  const dayMonthYear = date.toLocaleDateString('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
-
-  const hourMinSec = date.toLocaleTimeString('vi-VN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  });
-
-  return `${dayMonthYear} ${hourMinSec}`;
 };
 
 /**

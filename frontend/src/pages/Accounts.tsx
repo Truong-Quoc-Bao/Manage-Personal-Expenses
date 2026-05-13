@@ -49,7 +49,6 @@ export function Accounts() {
     return () => window.removeEventListener('money-guard-sync', handleSync);
   }, [fetchAccounts]);
 
-  // ✅ LOGIC TẠO LIÊN KẾT NGÂN HÀNG (CREATE BANK LINK)
   // ✅ LOGIC TẠO LIÊN KẾT NGÂN HÀNG (Sửa lỗi cú pháp)
   const handleConnectBank = async () => {
     try {
@@ -62,13 +61,61 @@ export function Accounts() {
       // Dữ liệu từ API wrapper thường nằm trong res.data
       const data = res.data;
 
-      // Chuyển hướng sang trang liên kết của ngân hàng
-      if (data && data.url) {
-        console.log('✅ Nhận được link ngân hàng:', data.url);
-        window.location.href = data.url;
-      } else {
-        throw new Error('Hệ thống không trả về đường dẫn liên kết');
-      }
+      // // Chuyển hướng sang trang liên kết của ngân hàng
+      // if (data && data.url) {
+      //   console.log('✅ Nhận được link ngân hàng:', data.url);
+      //   // window.location.href = data.url;
+      //   const popup = window.open(data.url, 'bankhub', 'width=500,height=700');
+      // } else {
+      //   throw new Error('Hệ thống không trả về đường dẫn liên kết');
+      // }
+
+      if (!data?.url) throw new Error('Hệ thống không trả về đường dẫn liên kết');
+
+      console.log('✅ Nhận được link ngân hàng:', data.url);
+
+      // Mở popup thay vì chuyển trang
+      const popup = window.open(data.url, 'bankhub', 'width=500,height=700');
+
+      // Lắng nghe postMessage từ SePay
+      const handleMessage = async (event: MessageEvent) => {
+        console.log('📨 postMessage nhận được:', event.data);
+        console.log('📨 postMessage FULL data:', JSON.stringify(event.data));
+        console.log('📨 RAW event.data:', JSON.stringify(event.data, null, 2));
+        console.log('📨 event.origin:', event.origin);
+        // SePay gửi event FINISHED_BANK_ACCOUNT_LINK
+        if (event.data?.event === 'FINISHED_BANK_ACCOUNT_LINK') {
+          window.removeEventListener('message', handleMessage);
+          clearInterval(checkClosed);
+          popup?.close();
+
+          // ✅ Lấy từ metadata, không phải root
+          const { account_number, account_type, bank_name } = event.data.metadata;
+          console.log('🏦 Data từ SePay:', { account_number, account_type, bank_name });
+
+          try {
+            await bankApi.saveBankAccount({ account_number, account_type, bank_name });
+            toast.success('Liên kết ngân hàng thành công!');
+            fetchAccounts();
+          } catch (err) {
+            console.error('Lỗi lưu tài khoản:', err);
+            toast.error('Liên kết thành công nhưng lưu thất bại');
+          } finally {
+            setIsLinkingBank(false);
+          }
+        }
+      };
+
+      window.addEventListener('message', handleMessage);
+
+      // Cleanup nếu user đóng popup thủ công
+      const checkClosed = setInterval(() => {
+        if (popup?.closed) {
+          clearInterval(checkClosed);
+          window.removeEventListener('message', handleMessage);
+          setIsLinkingBank(false);
+        }
+      }, 1000);
     } catch (error: any) {
       console.error('Lỗi Connect Bank:', error);
       // Hiển thị lỗi chi tiết từ server nếu có

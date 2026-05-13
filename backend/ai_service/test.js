@@ -1,42 +1,38 @@
-// --- BƯỚC FIX: LẮNG NGHE THÔNG BÁO NGÂN HÀNG ĐỂ TỰ ĐỘNG HIỆN TIN NHẮN ---
-  useEffect(() => {
-    const handleBankMessage = (event: any) => {
-      const { text, isUser } = event.detail;
+app.get('/api/callback/:userId', async (req, res) => {
+  // 1. Lấy dữ liệu từ tham số
+  const { userId } = req.params; // Đây là ID lấy từ URL (ví dụ: 4f4b144d-...)
+  const { link_token, external_id } = req.query; // external_id bây giờ là "user_ID_9999"
 
-      console.log('🤖 Chatbox tập trung nhận được tin nhắn hệ thống:', text);
+  console.log('🚨 ĐÃ NHẬN CALLBACK');
+  console.log('- User ID gốc:', userId);
+  console.log('- External ID nhận từ SePay:', external_id);
 
-      // 1. Thêm tin nhắn mới vào danh sách
-      setMessages((prev) => {
-        // Chốt chặn chống trùng tin nhắn trong 1 giây
-        if (prev.length > 0 && prev[prev.length - 1].content === text) {
-          return prev;
-        }
-        
-        return [
-          ...prev,
-          {
-            id: Date.now(),
-            role: isUser ? 'user' : 'model',
-            content: text,
-            timestamp: new Date(),
-          },
-        ];
-      });
+  if (!link_token || !userId) {
+    return res.status(400).send('Thiếu thông tin từ SePay');
+  }
 
-      // 2. Phát âm thanh "Ting Ting"
-      if (hasInteractedRef.current) {
-        audioRef.current?.play().catch(() => {});
-      }
+  try {
+    // ... (Giữ nguyên đoạn lấy Access Token của em) ...
+    // ... (Giữ nguyên đoạn gọi API link-token/${link_token} của em) ...
 
-      // 3. Tự động load lại số liệu (Stats) để Dashboard cập nhật số tiền mới
-      initChatData(); 
-    };
+    // 2. Lấy thông tin ngân hàng
+    const responseData = accountDetailRes.data.data || accountDetailRes.data;
+    const bankAccount = responseData.bank_account;
+    const accName = `${bankAccount.bank_name} - ${bankAccount.account_number}`;
 
-    // Đăng ký nghe sự kiện 'ai_add_message' phát ra từ NotificationCenter
-    window.addEventListener('ai_add_message', handleBankMessage);
+    // 3. LƯU VÀO DATABASE
+    // QUAN TRỌNG: Dùng chính cái userId từ req.params để lưu
+    await pool.query(
+      `INSERT INTO account_service.accounts (user_id, account_name, balance, type, currency)
+       VALUES ($1, $2, 0, 'bank', 'VND')
+       ON CONFLICT (user_id, account_name) DO UPDATE SET updated_at = NOW()`,
+      [userId, accName], // Lưu đúng ID gốc của Bảo vào DB
+    );
 
-    return () => {
-      // Hủy nghe khi Bảo chuyển trang khác
-      window.removeEventListener('ai_add_message', handleBankMessage);
-    };
-  }, []); // [] để chỉ chạy 1 lần khi mở trang
+    console.log('✅ THÀNH CÔNG: Đã lưu tài khoản', accName);
+    res.redirect('https://ba-da-fu-ta-food.vercel.app?status=linked_success');
+  } catch (err) {
+    console.error('❌ Lỗi:', err.message);
+    res.redirect('https://ba-da-fu-ta-food.vercel.app?status=linked_failed');
+  }
+});
