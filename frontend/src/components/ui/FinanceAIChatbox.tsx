@@ -128,6 +128,49 @@ export function FinanceAIChatbox() {
     }
   };
 
+  //LẮNG NGHE THÔNG BÁO NGÂN HÀNG ĐỂ TỰ ĐỘNG HIỆN TIN NHẮN ---
+  useEffect(() => {
+    const handleBankMessage = (event: any) => {
+      const { text, isUser } = event.detail;
+
+      console.log('🤖 Chatbox tập trung nhận được tin nhắn hệ thống:', text);
+
+      // 1. Thêm tin nhắn mới vào danh sách
+      setMessages((prev) => {
+        // Chốt chặn chống trùng tin nhắn trong 1 giây
+        if (prev.length > 0 && prev[prev.length - 1].content === text) {
+          return prev;
+        }
+
+        return [
+          ...prev,
+          {
+            id: Date.now(),
+            role: isUser ? 'user' : 'model',
+            content: text,
+            timestamp: new Date(),
+          },
+        ];
+      });
+
+      // 2. Phát âm thanh "Ting Ting"
+      if (hasInteractedRef.current) {
+        audioRef.current?.play().catch(() => {});
+      }
+
+      // 3. Tự động load lại số liệu (Stats) để Dashboard cập nhật số tiền mới
+      initChatData();
+    };
+
+    // Đăng ký nghe sự kiện 'ai_add_message' phát ra từ NotificationCenter
+    window.addEventListener('ai_add_message', handleBankMessage);
+
+    return () => {
+      // Hủy nghe khi Bảo chuyển trang khác
+      window.removeEventListener('ai_add_message', handleBankMessage);
+    };
+  }, []); // [] để chỉ chạy 1 lần khi mở trang
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading, showVoicePreview]);
@@ -245,13 +288,9 @@ export function FinanceAIChatbox() {
               <Brain className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h3 className="text-white font-bold text-sm tracking-wide">
-                Money Guard
-              </h3>
+              <h3 className="text-white font-bold text-sm tracking-wide">Money Guard</h3>
               <p className="text-[10px] text-white/70">
-                {onlineCount > 0
-                  ? `${onlineCount} model online`
-                  : 'Đang kết nối...'}
+                {onlineCount > 0 ? `${onlineCount} model online` : 'Đang kết nối...'}
               </p>
             </div>
           </div>
@@ -264,9 +303,7 @@ export function FinanceAIChatbox() {
               className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 border border-white/25 rounded-lg px-2.5 py-1.5 transition-all"
             >
               <Cpu className="w-3.5 h-3.5 text-white" />
-              <span className="text-[11px] font-semibold text-white">
-                {selectedModelLabel}
-              </span>
+              <span className="text-[11px] font-semibold text-white">{selectedModelLabel}</span>
               <ChevronDown className="w-3 h-3 text-white/70" />
             </button>
 
@@ -274,9 +311,14 @@ export function FinanceAIChatbox() {
               <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-1.5 z-50 animate-in fade-in slide-in-from-top-2">
                 <button
                   type="button"
-                  onClick={() => { setSelectedModel('auto'); setShowModelPicker(false); }}
+                  onClick={() => {
+                    setSelectedModel('auto');
+                    setShowModelPicker(false);
+                  }}
                   className={`w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm transition hover:bg-orange-50 ${
-                    selectedModel === 'auto' ? 'bg-orange-50 text-orange-600 font-semibold' : 'text-gray-700'
+                    selectedModel === 'auto'
+                      ? 'bg-orange-50 text-orange-600 font-semibold'
+                      : 'text-gray-700'
                   }`}
                 >
                   <Sparkles className="w-4 h-4 text-orange-400" />
@@ -290,21 +332,30 @@ export function FinanceAIChatbox() {
                     key={m.name}
                     type="button"
                     disabled={m.status !== 'online'}
-                    onClick={() => { setSelectedModel(m.name); setShowModelPicker(false); }}
+                    onClick={() => {
+                      setSelectedModel(m.name);
+                      setShowModelPicker(false);
+                    }}
                     className={`w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm transition ${
-                      m.status !== 'online'
-                        ? 'opacity-40 cursor-not-allowed'
-                        : 'hover:bg-orange-50'
+                      m.status !== 'online' ? 'opacity-40 cursor-not-allowed' : 'hover:bg-orange-50'
                     } ${
-                      selectedModel === m.name ? 'bg-orange-50 text-orange-600 font-semibold' : 'text-gray-700'
+                      selectedModel === m.name
+                        ? 'bg-orange-50 text-orange-600 font-semibold'
+                        : 'text-gray-700'
                     }`}
                   >
-                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                      m.status === 'online' ? 'bg-green-500' : 'bg-gray-300'
-                    }`} />
+                    <span
+                      className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                        m.status === 'online' ? 'bg-green-500' : 'bg-gray-300'
+                      }`}
+                    />
                     <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{m.name.split('-').pop()?.toUpperCase()}</p>
-                      <p className="text-[10px] text-gray-400">{m.status === 'online' ? 'Sẵn sàng' : 'Offline'}</p>
+                      <p className="text-sm font-medium truncate">
+                        {m.name.split('-').pop()?.toUpperCase()}
+                      </p>
+                      <p className="text-[10px] text-gray-400">
+                        {m.status === 'online' ? 'Sẵn sàng' : 'Offline'}
+                      </p>
                     </div>
                   </button>
                 ))}
@@ -442,9 +493,16 @@ export function FinanceAIChatbox() {
         {/* Image Preview */}
         {imagePreview && (
           <div className="mb-3 relative inline-block">
-            <img src={imagePreview} className="h-16 rounded-lg border border-gray-200" alt="preview" />
+            <img
+              src={imagePreview}
+              className="h-16 rounded-lg border border-gray-200"
+              alt="preview"
+            />
             <button
-              onClick={() => { setSelectedImage(null); setImagePreview(null); }}
+              onClick={() => {
+                setSelectedImage(null);
+                setImagePreview(null);
+              }}
               className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center"
             >
               <X size={12} />

@@ -36,6 +36,11 @@ export function MainLayout() {
   // Kiểm tra nếu đang ở trang trợ lý AI thì không hiện nút nổi
   const isChatPage = location.pathname === '/chatbox';
 
+  // Tạo link Telegram linh động dựa trên user_id của người đang đăng nhập
+  const telegramBotLink = user?.user_id
+    ? `https://t.me/truongquocbao_bot?start=${user.user_id}`
+    : `https://t.me/truongquocbao_bot`;
+
   useEffect(() => {
     socketService.connect();
 
@@ -185,7 +190,16 @@ export function MainLayout() {
       <div className="lg:pl-[300px]">
         {/* Header Desktop - Để hiện thông báo ở góc phải trên cùng màn hình máy tính */}
         <header className="hidden lg:flex sticky top-0 z-30 h-16 items-center justify-end px-8 bg-transparent">
-           <NotificationCenter />
+          <a
+            href={telegramBotLink}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-2 px-4 py-2 bg-white/70 backdrop-blur-md border border-blue-100 rounded-full text-blue-600 hover:bg-blue-500 hover:text-white transition-all text-sm font-bold shadow-sm"
+          >
+            <i className="fa-brands fa-telegram text-lg"></i>
+            <span>Nhận tin qua Telegram</span>
+          </a>
+          <NotificationCenter />
         </header>
 
         <header className="sticky top-0 z-30 bg-white shadow-sm lg:hidden">
@@ -199,7 +213,10 @@ export function MainLayout() {
             </button>
 
             <span className="font-semibold !text-gray-900">Tài chính</span>
-
+            {/* Icon Telegram cho Mobile */}
+            <a href={telegramBotLink} target="_blank" className="text-blue-500">
+              <i className="fa-brands fa-telegram text-2xl"></i>
+            </a>
             {/* HIỆN CHUÔNG THÔNG BÁO Ở MOBILE - Thay cho div w-10 */}
             <NotificationCenter />
           </div>
