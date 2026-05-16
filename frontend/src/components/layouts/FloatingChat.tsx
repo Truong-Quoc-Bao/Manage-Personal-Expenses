@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { marked } from 'marked';
-import { formatMoney, formatDateTime } from '../../utils/format.ts';
+import { formatMessageTime, formatMoney, formatDateTime } from '../../utils/format.ts';
 import { chatApi, statsApi } from '../../api/ai.api';
 
 // --- Interface chuẩn hóa ---
@@ -32,6 +32,7 @@ interface Message {
     cost: number;
     usage?: any;
   };
+  timestamp: Date;
 }
 
 interface AIModel {
@@ -170,6 +171,7 @@ export function FloatingChat() {
         {
           role: isUser ? 'user' : 'model',
           content: text,
+          timestamp: new Date(),
         },
       ]);
 
@@ -210,9 +212,11 @@ export function FloatingChat() {
         statsApi.getStats(),
       ]);
 
-      const history = histRes.data.map((m: any) => ({
+      const history = histRes.data.map((m: any, idx: number) => ({
+        id: m.id || `hist-${idx}`, // Nên dùng id từ DB nếu có
         role: m.role === 'user' ? 'user' : 'model',
         content: m.message.replace(/<.*?>[\s\S]*?<\/.*?>/gs, '').trim(),
+        timestamp: m.created_at ? new Date(m.created_at) : new Date(),
       }));
 
       setMessages(
@@ -220,8 +224,10 @@ export function FloatingChat() {
           ? history
           : [
               {
+                id: 'welcome',
                 role: 'model',
-                content: 'Xin chào! Money Guard đây, hôm nay bạn muốn ghi sổ món gì nào?',
+                content: 'Xin chào! Tôi là Money Guard. Bạn cần soi ví hay ghi sổ món gì không?',
+                timestamp: new Date(),
               },
             ],
       );
@@ -289,6 +295,7 @@ export function FloatingChat() {
 
     // Lấy danh sách category từ expenseCategories (vì gợi ý thường tập trung vào chi tiêu)
     const categories = stats.expenseCategories || [];
+    const budgets = stats.budgets || [];
 
     const now = new Date();
     const day = now.getDate();
@@ -296,7 +303,16 @@ export function FloatingChat() {
     const month = now.getMonth() + 1;
     const year = now.getFullYear();
 
-    // --- 1. NHÓM: NGƯỜI MỚI (CHƯA CÓ DỮ LIỆU) ---
+    // --- 1. NHÓM QUẢN LÝ DANH MỤC & NGÂN SÁCH (MỚI) ---
+    sug.push({ icon: 'fa-plus', text: 'Tạo danh mục chi tiêu mới' });
+
+    if (budgets.length === 0) {
+      sug.push({ icon: 'fa-wallet', text: 'Đặt ngân sách tháng này' });
+    } else {
+      sug.push({ icon: 'fa-chart-pie', text: 'Tháng này tôi đã dùng bao nhiêu ngân sách?' });
+    }
+
+    // --- 2. NHÓM: NGƯỜI MỚI (CHƯA CÓ DỮ LIỆU) ---
     if (income === 0 && expense === 0) {
       return [
         { icon: 'fa-rocket', text: 'Bắt đầu hành trình tiết kiệm' },
@@ -304,10 +320,12 @@ export function FloatingChat() {
         { icon: 'fa-camera', text: 'Chụp thử 1 hóa đơn cafe' },
         { icon: 'fa-circle-question', text: 'Money Guard làm được những gì?' },
         { icon: 'fa-user-shield', text: 'Dữ liệu của tôi có an toàn không?' },
+        { icon: 'fa-plus', text: 'Tạo danh mục chi tiêu đầu tiên' },
+        { icon: 'fa-wallet', text: 'Thiết lập ngân sách tháng' },
       ].slice(0, 6);
     }
 
-    // --- 2. NHÓM: CẢNH BÁO TÀI CHÍNH (ÂM TIỀN/SẮP HẾT TIỀN) ---
+    // --- 3. NHÓM: CẢNH BÁO TÀI CHÍNH (ÂM TIỀN/SẮP HẾT TIỀN) ---
     if (balance < 0) {
       sug.push({ icon: 'fa-skull-crossbones', text: 'Kế hoạch trả nợ khẩn cấp' });
       sug.push({ icon: 'fa-hand-holding-dollar', text: 'Tìm nguồn thu nhập bổ sung' });
@@ -316,14 +334,14 @@ export function FloatingChat() {
       sug.push({ icon: 'fa-triangle-exclamation', text: 'Cảnh báo: Sắp chạm đáy ví!' });
     }
 
-    // --- 3. NHÓM: NGƯỜI GIÀU (DƯ NHIỀU TIỀN) ---
+    // --- 4. NHÓM: NGƯỜI GIÀU (DƯ NHIỀU TIỀN) ---
     if (balance > 10000000) {
       sug.push({ icon: 'fa-coins', text: 'Gợi ý kênh đầu tư an toàn' });
       sug.push({ icon: 'fa-gem', text: 'Tôi có thể mua gì tự thưởng cho mình?' });
       sug.push({ icon: 'fa-arrow-up-right-dots', text: 'Làm sao để tiền đẻ ra tiền?' });
     }
 
-    // --- 4. NHÓM: THEO THỜI GIAN TRONG NGÀY ---
+    // --- 5. NHÓM: THEO THỜI GIAN TRONG NGÀY ---
     if (hour < 10) {
       sug.push({ icon: 'fa-mug-saucer', text: 'Kế hoạch chi tiêu hôm nay' });
     } else if (hour > 21) {
@@ -331,7 +349,7 @@ export function FloatingChat() {
       sug.push({ icon: 'fa-bed', text: 'Ngày mai nên tiêu tối đa bao nhiêu?' });
     }
 
-    // --- 5. NHÓM: THEO CHU KỲ THÁNG (ĐẦU/CUỐI THÁNG) ---
+    // --- 6. NHÓM: THEO CHU KỲ THÁNG (ĐẦU/CUỐI THÁNG) ---
     const daysInMonth = new Date(year, month, 0).getDate();
     if (day <= 5) {
       sug.push({ icon: 'fa-flag', text: `Lập ngân sách cho tháng ${month}` });
@@ -341,11 +359,14 @@ export function FloatingChat() {
       sug.push({ icon: 'fa-file-invoice-dollar', text: 'Dự báo số dư cuối tháng' });
     }
 
-    // --- 6. NHÓM: THEO THÓI QUEN (DANH MỤC) ---
+    // --- 7. NHÓM: THEO THÓI QUEN (DANH MỤC) ---
     if (categories.length > 0) {
       // Tìm hạng mục chi nhiều nhất
       const topCat = [...categories].sort((a, b) => b.amount - a.amount)[0];
       const name = (topCat.category_name || '').toLowerCase();
+
+      sug.push({ icon: 'fa-pen', text: `Sửa tên danh mục ${name}` });
+      sug.push({ icon: 'fa-trash', text: `Xóa danh mục không cần thiết` });
 
       if (name.includes('ăn') || name.includes('food')) {
         sug.push({ icon: 'fa-utensils', text: 'Cắt giảm tiền ăn uống thế nào?' });
@@ -361,12 +382,12 @@ export function FloatingChat() {
       }
     }
 
-    // --- 7. NHÓM: TRUY VẤN DỮ LIỆU THÔNG MINH ---
+    // --- 8. NHÓM: TRUY VẤN DỮ LIỆU THÔNG MINH ---
     sug.push({ icon: 'fa-magnifying-glass-chart', text: 'So sánh với tuần trước' });
     sug.push({ icon: 'fa-bolt', text: 'Khoản chi nào bất thường nhất?' });
     sug.push({ icon: 'fa-calendar-days', text: 'Thứ mấy tôi tiêu nhiều nhất?' });
 
-    // --- 8. NHÓM: TRUYỀN CẢM HỨNG (MOTIVATION) ---
+    // --- 9. NHÓM: TRUYỀN CẢM HỨNG (MOTIVATION) ---
     sug.push({ icon: 'fa-quote-left', text: 'Lời khuyên tài chính hôm nay' });
     sug.push({ icon: 'fa-trophy', text: 'Thử thách 7 ngày không trà sữa' });
 
@@ -884,6 +905,7 @@ export function FloatingChat() {
             usage: aiInfo.usage,
           }
         : undefined,
+      timestamp: new Date(),
     };
 
     setMessages((prev) => [...prev, newMessage]);
@@ -1022,6 +1044,7 @@ export function FloatingChat() {
       role: 'user',
       content: message || (file ? '🖼️ Phân tích hình ảnh này giúp mình...' : ''),
       image: imagePreview || undefined,
+      timestamp: new Date(),
     };
     setMessages((prev) => [...prev, userMsg]);
 
@@ -1074,6 +1097,7 @@ export function FloatingChat() {
             cost: data.cost || 0,
             usage: data.usage,
           },
+          timestamp: new Date(),
         },
       ]);
 
@@ -1112,6 +1136,7 @@ export function FloatingChat() {
         {
           role: 'model',
           content: `🚨 Lỗi: ${err.message || 'Server bận'}. Bạn thử lại nhé!`,
+          timestamp: new Date(),
         },
       ]);
     } finally {
@@ -1177,6 +1202,13 @@ export function FloatingChat() {
     console.log('🎉 Money Guard Dashboard đã sẵn sàng!');
   }
 
+  // check bao nhiêu con online
+  const onlineCount = aiModels.filter((m) => m.status === 'online').length;
+  const selectedModelLabel =
+    selectedModel === 'auto'
+      ? 'Auto'
+      : selectedModel.split('-').pop()?.toUpperCase() || selectedModel;
+
   // XỬ LÝ SỰ KIỆN LOAD (Đảm bảo chạy đúng dù là React hay HTML tĩnh)
   if (document.readyState === 'complete') {
     initializeMoneyGuard();
@@ -1201,9 +1233,9 @@ export function FloatingChat() {
                 <h2 className="font-bold text-[15px] leading-tight">Money Guard AI</h2>
                 <div className="flex items-center space-x-1">
                   <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
-                  <span className="text-[10px] text-white/70 font-medium tracking-wide">
-                    AI Active
-                  </span>
+                  <p className="text-[10px] text-white/70">
+                    {onlineCount > 0 ? `${onlineCount} model online` : 'Đang kết nối...'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -1306,6 +1338,10 @@ export function FloatingChat() {
                     </div>
                   </div>
                 )}
+                <span className="text-[9px] text-gray-400 mt-1 tracking-tight">
+                  {/* {msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} */}
+                  {formatMessageTime(msg.timestamp)}
+                </span>
               </div>
             ))}
             {isLoading && (

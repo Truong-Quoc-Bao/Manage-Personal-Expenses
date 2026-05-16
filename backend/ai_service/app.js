@@ -170,6 +170,7 @@ app.post('/webhook/bank-transfer', async (req, res) => {
 
     // --- NẾU LÀ NGÂN HÀNG THẬT THÌ MỚI CHẠY TIẾP XUỐNG DƯỚI ---
 
+    const currentUserName = await getUserName(userId);
     const finalAmount = parseFloat(
       transferAmount || transfer_amount || amount_out || amount_in || 0,
     );
@@ -183,7 +184,34 @@ app.post('/webhook/bank-transfer', async (req, res) => {
 
     console.log(`💰 [${transactionType.toUpperCase()}] Số tiền: ${finalAmount}đ`);
 
-    // 2. NHỜ AI PHÂN LOẠI (Gửi thêm ngữ cảnh là Tiền vào hay Tiền ra)
+    // 1. Tìm tài khoản của User (lấy cái đầu tiên nếu có nhiều)
+    let accRes = await pool.query(
+      'SELECT account_id, balance FROM account_service.accounts WHERE user_id = $1 LIMIT 1',
+      [userId],
+    );
+
+    let accountId;
+    // Nếu chưa có tài khoản, tạo mới cho user
+    if (accRes.rows.length === 0) {
+      const newAcc = await pool.query(
+        `INSERT INTO account_service.accounts (user_id, account_name, balance, type, currency) 
+         VALUES ($1, $2, 0, 'bank', 'VND') RETURNING account_id`,
+        [userId, 'Tài khoản mặc định'],
+      );
+      accountId = newAcc.rows[0].account_id;
+    } else {
+      accountId = accRes.rows[0].account_id;
+    }
+
+    // 2. Cập nhật số dư (Balance) trong bảng accounts
+    // Nếu tiền vào (Income) thì cộng, nếu tiền ra (Expense) thì trừ
+    const balanceChange = isIncome ? finalAmount : -finalAmount;
+    await pool.query(
+      'UPDATE account_service.accounts SET balance = balance + $1, updated_at = NOW() WHERE account_id = $2',
+      [balanceChange, accountId],
+    );
+
+    // NHỜ AI PHÂN LOẠI (Gửi thêm ngữ cảnh là Tiền vào hay Tiền ra)
     const model = genAI.getGenerativeModel({ model: 'gemini-flash-lite-latest' });
 
     const promptBankAI = `
@@ -201,7 +229,7 @@ app.post('/webhook/bank-transfer', async (req, res) => {
         (Ví dụ: "NGUYEN VAN A CHUYEN TIEN 123456" -> "${
           isIncome ? 'Nguyễn Văn A chuyển tiền' : 'Chuyển tiền cho Nguyễn Văn A'
         }")
-2. "category_name": Phân loại danh mục tự động. Dựa vào chiều giao dịch, hãy áp dụng quy tắc:
+      2. "category_name": Phân loại danh mục tự động. Dựa vào chiều giao dịch, hãy áp dụng quy tắc:
         ${
           isIncome
             ? '=> Đây là TIỀN VÀO: Hãy phân loại vào một trong các danh mục: "Lương", "Người khác chuyển", "Tiền thưởng", "Thu nhập khác".'
@@ -259,8 +287,8 @@ app.post('/webhook/bank-transfer', async (req, res) => {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
         // 1,
-        'd4ffbef0-8bcc-445e-9ea3-7bc854e2ad76',
-        // targetAccountId,
+        // 'd4ffbef0-8bcc-445e-9ea3-7bc854e2ad76',
+        accountId,
         categoryId,
         finalAmount,
         transactionType,
@@ -274,11 +302,11 @@ app.post('/webhook/bank-transfer', async (req, res) => {
     // 4. THÔNG BÁO THÔNG MINH (Thay đổi câu chữ dựa trên isIncome)
     let notificationMsg = '';
     if (isIncome) {
-      notificationMsg = `💰 **Ting ting!** Money Guard thấy Bảo vừa **nhận được** **${finalAmount.toLocaleString()}đ** từ "${
+      notificationMsg = `💰 **Ting ting!** Money Guard thấy ${currentUserName} vừa **nhận được** **${finalAmount.toLocaleString()}đ** từ "${
         aiData.clean_name
-      }". Chúc mừng Bảo có thêm thu nhập! 🥳`;
+      }". Chúc mừng ${currentUserName} có thêm thu nhập! 🥳`;
     } else {
-      notificationMsg = `💸 **Ting ting!** Money Guard thấy Bảo vừa **chuyển đi** **${finalAmount.toLocaleString()}đ** cho "${
+      notificationMsg = `💸 **Ting ting!** Money Guard thấy ${currentUserName} vừa **chuyển đi** **${finalAmount.toLocaleString()}đ** cho "${
         aiData.clean_name
       }". Đã ghi vào sổ rồi nhé!`;
     }
@@ -290,16 +318,16 @@ app.post('/webhook/bank-transfer', async (req, res) => {
     // 1. Lấy sức khỏe tài chính thực tế từ Database
     const health = await getProactiveContext(userId);
 
-    // 2. Moni tự động "soi" dữ liệu để đưa ra lời khuyên "đanh đá"
+    // 2. Money Guard tự động "soi" dữ liệu để đưa ra lời khuyên "đanh đá"
     let proactiveMsg = '';
     if (health.status.includes('🔴')) {
-      proactiveMsg = `\n\n🚨 **TỔNG BÁO ĐỘNG**: Bảo ơi, hiện tại Bảo đang TIÊU VƯỢT THU NHẬP rồi! Cất ngay cái thẻ đi trước khi cái ví "đăng xuất" khỏi trái đất! 😤`;
+      proactiveMsg = `\n\n🚨 **TỔNG BÁO ĐỘNG**: ${currentUserName} ơi, hiện tại ${currentUserName} đang TIÊU VƯỢT THU NHẬP rồi! Cất ngay cái thẻ đi trước khi cái ví "đăng xuất" khỏi trái đất! 😤`;
     } else if (health.daysToEmpty <= 5 && health.balance > 0) {
-      proactiveMsg = `\n\n⚠️ **CẢNH BÁO ĐÓI KÉM**: Với đà này Bảo chỉ còn đủ tiền sống trong **${health.daysToEmpty} ngày** nữa thôi. Chuẩn bị tinh thần ăn mì tôm cả tháng nhé! 🍜`;
+      proactiveMsg = `\n\n⚠️ **CẢNH BÁO ĐÓI KÉM**: Với đà này ${currentUserName} chỉ còn đủ tiền sống trong **${health.daysToEmpty} ngày** nữa thôi. Chuẩn bị tinh thần ăn mì tôm cả tháng nhé! 🍜`;
     } else if (finalAmount > 1000000 && transactionType === 'expense') {
-      proactiveMsg = `\n\n💸 **XÀI SANG QUÁ**: Món này tận **${finalAmount.toLocaleString()}đ**, Bảo có thực sự cần nó không hay chỉ là nhất thời? Suy nghĩ kỹ đi nhé! 🤔`;
+      proactiveMsg = `\n\n💸 **XÀI SANG QUÁ**: Món này tận **${finalAmount.toLocaleString()}đ**, ${currentUserName} có thực sự cần nó không hay chỉ là nhất thời? Suy nghĩ kỹ đi nhé! 🤔`;
     } else {
-      proactiveMsg = `\n\n✅ **TỐT LẮM**: Duy trì phong độ này nhé Bảo, hiện Bảo vẫn còn sống sót được thêm **${health.daysToEmpty} ngày** nữa. Tiết kiệm là quốc sách! 💎`;
+      proactiveMsg = `\n\n✅ **TỐT LẮM**: Duy trì phong độ này nhé ${currentUserName}, hiện ${currentUserName} vẫn còn sống sót được thêm **${health.daysToEmpty} ngày** nữa. Tiết kiệm là quốc sách! 💎`;
     }
 
     // 3. Gộp nội dung thông báo gốc + Lời cảnh báo chủ động của AI
@@ -350,7 +378,7 @@ function requireUserId(req, res) {
 }
 
 // --- API LẤY THỐNG KÊ CHO DASHBOARD ---
-app.get('/api/stats', async (req, res) => {
+app.get('/stats', async (req, res) => {
   try {
     const userId = requireUserId(req, res);
     if (!userId) {
@@ -412,7 +440,7 @@ app.get('/api/stats', async (req, res) => {
 });
 
 // API lấy danh sách ngân sách tháng hiện tại
-app.get('/api/budgets', async (req, res) => {
+app.get('/budgets', async (req, res) => {
   try {
     const userId = requireUserId(req, res);
     if (!userId) {
@@ -443,7 +471,7 @@ app.get('/api/budgets', async (req, res) => {
 });
 
 // api giao dịch gần đây
-app.get('/api/recent-transactions', async (req, res) => {
+app.get('/recent-transactions', async (req, res) => {
   try {
     const userId = requireUserId(req, res);
     if (!userId) {
@@ -476,7 +504,7 @@ app.get('/api/recent-transactions', async (req, res) => {
 });
 
 // all giao dịch
-app.get('/api/all-transactions', async (req, res) => {
+app.get('/all-transactions', async (req, res) => {
   try {
     const userId = requireUserId(req, res);
     if (!userId) return;
@@ -517,7 +545,7 @@ app.get('/chat-history', async (req, res) => {
       return;
     }
     const result = await pool.query(
-      'SELECT role, message FROM ai_service.message_history WHERE user_id = $1 ORDER BY created_at ASC',
+      'SELECT role, message, created_at FROM ai_service.message_history WHERE user_id = $1 ORDER BY created_at ASC',
       [userId],
     );
     res.json(result.rows);
@@ -607,7 +635,7 @@ async function addNotification(message, userId) {
 }
 
 // API Lấy thông báo (Lấy hết, không lọc is_read để không bị mất tin khi load lại)
-app.get('/api/notifications', async (req, res) => {
+app.get('/notifications', async (req, res) => {
   try {
     const userId = requireUserId(req, res);
     if (!userId) {
@@ -624,7 +652,7 @@ app.get('/api/notifications', async (req, res) => {
 });
 
 // API Đánh dấu đã đọc (Lưu ý đường dẫn phải có :id)
-app.post('/api/notifications/read/:id', async (req, res) => {
+app.post('/notifications/read/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const userId = requireUserId(req, res);
@@ -642,7 +670,7 @@ app.post('/api/notifications/read/:id', async (req, res) => {
   }
 });
 // Route 2: Đánh dấu đọc TẤT CẢ (Không cần ID)
-app.post('/api/notifications/read-all', async (req, res) => {
+app.post('/notifications/read-all', async (req, res) => {
   const userId = requireUserId(req, res);
   if (!userId) {
     return;
@@ -655,7 +683,7 @@ app.post('/api/notifications/read-all', async (req, res) => {
 
 // API xoá tin thông báo
 // Xóa 1 tin cụ thể theo ID
-app.delete('/api/notifications/delete/:id', async (req, res) => {
+app.delete('/notifications/delete/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -674,7 +702,7 @@ app.delete('/api/notifications/delete/:id', async (req, res) => {
 });
 
 // Xóa tất cả thông báo của người dùng
-app.delete('/api/notifications/delete-all', async (req, res) => {
+app.delete('/notifications/delete-all', async (req, res) => {
   try {
     const userId = requireUserId(req, res);
     if (!userId) {
@@ -746,12 +774,12 @@ async function getProactiveContext(userId) {
 }
 
 // --- API TẠO LINK LIÊN KẾT (CHỈNH THEO CHUẨN SEPAY) ---
-app.get('/api/create-bank', async (req, res) => {
+app.get('/create-bank', async (req, res) => {
+  const userId = requireUserId(req, res);
+  if (!userId) {
+    return;
+  }
   try {
-    const userId = requireUserId(req, res);
-    if (!userId) {
-      return;
-    }
     const companyXid = process.env.BANKHUB_COMPANY_XID;
 
     if (!companyXid) {
@@ -760,7 +788,6 @@ app.get('/api/create-bank', async (req, res) => {
 
     const clientId = process.env.BANKHUB_CLIENT_ID;
     const clientSecret = process.env.BANKHUB_CLIENT_SECRET;
-
     const authString = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
     const headers = {
@@ -814,14 +841,19 @@ app.get('/api/create-bank', async (req, res) => {
       json: {
         company_xid: companyXid,
         purpose: 'LINK_BANK_ACCOUNT',
-        completion_redirect_uri: 'https://badafuta.com/api/callback',
-        external_id: `user_${userId}`,
+        // callback về back end nếu deploy
+        // còn đây là link localtunnel test
+        completion_redirect_uri: `https://unnibbed-unthrilled-averi.ngrok-free.dev/api/callback/${userId}`,
+        // completion_redirect_uri: `https://aercg-171-236-49-110.run.pinggy-free.link /api/callback/${userId}`,
+        // external_id: `user_${userId}`,
+        external_id: `user_${userId}_${Math.floor(Math.random() * 999999)}`,
       },
       responseType: 'json',
       https: { rejectUnauthorized: false },
     });
 
     console.log('✅ Tạo link thành công!');
+    console.log('🔍 linkRes.body:', JSON.stringify(linkRes.body, null, 2));
 
     return res.json({
       url: linkRes.body.hosted_link_url,
@@ -840,17 +872,159 @@ app.get('/api/create-bank', async (req, res) => {
   }
 });
 
+// ✅ THÊM MỚI: Route nhận data từ postMessage của iframe Bankhub
+// Frontend gọi sau khi nhận event FINISHED_BANK_ACCOUNT_LINK
+app.post('/save-bank-account', async (req, res) => {
+  const userId = requireUserId(req, res);
+  if (!userId) return;
+
+  console.log('user bank', userId);
+  const { account_number, account_type, bank_name } = req.body;
+
+  console.log('💾 Nhận data từ postMessage:', { account_number, account_type, bank_name });
+
+  if (!account_number) {
+    return res.status(400).json({ error: 'Thiếu account_number' });
+  }
+
+  try {
+    // Ghép tên tài khoản: "Tên ngân hàng - Số tài khoản" hoặc chỉ số tài khoản nếu không có bank_name
+    const accName = bank_name ? `${bank_name} - ${account_number}` : account_number;
+
+    const insertAccQuery = `
+      INSERT INTO account_service.accounts 
+      (user_id, account_name, balance, type, currency) 
+      VALUES ($1, $2, 0, 'bank', 'VND')
+      ON CONFLICT (user_id, account_name) DO NOTHING 
+      RETURNING account_id`;
+
+    const result = await pool.query(insertAccQuery, [userId, accName]);
+
+    if (result.rows.length === 0) {
+      console.log('⚠️ Tài khoản đã tồn tại, bỏ qua:', accName);
+      return res.json({ success: true, message: 'Tài khoản đã tồn tại' });
+    }
+
+    console.log('✅ Đã lưu tài khoản:', accName, '| account_id:', result.rows[0].account_id);
+    return res.json({ success: true, account_id: result.rows[0].account_id });
+  } catch (err) {
+    console.error('❌ Lỗi lưu DB:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+//
+//
+//
+
+// callback — dùng làm fallback phòng khi Sepay vẫn redirect
+// Nhưng fix lại: không báo 400 ngay, log hết ra để debug rồi redirect về dashboard
+app.get('/api/callback/:userId', async (req, res) => {
+  const { userId } = req.params;
+  const { link_token, external_id } = req.query;
+
+  console.log('🚨 ĐÃ NHẬN CALLBACK');
+  console.log('- User ID gốc:', userId);
+  console.log('- External ID nhận từ SePay:', external_id);
+
+  if (!userId) {
+    console.warn('⚠️ Không có userId trong callback');
+    return res.redirect(
+      'https://absolutely-elliott-sealed-owners.trycloudflare.com/dashboard?error=missing_user',
+    );
+  }
+
+  // Không có link_token → data đã lưu qua postMessage rồi, redirect luôn
+  if (!link_token) {
+    console.log('ℹ️ Không có link_token — data đã lưu qua postMessage, redirect về dashboard');
+    return res.redirect(
+      'https://absolutely-elliott-sealed-owners.trycloudflare.com/dashboard?status=linked_success',
+    );
+  }
+
+  // Có link_token → fetch thêm data từ Bankhub rồi lưu DB
+  try {
+    console.log(`🔗 [CALLBACK] Đang xử lý liên kết cho User: ${userId}`);
+
+    const clientId = process.env.BANKHUB_CLIENT_ID;
+    const clientSecret = process.env.BANKHUB_CLIENT_SECRET;
+    const authString = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+
+    const tokenRes = await got.post('https://bankhub-api-sandbox.sepay.vn/v1/token', {
+      headers: { Authorization: `Basic ${authString}`, 'Content-Type': 'application/json' },
+      responseType: 'json',
+      https: { rejectUnauthorized: false },
+    });
+    const accessToken = tokenRes.body.access_token;
+
+    const accountDetailRes = await axios.get(
+      `https://bankhub-api-sandbox.sepay.vn/v1/link-token/${link_token}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+
+    console.log('🔍 DATA TỪ BANKHUB TRẢ VỀ:', JSON.stringify(accountDetailRes.data, null, 2));
+
+    const responseData = accountDetailRes.data.data || accountDetailRes.data;
+    const bankAccount = responseData.bank_account;
+
+    if (!bankAccount) {
+      throw new Error('Không tìm thấy thông tin bank_account trong trả về của SePay');
+    }
+
+    const accName = `${bankAccount.bank_name} - ${bankAccount.account_number}`;
+
+    await pool.query(
+      `INSERT INTO account_service.accounts (user_id, account_name, balance, type, currency)
+       VALUES ($1, $2, 0, 'bank', 'VND')
+       ON CONFLICT (user_id, account_name) DO UPDATE SET updated_at = NOW()`,
+      [userId, accName],
+    );
+
+    console.log('✅ Đã lưu tài khoản ngân hàng:', accName);
+    return res.redirect(
+      'https://absolutely-elliott-sealed-owners.trycloudflare.com/dashboard?status=linked_success',
+    );
+  } catch (err) {
+    console.error('❌ Lỗi callback Bankhub:', err.message);
+    return res.redirect(
+      'https://absolutely-elliott-sealed-owners.trycloudflare.com/dashboard?status=linked_failed',
+    );
+  }
+});
+//
+//
+//
 app.post('/chat', upload.single('image'), async (req, res) => {
   try {
-    const { message, model: requestedModel } = req.body;
+    const { message, model: requestedModel, userId: telegramUserId } = req.body;
 
     // const { message } = req.body;
     const imageFile = req.file; // Lấy file ảnh nếu có
-    const currentUserId = requireUserId(req, res);
-    console.log('user trả vô', currentUserId);
-    if (!currentUserId) {
-      return;
+    const apiKey = req.headers['x-api-key'];
+
+    let currentUserId = null;
+    // const currentUserId = requireUserId(req, res);
+
+    // --- SỬA LỖI 2: Đưa logic check API Key lên trước để né requireUserId ---
+    if (apiKey === 'my_super_secret_123') {
+      currentUserId = telegramUserId;
+      console.log('🤖 [TELEGRAM]: Xác thực bằng API Key thành công cho User:', currentUserId);
+    } else {
+      // Chỉ gọi hàm này nếu không phải từ n8n/Telegram
+      currentUserId = requireUserId(req, res);
+
+      // Nếu không có token, hàm requireUserId đã gửi res.status(401) rồi
+      // Chúng ta phải return ngay để không chạy code bên dưới nữa
+      if (!currentUserId) return;
+
+      console.log('💻 [WEB]: Xác thực bằng Token thành công cho User:', currentUserId);
     }
+
+    // Kiểm tra nếu sau cả 2 bước vẫn không có ID (phòng hờ n8n gửi thiếu userId trong body)
+    if (!currentUserId) {
+      return res.status(400).json({ error: 'Missing User ID' });
+    }
+
     const currentUserName = await getUserName(currentUserId);
     // CHẶN NGAY TỪ ĐẦU NẾU LỖI
     if (message.length > 30000) {
@@ -1164,6 +1338,17 @@ app.post('/chat', upload.single('image'), async (req, res) => {
        - XÓA: Nếu ${currentUserName} nói "Xóa món...", hãy tìm ID trong danh sách gần nhất và trả về thẻ: <delete_transaction>{"id": ID}</delete_transaction>
        - SỬA: Nếu ${currentUserName} nói "Sửa món ID... thành...", trả về thẻ: <update_transaction>{"id": ID, "amount": SỐ_TIỀN_MỚI}</update_transaction>. Khi sửa, hãy tự động cập nhật note thành: "Đã điều chỉnh theo yêu cầu của ${currentUserName}".
 
+       THIẾT LẬP NGÂN SÁCH (QUAN TRỌNG): Khi người dùng nói "Đặt ngân sách...", "Hạn mức cho mục X là...", "Tháng này chỉ tiêu Y cho Z"... 
+         => BẠN BẮT BUỘC PHẢI nhả thẻ: <manage_budget>{"category_name": "tên_mục", "amount_limit": số_tiền, "month": ${currentMonth}, "year": ${currentYear}}</manage_budget>
+         => Lưu ý: Phải xuất thẻ này ở CUỐI câu trả lời, không được thiếu!
+       - Nếu người dùng muốn tạo danh mục (VD: "Tạo danh mục X"): 
+         => Trả về thẻ: <manage_category>{"action": "create", "category_name": "X"}</manage_category>
+       - Nếu người dùng muốn sửa tên danh mục (VD: "Đổi tên danh mục X thành Y"):
+         => Trả về thẻ: <manage_category>{"action": "update", "old_name": "X", "new_name": "Y"}</manage_category>
+       - Nếu người dùng muốn xóa danh mục (VD: "Xóa danh mục Z"):
+         => Trả về thẻ: <manage_category>{"action": "delete", "category_name": "Z"}</manage_category>
+       - QUY TẮC THỜI GIAN: Nếu người dùng không nói thời gian (ngày/tháng), mặc định lấy tháng và năm hiện tại: ${currentMonth}/${currentYear}. Nếu người dùng nói khoảng thời gian (VD: "từ 1-5 đến 30-5"), PHẢI kèm thêm trong thẻ: "start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD".
+       
     6. SMART BUDGET: Nếu hạng mục nào ở [Báo cáo hạng mục] ghi "Vượt hạn mức", hãy kích hoạt chế độ "Chửi gắt" ngay lập tức khi ${currentUserName} nhắc đến hạng mục đó.
 
     7. DỰ BÁO TÀI CHÍNH (PREDICTIVE AI): 
@@ -1181,20 +1366,23 @@ app.post('/chat', upload.single('image'), async (req, res) => {
       stats.month
     }]. Khi ${currentUserName} hỏi "Tháng này tiêu bao nhiêu?", "Còn dư bao nhiêu?" -> HÃY ĐỌC DỮ LIỆU ĐÓ VÀ TRẢ LỜI LUÔN. TUYỆT ĐỐI KHÔNG dùng thẻ <query_db>.
     10. CHỈ DÙNG thẻ <query_db> KHI hỏi quá khứ hoặc chi tiết:
-         - "Tháng trước tiêu bao nhiêu?" -> <query_db>{"type": "total_spending", "month": ${
-           currentMonth - 1
-         }, "year": ${currentYear}}</query_db>
-         - "Tháng này ăn uống mấy lần?" -> <query_db>{"type": "category_spending", "category": "ăn uống", "month": ${currentMonth}, "year": ${currentYear}}</query_db>
-
-    Nếu ${currentUserName} vừa nhập một món đồ mà trong 7 ngày qua ${currentUserName} đã mua món đó hơn 3 lần (ví dụ Trà sữa), bạn PHẢI khịa ${currentUserName} về việc nghiện món này và tính tổng tiền ${currentUserName} đã 'cúng' cho món đó trong tuần.
+       - "Tháng trước tiêu bao nhiêu?" -> <query_db>{"type": "total_spending", "month": ${
+         currentMonth - 1
+       }, "year": ${currentYear}}</query_db>
+       - "Tháng này ăn uống mấy lần?" -> <query_db>{"type": "category_spending", "category": "ăn uống", "month": ${currentMonth}, "year": ${currentYear}}</query_db>
+       - "Hạn mức tiền ăn/xăng/... còn bao nhiêu?", "Tao tiêu lố ngân sách chưa?" -> <query_db>{"type": "budget_check", "category": "tên_hạng_mục", "month": ${currentMonth}, "year": ${currentYear}}</query_db>
+       - "Ngân sách tháng này của tao thế nào?" -> <query_db>{"type": "budget_check", "month": ${currentMonth}, "year": ${currentYear}}</query_db>
     
+    Nếu ${currentUserName} vừa nhập một món đồ mà trong 7 ngày qua ${currentUserName} đã mua món đó hơn 3 lần (ví dụ Trà sữa), bạn PHẢI khịa ${currentUserName} về việc nghiện món này và tính tổng tiền ${currentUserName} đã 'cúng' cho món đó trong tuần.
     Dựa vào số dư ${
       health.balance
     }đ, Money Guard dự báo ${currentUserName} chỉ còn trụ được đến ngày X tháng này. Nếu muốn sống sót đến ngày 30, từ mai ${currentUserName} chỉ được tiêu tối đa Y đồng/ngày thôi!
     
     [CÂU HỎI CỦA ${currentUserName.toUpperCase()}]: "${message}"
 
-    [QUY TẮC PHẢN HỒI]: Trình bày theo phong cách hiện đại, sử dụng icon 🚨, 💸, 🛡️, 📈. Tuyệt đối không để lộ mã JSON rác ra ngoài các thẻ quy định.
+    [QUY TẮC PHẢN HỒI]:
+     Trình bày theo phong cách hiện đại, sử dụng icon 🚨, 💸, 🛡️, 📈. Tuyệt đối không để lộ mã JSON rác ra ngoài các thẻ quy định.
+     Dù bạn đang nhập vai "mỏ hỗn" hay đang mắng người dùng, nếu người dùng đưa ra một con số để Ghi sổ hoặc Đặt ngân sách, bạn TUYỆT ĐỐI KHÔNG ĐƯỢC QUÊN xuất thẻ <transaction> hoặc <manage_budget>. Thiếu thẻ lệnh là bạn sẽ bị "đăng xuất" khỏi hệ thống!
   `;
 
     if (message.length > 30000) {
@@ -1378,6 +1566,180 @@ app.post('/chat', upload.single('image'), async (req, res) => {
                 `;
             }
 
+            // 8. (MỚI) Truy vấn Ngân sách (Hạn mức so với chi tiêu thực tế)
+            else if (queryData.type === 'budget_check') {
+              sql = `
+              SELECT 
+                  c.category_name, 
+                  b.amount_limit, 
+                  COALESCE(SUM(t.amount), 0) as spent,
+                  (b.amount_limit - COALESCE(SUM(t.amount), 0)) as remaining,
+                  b.month,
+                  b.year
+              FROM budgets_service.budgets b
+              JOIN category_service.categories c ON b.category_id = c.category_id
+              LEFT JOIN transaction_service.transactions t ON c.category_id = t.category_id 
+                  AND EXTRACT(MONTH FROM t.date) = b.month 
+                  AND EXTRACT(YEAR FROM t.date) = b.year
+                  AND t.transaction_type = 'expense'
+              WHERE b.user_id = $1 
+                AND b.month = $2 
+                AND b.year = $3
+                ${queryData.category ? 'AND (c.category_name ILIKE $4)' : ''}
+              GROUP BY c.category_name, b.amount_limit, b.month, b.year`;
+
+              params.push(queryData.month || currentMonth, queryData.year || currentYear);
+              if (queryData.category) params.push(`%${queryData.category}%`);
+            }
+
+            // 9. THÊM HOẶC CẬP NHẬT NGÂN SÁCH (Upsert)
+            // Dùng khi: "Đặt ngân sách ăn uống tháng này 5 triệu"
+            else if (queryData.type === 'budget_upsert') {
+              // 1. Tự động tính ngày nếu không có
+              const start = queryData.start_date || `${currentYear}-${currentMonth}-01`;
+              const end =
+                queryData.end_date ||
+                `${currentYear}-${currentMonth}-${new Date(
+                  currentYear,
+                  currentMonth,
+                  0,
+                ).getDate()}`;
+
+              // 2. SQL với cấu trúc bảng thực tế của bạn
+              sql = `
+                INSERT INTO budgets_service.budgets (
+                  user_id, 
+                  category_id, 
+                  amount_limit, 
+                  title, 
+                  date_start, 
+                  date_end, 
+                  month, 
+                  year,
+                  updated_at
+                )
+                VALUES (
+                  $1, 
+                  (SELECT category_id FROM category_service.categories WHERE category_name ILIKE $2 AND user_id = $1 LIMIT 1), 
+                  $3, $4, $5, $6, $7, $8, NOW()
+                )
+                ON CONFLICT (user_id, category_id, month, year) -- Giả định constraint này tồn tại
+                DO UPDATE SET 
+                  amount_limit = EXCLUDED.amount_limit,
+                  title = EXCLUDED.title,
+                  date_start = EXCLUDED.date_start,
+                  date_end = EXCLUDED.date_end,
+                  updated_at = NOW();
+              `;
+
+              params = [
+                currentUserId,
+                queryData.category, // $2
+                queryData.amount, // $3
+                queryData.category, // $4: title
+                start, // $5: date_start
+                end, // $6: date_end
+                currentMonth, // $7: month
+                currentYear, // $8: year
+              ];
+            }
+
+            // 10. XÓA NGÂN SÁCH
+            // Dùng khi: "Xóa ngân sách tiền điện tháng này đi"
+            else if (queryData.type === 'budget_delete') {
+              sql = `
+              DELETE FROM budgets_service.budgets 
+              WHERE user_id = $1 
+              AND category_id = (SELECT category_id FROM category_service.categories WHERE category_name ILIKE $2 AND user_id = $1 LIMIT 1)
+              AND month = $3 
+              AND year = $4
+              RETURNING *`;
+
+              params.push(
+                queryData.category,
+                queryData.month || currentMonth,
+                queryData.year || currentYear,
+              );
+            }
+
+            // 11. DANH SÁCH TẤT CẢ NGÂN SÁCH (Budget Summary)
+            // Dùng khi: "Tháng này tôi đã chi tiêu thế nào so với ngân sách?"
+            else if (queryData.type === 'budget_summary') {
+              sql = `
+              SELECT 
+                  c.category_name,
+                  b.amount_limit,
+                  COALESCE(SUM(t.amount), 0) as spent,
+                  CASE 
+                      WHEN b.amount_limit > 0 THEN ROUND((COALESCE(SUM(t.amount), 0) / b.amount_limit) * 100, 2)
+                      ELSE 0 
+                  END as percent_used
+              FROM budgets_service.budgets b
+              JOIN category_service.categories c ON b.category_id = c.category_id
+              LEFT JOIN transaction_service.transactions t ON c.category_id = t.category_id 
+                  AND EXTRACT(MONTH FROM t.date) = b.month 
+                  AND EXTRACT(YEAR FROM t.date) = b.year
+                  AND t.transaction_type = 'expense'
+              WHERE b.user_id = $1 AND b.month = $2 AND b.year = $3
+              GROUP BY c.category_name, b.amount_limit`;
+
+              params.push(queryData.month || currentMonth, queryData.year || currentYear);
+            }
+
+            // --- 12. TẠO HOẶC CẬP NHẬT DANH MỤC CHI TIÊU (Upsert) ---
+            // VD: "Tạo danh mục ăn uống" hoặc "Sửa danh mục cafe thành tiền nước"
+            else if (queryData.type === 'category_upsert') {
+              // Nếu có old_name thì là Sửa, không thì là Tạo mới
+              if (queryData.old_name) {
+                sql = `
+                  UPDATE category_service.categories 
+                  SET category_name = $1, updated_at = CURRENT_TIMESTAMP
+                  WHERE user_id = $2 AND category_name ILIKE $3
+                  RETURNING *`;
+                params = [queryData.new_name, currentUserId, queryData.old_name];
+              } else {
+                sql = `
+                  INSERT INTO category_service.categories (user_id, category_name)
+                  VALUES ($1, $2)
+                  ON CONFLICT (user_id, category_name) DO NOTHING
+                  RETURNING *`;
+                params = [currentUserId, queryData.category_name];
+              }
+            }
+
+            // --- 13. XÓA DANH MỤC ---
+            // VD: "Xóa danh mục game"
+            else if (queryData.type === 'category_delete') {
+              sql = `DELETE FROM category_service.categories WHERE user_id = $1 AND category_name ILIKE $2 RETURNING *`;
+              params = [currentUserId, queryData.category_name];
+            }
+
+            // --- 14. TRUY VẤN CÓ KHOẢNG NGÀY (Nâng cấp) ---
+            // Xử lý: "Chi tiêu ăn uống từ 1-5 đến 30-5"
+            else if (queryData.type === 'category_spending_range' && queryData.category) {
+              sql = `
+                SELECT COALESCE(SUM(t.amount), 0) as total, COUNT(*) as count
+                FROM transaction_service.transactions t 
+                JOIN account_service.accounts a ON t.account_id = a.account_id
+                JOIN account_service.categories c ON t.category_id = c.category_id
+                WHERE a.user_id = $1 
+                AND c.category_name ILIKE $2
+                AND t.date >= $3::date AND t.date <= $4::date
+                AND t.transaction_type = 'expense'`;
+
+              // Logic: Nếu không có ngày thì mặc định tháng hiện tại, nếu có thì dùng
+              const start = queryData.start_date || `${currentYear}-${currentMonth}-01`;
+              const end =
+                queryData.end_date ||
+                `${currentYear}-${currentMonth}-${new Date(
+                  currentYear,
+                  currentMonth,
+                  0,
+                ).getDate()}`;
+
+              params = [currentUserId, `%${queryData.category}%`, start, end];
+            }
+
             if (sql) {
               const dbRes = await pool.query(sql, params);
               const dataFound = dbRes.rows[0];
@@ -1409,7 +1771,49 @@ app.post('/chat', upload.single('image'), async (req, res) => {
                   dbResult += `- Số giao dịch: ${dataFound.count || 0}`;
                 }
 
-                // TRƯỜNG HỢP 3: Tổng Thu/Chi (Hôm nay, Tháng này, Hạng mục)
+                // TRƯỜNG HỢP 3: Báo cáo ngân sách (Nếu có biến amount_limit)
+                else if (dataFound && dataFound.hasOwnProperty('amount_limit')) {
+                  const limit = parseFloat(dataFound.amount_limit);
+                  const spent = parseFloat(dataFound.spent);
+                  const remain = parseFloat(dataFound.remaining);
+                  const percent = limit > 0 ? Math.round((spent / limit) * 100) : 0;
+
+                  dbResult += `[BÁO CÁO NGÂN SÁCH DANH MỤC ${dataFound.category_name.toUpperCase()}]:\n`;
+                  dbResult += `- Hạn mức ${currentUserName} đặt: ${limit.toLocaleString()}đ\n`;
+                  dbResult += `- Đã tiêu hết: ${spent.toLocaleString()}đ (${percent}% ngân sách)\n`;
+                  dbResult += `- Quỹ còn lại được phép tiêu: ${remain.toLocaleString()}đ\n`;
+
+                  if (remain < 0) {
+                    dbResult += `🚨 CẢNH BÁO: ${currentUserName} đã TIÊU LỐ ${Math.abs(
+                      remain,
+                    ).toLocaleString()}đ so với kế hoạch!`;
+                  } else if (percent >= 80) {
+                    dbResult += `⚠️ Nhắc nhở: ${currentUserName} đã dùng gần hết hạn mức rồi (${percent}%).`;
+                  }
+                }
+
+                // TRƯỜNG HỢP 4: Báo cáo ngân sách (Nếu có biến amount_limit)
+                else if (dataFound && dataFound.hasOwnProperty('amount_limit')) {
+                  const limit = parseFloat(dataFound.amount_limit);
+                  const spent = parseFloat(dataFound.spent);
+                  const remain = parseFloat(dataFound.remaining);
+                  const percent = limit > 0 ? Math.round((spent / limit) * 100) : 0;
+
+                  dbResult += `[BÁO CÁO NGÂN SÁCH DANH MỤC ${dataFound.category_name.toUpperCase()}]:\n`;
+                  dbResult += `- Hạn mức Bảo đặt: ${limit.toLocaleString()}đ\n`;
+                  dbResult += `- Đã tiêu hết: ${spent.toLocaleString()}đ (${percent}% ngân sách)\n`;
+                  dbResult += `- Quỹ còn lại được phép tiêu: ${remain.toLocaleString()}đ\n`;
+
+                  if (remain < 0) {
+                    dbResult += `🚨 CẢNH BÁO: Bảo đã TIÊU LỐ ${Math.abs(
+                      remain,
+                    ).toLocaleString()}đ so với kế hoạch!`;
+                  } else if (percent >= 80) {
+                    dbResult += `⚠️ Nhắc nhở: Bảo đã dùng gần hết hạn mức rồi (${percent}%).`;
+                  }
+                }
+
+                // TRƯỜNG HỢP 5: Tổng Thu/Chi (Hôm nay, Tháng này, Hạng mục)
                 else {
                   dbResult += `- Tổng Thu: ${parseFloat(
                     dataFound.total_income || 0,
@@ -1455,7 +1859,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
         }
 
         // ==========================================
-        // VỊ TRÍ 2: DÁN ĐOẠN LƯU CÂU TRẢ LỜI MONEY GUARD TẠI ĐÂY
+        // VỊ TRÍ 2: LƯU CÂU TRẢ LỜI MONEY GUARD
         // ==========================================
         try {
           // Trước khi lưu, mình xóa mấy cái thẻ rác đi để DB sạch đẹp
@@ -1478,7 +1882,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
         chatHistory.push({ role: 'user', parts: [{ text: message }] });
         chatHistory.push({ role: 'model', parts: [{ text: reply }] });
 
-        // LOGIC CHỈ TẠO DANH MỤC (Dùng cho yêu cầu thêm danh mục mới) ---
+        // --- LOGIC CHỈ TẠO DANH MỤC (Dùng cho yêu cầu thêm danh mục mới) ---
         const createCatMatch = reply.match(/<create_category>(.*?)<\/create_category>/s);
         if (createCatMatch && createCatMatch[1]) {
           try {
@@ -1552,7 +1956,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
           }
         }
 
-        // 1. XỬ LÝ XÓA GIAO DỊCH QUA CHAT
+        // --- XỬ LÝ XÓA GIAO DỊCH QUA CHAT
         const deleteMatch = reply.match(/<delete_transaction>(.*?)<\/delete_transaction>/s);
         if (deleteMatch) {
           const { id } = JSON.parse(deleteMatch[1]);
@@ -1562,7 +1966,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
           console.log(`🗑️ Đã xóa giao dịch ID: ${id}`);
         }
 
-        // 2. XỬ LÝ CẬP NHẬT GIAO DỊCH QUA CHAT
+        // --- XỬ LÝ CẬP NHẬT GIAO DỊCH QUA CHAT
         const updateMatch = reply.match(/<update_transaction>(.*?)<\/update_transaction>/s);
         if (updateMatch) {
           const { id, amount, description, category_name } = JSON.parse(updateMatch[1]);
@@ -1571,6 +1975,141 @@ app.post('/chat', upload.single('image'), async (req, res) => {
             [amount, description, id],
           );
           console.log(`✏️ Đã cập nhật giao dịch ID: ${id} thành ${amount}đ`);
+        }
+
+        // --- LOGIC XỬ LÝ ĐẶT NGÂN SÁCH (ĐÃ TỐI ƯU & RENDER NGAY) ---
+        const budgetMatch = reply.match(/<manage_budget>(.*?)<\/manage_budget>/s);
+        if (budgetMatch) {
+          console.log('🔍 [BUDGET] Tìm thấy yêu cầu đặt ngân sách!');
+
+          try {
+            const bData = JSON.parse(budgetMatch[1].trim());
+
+            // 1. LÀM SẠCH TÊN: Bỏ mấy chữ rác AI hay thêm vào
+            let finalCatName = bData.category_name
+              .replace(/Ngân sách|Hạn mức|khoản|mục|đặt|hãy|cho|tiền|của|tôi/gi, '')
+              .trim();
+
+            if (finalCatName.length > 0) {
+              finalCatName = finalCatName.charAt(0).toUpperCase() + finalCatName.slice(1);
+            } else {
+              finalCatName = 'Chi tiêu khác'; // Phòng hờ người dùng gõ trống
+            }
+
+            const finalAmount = bData.amount_limit;
+            const targetMonth = bData.month || new Date().getMonth() + 1;
+            const targetYear = bData.year || new Date().getFullYear();
+
+            // Xử lý ngày bắt đầu/kết thúc
+            const start = bData.start_date || `${targetYear}-${targetMonth}-01`;
+            const end =
+              bData.end_date ||
+              `${targetYear}-${targetMonth}-${new Date(targetYear, targetMonth, 0).getDate()}`;
+
+            console.log(
+              `📦 [BUDGET] Đang xử lý mục: "${finalCatName}" | Số tiền: ${finalAmount}đ | Thời gian: ${start} đến ${end}`,
+            );
+
+            // 2. Tìm hoặc tạo danh mục (Dùng finalCatName đã làm sạch)
+            let catRes = await pool.query(
+              `SELECT category_id FROM category_service.categories WHERE category_name ILIKE $1 AND user_id = $2 LIMIT 1`,
+              [finalCatName, currentUserId],
+            );
+
+            let categoryId;
+            if (catRes.rows.length > 0) {
+              categoryId = catRes.rows[0].category_id;
+            } else {
+              console.log('✨ [BUDGET] Tạo danh mục mới cho ngân sách...');
+              const newCat = await pool.query(
+                "INSERT INTO category_service.categories (user_id, category_name, type, icon_id, color) VALUES ($1, $2, 'expense', 'f1995874-297d-460c-882d-136585918831', 'orange') RETURNING category_id",
+                [currentUserId, finalCatName],
+              );
+              categoryId = newCat.rows[0].category_id;
+            }
+
+            // 3. Lưu vào bảng budgets
+            const budgetQuery = await pool.query(
+              `INSERT INTO budgets_service.budgets 
+                (user_id, category_id, amount_limit, title, date_start, date_end, month, year, date, updated_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()) 
+               ON CONFLICT ON CONSTRAINT unique_budget_per_month 
+               DO UPDATE SET 
+                  amount_limit = EXCLUDED.amount_limit,
+                  title = EXCLUDED.title,
+                  date_start = EXCLUDED.date_start,
+                  date_end = EXCLUDED.date_end,
+                  updated_at = NOW()
+               RETURNING *`,
+              [
+                currentUserId,
+                categoryId,
+                finalAmount,
+                finalCatName, // title
+                start, // date_start
+                end, // date_end
+                targetMonth,
+                targetYear,
+              ],
+            );
+
+            console.log('💎 [BUDGET] DB cập nhật thành công:', budgetQuery.rows[0]);
+
+            // 🔥 4. LỆNH "ẢO THUẬT": Bắn socket để màn hình Web tự load lại số
+            io.emit('money-guard-sync'); // Lệnh này cực quan trọng để Dashboard nhảy số ngay
+
+            await addNotification(
+              `🎯 Money Guard đã đặt hạn mức "${finalCatName}": ${parseFloat(
+                finalAmount,
+              ).toLocaleString()}đ!`,
+              currentUserId,
+            );
+          } catch (e) {
+            console.error('❌ [BUDGET] Lỗi xử lý:', e.message);
+          }
+        }
+
+        // --- LOGIC XỬ LÝ QUẢN LÝ DANH MỤC (CRUD CATEGORY) ---
+        const manageCatMatch = reply.match(/<manage_category>(.*?)<\/manage_category>/s);
+        if (manageCatMatch) {
+          console.log('📂 [CATEGORY] Tìm thấy yêu cầu quản lý danh mục!');
+          try {
+            const data = JSON.parse(manageCatMatch[1].trim());
+            let sql = '';
+            let params = [];
+
+            if (data.action === 'create') {
+              sql = `INSERT INTO category_service.categories (user_id, category_name, type, icon_id, color) 
+             VALUES ($1, $2, 'expense', 'f1995874-297d-460c-882d-136585918831', 'blue') 
+             ON CONFLICT DO NOTHING`;
+              params = [currentUserId, data.category_name];
+            } else if (data.action === 'update') {
+              sql = `UPDATE category_service.categories 
+                     SET category_name = $1 
+                     WHERE user_id = $2 AND category_name ILIKE $3`;
+              params = [data.new_name, currentUserId, data.old_name];
+            } else if (data.action === 'delete') {
+              sql = `DELETE FROM category_service.categories WHERE user_id = $1 AND category_name ILIKE $2`;
+              params = [currentUserId, data.category_name];
+            }
+
+            if (sql) {
+              await pool.query(sql, params);
+              console.log('✅ [CATEGORY] DB cập nhật thành công!');
+
+              // Bắn socket để giao diện tự cập nhật danh sách
+              io.emit('money-guard-sync');
+
+              await addNotification(
+                `✨ Money Guard đã thực hiện: ${data.action} danh mục "${
+                  data.category_name || data.new_name
+                }"!`,
+                currentUserId,
+              );
+            }
+          } catch (e) {
+            console.error('❌ [CATEGORY] Lỗi xử lý:', e.message);
+          }
         }
 
         // --- LOGIC LƯU VÀO DATABASE POSTGRESQL (ĐÃ FIX NHẬP NHIỀU MÓN) ---
@@ -1598,12 +2137,34 @@ app.post('/chat', upload.single('image'), async (req, res) => {
                 finalDate = new Date().toISOString().split('T')[0];
               }
 
+              //
+              //
+              //
+              let finalDateString = data.date;
+              if (!finalDateString || finalDateString.includes('X')) {
+                finalDateString = new Date().toISOString().split('T')[0];
+              }
+
               // BẮT BUỘC: Ghép thêm Giờ:Phút:Giây thực tế lúc người dùng chat vào chuỗi ngày
               const now = new Date();
+              const [year, month, day] = finalDateString.split('-').map(Number);
+              const transactionDate = new Date(
+                year,
+                month - 1,
+                day,
+                now.getHours(),
+                now.getMinutes(),
+                now.getSeconds(),
+              );
+
+              //
+              //
+              //
               const timeString = now.toTimeString().split(' ')[0]; // Lấy ra chuỗi "09:20:35"
 
               // Kết quả sẽ ra một chuỗi đầy đủ: "2026-04-14 09:20:35"
-              finalDate = `${finalDate} ${timeString}`;
+              // finalDate = `${finalDate} ${timeString}`;
+              finalDate = `${finalDate} ${timeString}+07`;
 
               const transactionKey = `${data.description}-${data.amount}-${data.date}`;
               const nowTime = Date.now();
@@ -1673,7 +2234,8 @@ app.post('/chat', upload.single('image'), async (req, res) => {
                 finalAmount,
                 transactionType,
                 data.description,
-                finalDate,
+                // finalDate,
+                transactionDate,
                 data.note || '',
               ];
 
@@ -1735,7 +2297,13 @@ app.post('/chat', upload.single('image'), async (req, res) => {
     if (status === 503 || err.message?.includes('overloaded')) {
       clientMsg = 'Model đang quá tải, chờ chút rồi thử lại (hoặc đổi model)';
     } else if (status === 429) {
-      clientMsg = 'Quá giới hạn request, chờ 1 phút nhé';
+      // clientMsg = 'Quá giới hạn request, chờ 1 phút nhé';
+      const waitMatch = err.message.match(/retry in ([\d.]+)s/);
+      const waitTime = waitMatch ? parseFloat(waitMatch[1]) : 60;
+
+      clientMsg = `AI đang bận vì vượt quá hạn mức, hãy đợi ${Math.round(
+        waitTime,
+      )} giây rồi thử lại nhé!`;
     } else if (status === 401 || status === 403) {
       clientMsg = 'API key không hợp lệ';
     }
@@ -1747,7 +2315,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
 //
 //
 //
-app.get('/api/ai-deep-scan', async (req, res) => {
+app.get('/ai-deep-scan', async (req, res) => {
   try {
     const userId = requireUserId(req, res);
     if (!userId) return;

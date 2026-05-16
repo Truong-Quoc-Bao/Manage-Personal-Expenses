@@ -1,8 +1,6 @@
 // const express = require("express");
 // const { getCategoryList, createCategory, updateCategory, deleteCategory } = require("../controllers/category.controller");
 
-
-
 // const { validateGetCategories } = require("../validator/category.validator");
 // // const authMiddleware = require("../middlewares/auth.middleware");
 
@@ -17,57 +15,38 @@
 
 // router.delete("/category/:id",deleteCategory);
 
-
-
 // module.exports = router;
 
-
-const express = require("express");
+const express = require('express');
 
 const {
   getCategoryList,
   createCategory,
   updateCategory,
   deleteCategory,
-} = require("../controllers/category.controller");
+} = require('../controllers/category.controller');
 
-const validate = require("../middlewares/validation.middleware");
+const validate = require('../middlewares/validation.middleware');
 
 const {
   getCategoriesSchema,
   createCategorySchema,
   updateCategorySchema,
   deleteCategorySchema,
-} = require("../validator/category.validator");
+} = require('../validator/category.validator');
 
 const router = express.Router();
 
 // GET
-router.get(
-  "/categories",
-  validate(getCategoriesSchema),
-  getCategoryList
-);
+router.get('/categories', validate(getCategoriesSchema), getCategoryList);
 
 // POST
-router.post(
-  "/category",
-  validate(createCategorySchema),
-  createCategory
-);
+router.post('/category', validate(createCategorySchema), createCategory);
 
 // PUT
-router.put(
-  "/category/:id",
-  validate(updateCategorySchema),
-  updateCategory
-);
+router.put('/category/:id', validate(updateCategorySchema), updateCategory);
 
 // DELETE
-router.delete(
-  "/category/:id",
-  validate(deleteCategorySchema),
-  deleteCategory
-);
+router.delete('/category/:id', validate(deleteCategorySchema), deleteCategory);
 
 module.exports = router;
