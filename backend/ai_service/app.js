@@ -843,9 +843,8 @@ app.get('/create-bank', async (req, res) => {
         purpose: 'LINK_BANK_ACCOUNT',
         // callback về back end nếu deploy
         // còn đây là link localtunnel test
-        // completion_redirect_uri: `https://unnibbed-unthrilled-averi.ngrok-free.dev/api/callback/${userId}`,
-        completion_redirect_uri: `https://aercg-171-236-49-110.run.pinggy-free.link /api/callback/${userId}`,
-        // completion_redirect_uri: 'https://unnibbed-unthrilled-averi.ngrok-free.dev/api/callback',
+        completion_redirect_uri: `https://unnibbed-unthrilled-averi.ngrok-free.dev/api/callback/${userId}`,
+        // completion_redirect_uri: `https://aercg-171-236-49-110.run.pinggy-free.link /api/callback/${userId}`,
         // external_id: `user_${userId}`,
         external_id: `user_${userId}_${Math.floor(Math.random() * 999999)}`,
       },
