@@ -747,6 +747,11 @@ app.post('/webhook/bank-transfer', async (req, res) => {
     io.emit('bank_notification', { message: finalMsg });
     console.log('📡 [PROACTIVE]: Đã bắn Socket cảnh báo về Web.');
 
+    setTimeout(() => {
+      io.emit('money-guard-sync');
+      console.log('🔄 [SYNC] Đã báo hiệu cho FE cập nhật lại biểu đồ Thống kê');
+    }, 1500);
+
     await addNotification(finalMsg, userId);
 
     if (typeof sendPushNotification === 'function') {
@@ -2697,6 +2702,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
               });
               console.log(`✅ Đã lưu ${transactionType} qua API: ${data.description}`);
 
+              io.emit('money-guard-sync');
               // ============================================================
               // GỬI TIN SANG N8N ĐỂ KIỂM TRA HẠN MỨC (CHỈ KHI TIÊU TIỀN)
               // ============================================================

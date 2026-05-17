@@ -86,6 +86,17 @@ export function FinanceAIChatbox() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  //
+  useEffect(() => {
+    const handleSync = () => {
+      console.log('🤖 AI Chatbox: Đồng bộ stats mới...');
+      initChatData(); // Hàm này của bạn đã có sẵn ở dòng 90
+    };
+
+    window.addEventListener('money-guard-sync', handleSync);
+    return () => window.removeEventListener('money-guard-sync', handleSync);
+  }, []);
+
   const initChatData = async () => {
     try {
       const [histRes, statsRes] = await Promise.all([
@@ -653,7 +664,7 @@ export function FinanceAIChatbox() {
                 : 'text-gray-400 hover:text-white'
             }`}
           >
-            <Mic size={20}  className="text-white" />
+            <Mic size={20} className="text-white" />
           </button>
           <input
             type="text"

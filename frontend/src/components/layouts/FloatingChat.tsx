@@ -138,6 +138,7 @@ export function FloatingChat() {
   const recognitionRef = useRef<any>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const hasInteractedRef = useRef(false);
+  const lastMsgRef = useRef('');
 
   // --- 1. KHỞI TẠO ÂM THANH & TƯƠNG TÁC ---
   useEffect(() => {
@@ -166,14 +167,21 @@ export function FloatingChat() {
       console.log('📨 FloatingChat nhận được tin nhắn từ hệ thống:', text);
 
       // Thêm tin nhắn mới vào danh sách hiện tại
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: isUser ? 'user' : 'model',
-          content: text,
-          timestamp: new Date(),
-        },
-      ]);
+      setMessages((prev) => {
+        // Nếu tin nhắn mới trùng y hệt tin cuối cùng trong danh sách thì bỏ qua
+        if (prev.length > 0 && prev[prev.length - 1].content === text) {
+          console.log('🚫 Chặn tin nhắn trùng trong FloatingChat');
+          return prev;
+        }
+        return [
+          ...prev,
+          {
+            role: isUser ? 'user' : 'model',
+            content: text,
+            timestamp: new Date(),
+          },
+        ];
+      });
 
       // Tự động mở cửa sổ chat nếu đang đóng để Bảo thấy thông báo ngay
       if (!isOpen) {
