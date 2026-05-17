@@ -44,8 +44,8 @@ enum BudgetType {
 }
 
 enum Status {
-  warning
-  completed
+  limit
+  goal
 
   @@schema("budgets_service")
 }

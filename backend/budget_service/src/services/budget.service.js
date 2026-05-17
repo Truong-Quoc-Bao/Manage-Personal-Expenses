@@ -5,14 +5,48 @@ const {
   findDateByCategory,
   updateBudget,
   deleteBudget,
+  deriveStatusFromType,
 } = require("../repositories/budget.repository");
 const { validateCategory } = require("../gRPC/category.client");
+const rabbitMQClient = require("../../../shared/rabbitmq-client");
 
 const VALID_BUDGET_TYPES = ["limit", "plan"];
 
 const BUDGET_TYPE_TO_CATEGORY_TYPE = {
   limit: "Expense",
   plan: "Income",
+};
+
+const toIsoOrNull = (value) => {
+  if (!value) return null;
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+};
+
+const buildBudgetEventPayload = (budget) => {
+  if (!budget) return null;
+  return {
+    budget_id: budget.budget_id,
+    user_id: budget.user_id,
+    category_id: budget.category_id,
+    title: budget.title,
+    type: budget.type,
+    amount_limit: budget.amount_limit != null ? Number(budget.amount_limit) : 0,
+    current_amount: budget.current_amount != null ? Number(budget.current_amount) : 0,
+    date_start: toIsoOrNull(budget.date_start),
+    date_end: toIsoOrNull(budget.date_end),
+    // `status` không lưu xuống DB (enum DB chưa migrate), nên derive lại từ type.
+    status: budget.status ?? deriveStatusFromType(budget.type),
+    status_active: budget.status_active,
+  };
+};
+
+const safePublish = async (routingKey, payload) => {
+  try {
+    await rabbitMQClient.publish(routingKey, payload);
+  } catch (err) {
+    console.error(`[Budget] Failed to publish ${routingKey}:`, err.message);
+  }
 };
 
 async function validateCategoryForBudgetType({ categoryId, userId, type }) {
@@ -47,6 +81,8 @@ async function validateCategoryForBudgetType({ categoryId, userId, type }) {
 }
 
 const deleteBudgetService = async ({ userId, budgetId }) => {
+  console.log('🔍 [budget_delete qua API] userId service:', userId);
+  console.log('🔍 [budget_delete qua API] budgetId service:', budgetId);
   if (!userId) {
     const error = new Error("userId is required");
     error.statusCode = 400;
@@ -61,6 +97,9 @@ const deleteBudgetService = async ({ userId, budgetId }) => {
   }
 
   const budgets = await deleteBudget({ budgetId });
+
+  await safePublish("budget.deleted", buildBudgetEventPayload(checkBudget));
+
   return budgets;
 };
 
@@ -72,6 +111,7 @@ const updateBudgetService = async ({
   type,
   amountLimit,
   dateStart,
+  dateEnd,
 }) => {
   if (!userId) {
     const error = new Error("userId is required");
@@ -92,7 +132,7 @@ const updateBudgetService = async ({
   }
 
   if (!amountLimit) {
-    const error = new Error("amountLimit is required");
+    const error = new Error("amountLimit is required update");
     error.statusCode = 400;
     throw error;
   }
@@ -135,6 +175,17 @@ const updateBudgetService = async ({
     type: budgetType,
     amountLimit,
     dateStart,
+    dateEnd,
+  });
+
+  await safePublish("budget.updated", {
+    ...buildBudgetEventPayload(budgets),
+    old_category_id: checkBudget.category_id,
+    old_type: checkBudget.type,
+    old_amount_limit:
+      checkBudget.amount_limit != null ? Number(checkBudget.amount_limit) : 0,
+    old_date_start: toIsoOrNull(checkBudget.date_start),
+    old_date_end: toIsoOrNull(checkBudget.date_end),
   });
 
   return budgets;
@@ -147,6 +198,7 @@ const createBudgetService = async ({
   type,
   amountLimit,
   dateStart,
+  dateEnd,
 }) => {
   if (!userId) {
     const error = new Error("userId is required");
@@ -167,7 +219,7 @@ const createBudgetService = async ({
   }
 
   if (!amountLimit) {
-    const error = new Error("amountLimit is required");
+    const error = new Error("amountLimit is required create");
     error.statusCode = 400;
     throw error;
   }
@@ -207,7 +259,10 @@ const createBudgetService = async ({
     type: budgetType,
     amountLimit,
     dateStart,
+    dateEnd,
   });
+
+  await safePublish("budget.created", buildBudgetEventPayload(budget));
 
   return budget;
 };

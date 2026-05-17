@@ -41,7 +41,7 @@ const updateBudgetController = async (req, res, next) => {
     if (!userId) return;
     const budgetId = req.params.id;
 
-    const { title, categoryId, type, amountLimit, dateStart } = req.body;
+    const { title, categoryId, type, amountLimit, dateStart, dateEnd } = req.body;
 
     const budgets = await updateBudgetService({
       userId,
@@ -51,6 +51,7 @@ const updateBudgetController = async (req, res, next) => {
       type,
       amountLimit,
       dateStart,
+      dateEnd,
     });
 
     return res.status(200).json({
@@ -68,7 +69,7 @@ const createBudgetController = async (req, res, next) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
-    const { title, categoryId, type, amountLimit, dateStart } = req.body;
+    const { title, categoryId, type, amountLimit, dateStart, dateEnd } = req.body;
 
     const budgets = await createBudgetService({
       userId,
@@ -77,6 +78,7 @@ const createBudgetController = async (req, res, next) => {
       type,
       amountLimit,
       dateStart,
+      dateEnd,
     });
 
     return res.status(201).json({
