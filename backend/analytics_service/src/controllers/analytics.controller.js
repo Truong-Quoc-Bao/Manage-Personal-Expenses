@@ -4,8 +4,8 @@ const service = require('../services/analytics.service.js');
 
 function requireUserId(req, res) {
   const userId = req.headers['x-user-id'];
-  if (userId == null || userId === "") {
-    res.status(401).json({ success: false, message: "Unauthorized" });
+  if (userId == null || userId === '') {
+    res.status(401).json({ success: false, message: 'Unauthorized' });
     return null;
   }
   return String(userId);
@@ -23,6 +23,8 @@ const getUserAnalytics = async (req, res) => {
     if (!userId) {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
+    console.log('userId:', userId);
+    // console.log('data:', data);
     const data = await service.getUserAnalytics(userId);
     return res.status(200).json({ success: true, data });
   } catch (err) {
@@ -46,20 +48,31 @@ const createUserAnalytics = async (req, res) => {
     const data = req.body;
 
     console.log('=== userId:', userId);
-    console.log("=== data nhận được:", JSON.stringify(data, null, 2));
+    console.log('=== data nhận được:', JSON.stringify(data, null, 2));
 
     if (data.total_income === undefined || typeof data.total_income !== 'number') {
-      return res.status(400).json({ success: false, message: 'total_income is required and must be a number' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'total_income is required and must be a number' });
     }
     if (data.total_expense === undefined || typeof data.total_expense !== 'number') {
-      return res.status(400).json({ success: false, message: 'total_expense is required and must be a number' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'total_expense is required and must be a number' });
     }
     if (!data.current_month?.year || !data.current_month?.month) {
-      return res.status(400).json({ success: false, message: 'current_month.year and current_month.month are required' });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: 'current_month.year and current_month.month are required',
+        });
     }
 
     const result = await service.createUserAnalytics(userId, data);
-    return res.status(201).json({ success: true, message: 'User analytics created successfully', data: result });
+    return res
+      .status(201)
+      .json({ success: true, message: 'User analytics created successfully', data: result });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
@@ -72,7 +85,9 @@ const updateUserAnalytics = async (req, res) => {
     const data = req.body;
 
     const result = await service.updateUserAnalytics(userId, data);
-    return res.status(200).json({ success: true, message: 'User analytics updated successfully', data: result });
+    return res
+      .status(200)
+      .json({ success: true, message: 'User analytics updated successfully', data: result });
   } catch (err) {
     const status = err.message.includes('not found') ? 404 : 500;
     return res.status(status).json({ success: false, message: err.message });
@@ -84,13 +99,14 @@ const deleteUserAnalytics = async (req, res) => {
     const { userId } = req.params;
 
     const result = await service.deleteUserAnalytics(userId);
-    return res.status(200).json({ success: true, message: 'User analytics deleted successfully', data: result });
+    return res
+      .status(200)
+      .json({ success: true, message: 'User analytics deleted successfully', data: result });
   } catch (err) {
     const status = err.message.includes('not found') ? 404 : 500;
     return res.status(status).json({ success: false, message: err.message });
   }
 };
- 
 
 const getAnomalyLogs = async (req, res) => {
   try {
@@ -143,11 +159,15 @@ const createAnomalyLog = async (req, res) => {
     const data = req.body;
 
     if (!data.type || !data.severity || !data.description) {
-      return res.status(400).json({ success: false, message: 'type, severity, description are required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'type, severity, description are required' });
     }
 
     const result = await service.createAnomalyLog(userId, data);
-    return res.status(201).json({ success: true, message: 'Anomaly log created successfully', data: result });
+    return res
+      .status(201)
+      .json({ success: true, message: 'Anomaly log created successfully', data: result });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
@@ -159,7 +179,9 @@ const updateAnomalyLog = async (req, res) => {
     const data = req.body;
 
     const result = await service.updateAnomalyLog(logId, data);
-    return res.status(200).json({ success: true, message: 'Anomaly log updated successfully', data: result });
+    return res
+      .status(200)
+      .json({ success: true, message: 'Anomaly log updated successfully', data: result });
   } catch (err) {
     const status = err.message.includes('not found') ? 404 : 500;
     return res.status(status).json({ success: false, message: err.message });
@@ -170,7 +192,9 @@ const markAllAnomalyLogsRead = async (req, res) => {
   try {
     const { userId } = req.params;
     const result = await service.markAllAnomalyLogsRead(userId);
-    return res.status(200).json({ success: true, message: 'All anomaly logs marked as read', data: result });
+    return res
+      .status(200)
+      .json({ success: true, message: 'All anomaly logs marked as read', data: result });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
@@ -191,7 +215,9 @@ const deleteAnomalyLog = async (req, res) => {
   try {
     const { logId } = req.params;
     const result = await service.deleteAnomalyLog(logId);
-    return res.status(200).json({ success: true, message: 'Anomaly log deleted successfully', data: result });
+    return res
+      .status(200)
+      .json({ success: true, message: 'Anomaly log deleted successfully', data: result });
   } catch (err) {
     const status = err.message.includes('not found') ? 404 : 500;
     return res.status(status).json({ success: false, message: err.message });
@@ -202,12 +228,13 @@ const deleteAllAnomalyLogs = async (req, res) => {
   try {
     const { userId } = req.params;
     const result = await service.deleteAllAnomalyLogs(userId);
-    return res.status(200).json({ success: true, message: 'All anomaly logs deleted', data: result });
+    return res
+      .status(200)
+      .json({ success: true, message: 'All anomaly logs deleted', data: result });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
 };
- 
 
 const getCategorySummary = async (req, res) => {
   try {
@@ -227,7 +254,9 @@ const getCategorySummaryByMonth = async (req, res) => {
     const { year, month } = req.query;
 
     if (!year || !month) {
-      return res.status(400).json({ success: false, message: 'year and month query params are required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'year and month query params are required' });
     }
 
     const data = await service.getCategorySummaryByMonth(userId, year, month);
@@ -265,11 +294,15 @@ const createCategorySummary = async (req, res) => {
     const data = req.body;
 
     if (!data.category_id || !data.category_name || !data.year || !data.month) {
-      return res.status(400).json({ success: false, message: 'category_id, category_name, year, month are required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'category_id, category_name, year, month are required' });
     }
 
     const result = await service.createCategorySummary(userId, data);
-    return res.status(201).json({ success: true, message: 'Category summary created successfully', data: result });
+    return res
+      .status(201)
+      .json({ success: true, message: 'Category summary created successfully', data: result });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
@@ -281,11 +314,15 @@ const upsertCategorySummary = async (req, res) => {
     const data = req.body;
 
     if (!data.category_id || !data.year || !data.month) {
-      return res.status(400).json({ success: false, message: 'category_id, year, month are required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'category_id, year, month are required' });
     }
 
     const result = await service.upsertCategorySummary(userId, data);
-    return res.status(200).json({ success: true, message: 'Category summary upserted successfully', data: result });
+    return res
+      .status(200)
+      .json({ success: true, message: 'Category summary upserted successfully', data: result });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
@@ -297,7 +334,9 @@ const updateCategorySummary = async (req, res) => {
     const data = req.body;
 
     const result = await service.updateCategorySummary(id, data);
-    return res.status(200).json({ success: true, message: 'Category summary updated successfully', data: result });
+    return res
+      .status(200)
+      .json({ success: true, message: 'Category summary updated successfully', data: result });
   } catch (err) {
     const status = err.message.includes('not found') ? 404 : 500;
     return res.status(status).json({ success: false, message: err.message });
@@ -308,7 +347,9 @@ const deleteCategorySummary = async (req, res) => {
   try {
     const { id } = req.params;
     const result = await service.deleteCategorySummary(id);
-    return res.status(200).json({ success: true, message: 'Category summary deleted successfully', data: result });
+    return res
+      .status(200)
+      .json({ success: true, message: 'Category summary deleted successfully', data: result });
   } catch (err) {
     const status = err.message.includes('not found') ? 404 : 500;
     return res.status(status).json({ success: false, message: err.message });
@@ -319,12 +360,13 @@ const deleteAllCategorySummary = async (req, res) => {
   try {
     const { userId } = req.params;
     const result = await service.deleteAllCategorySummary(userId);
-    return res.status(200).json({ success: true, message: 'All category summaries deleted', data: result });
+    return res
+      .status(200)
+      .json({ success: true, message: 'All category summaries deleted', data: result });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
 };
- 
 
 const getDashboardCache = async (req, res) => {
   try {
@@ -333,7 +375,9 @@ const getDashboardCache = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
     const data = await service.getDashboardCache(userId);
-    return res.status(200).json({ success: true, count: Array.isArray(data) ? data.length : 0, data });
+    return res
+      .status(200)
+      .json({ success: true, count: Array.isArray(data) ? data.length : 0, data });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
@@ -358,12 +402,14 @@ const upsertDashboardCache = async (req, res) => {
     if (!data || !data.account_id || Object.keys(data).length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Request body is required'
+        message: 'Request body is required',
       });
     }
 
     const result = await service.upsertDashboardCache(userId, data);
-    return res.status(200).json({ success: true, message: 'Dashboard cache upserted successfully', data: result });
+    return res
+      .status(200)
+      .json({ success: true, message: 'Dashboard cache upserted successfully', data: result });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
@@ -374,12 +420,13 @@ const invalidateDashboardCache = async (req, res) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
     const result = await service.invalidateDashboardCache(userId);
-    return res.status(200).json({ success: true, message: 'Dashboard cache invalidated', data: result });
+    return res
+      .status(200)
+      .json({ success: true, message: 'Dashboard cache invalidated', data: result });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
 };
- 
 
 const getMonthlyReport = async (req, res) => {
   try {
@@ -389,7 +436,7 @@ const getMonthlyReport = async (req, res) => {
     if (!userId) {
       return res.status(400).json({
         success: false,
-        message: 'userId is required'
+        message: 'userId is required',
       });
     }
 
@@ -397,13 +444,12 @@ const getMonthlyReport = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      data: data || []
+      data: data || [],
     });
-
   } catch (err) {
     return res.status(500).json({
       success: false,
-      message: err.message
+      message: err.message,
     });
   }
 };
@@ -415,7 +461,9 @@ const getMonthlyReportByMonth = async (req, res) => {
     const { year, month } = req.query;
 
     if (!year || !month) {
-      return res.status(400).json({ success: false, message: 'year and month query params are required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'year and month query params are required' });
     }
 
     const data = await service.getMonthlyReportByMonth(userId, year, month);
@@ -460,7 +508,9 @@ const createMonthlyReport = async (req, res) => {
     }
 
     const result = await service.createMonthlyReport(userId, data);
-    return res.status(201).json({ success: true, message: 'Monthly report created successfully', data: result });
+    return res
+      .status(201)
+      .json({ success: true, message: 'Monthly report created successfully', data: result });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
@@ -476,7 +526,9 @@ const upsertMonthlyReport = async (req, res) => {
     }
 
     const result = await service.upsertMonthlyReport(userId, data);
-    return res.status(200).json({ success: true, message: 'Monthly report upserted successfully', data: result });
+    return res
+      .status(200)
+      .json({ success: true, message: 'Monthly report upserted successfully', data: result });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
@@ -488,7 +540,9 @@ const updateMonthlyReport = async (req, res) => {
     const data = req.body;
 
     const result = await service.updateMonthlyReport(id, data);
-    return res.status(200).json({ success: true, message: 'Monthly report updated successfully', data: result });
+    return res
+      .status(200)
+      .json({ success: true, message: 'Monthly report updated successfully', data: result });
   } catch (err) {
     const status = err.message.includes('not found') ? 404 : 500;
     return res.status(status).json({ success: false, message: err.message });
@@ -499,7 +553,9 @@ const deleteMonthlyReport = async (req, res) => {
   try {
     const { id } = req.params;
     const result = await service.deleteMonthlyReport(id);
-    return res.status(200).json({ success: true, message: 'Monthly report deleted successfully', data: result });
+    return res
+      .status(200)
+      .json({ success: true, message: 'Monthly report deleted successfully', data: result });
   } catch (err) {
     const status = err.message.includes('not found') ? 404 : 500;
     return res.status(status).json({ success: false, message: err.message });
@@ -510,12 +566,13 @@ const deleteAllMonthlyReports = async (req, res) => {
   try {
     const { userId } = req.params;
     const result = await service.deleteAllMonthlyReports(userId);
-    return res.status(200).json({ success: true, message: 'All monthly reports deleted', data: result });
+    return res
+      .status(200)
+      .json({ success: true, message: 'All monthly reports deleted', data: result });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
 };
- 
 
 const getSpendingTrend = async (req, res) => {
   try {
@@ -559,11 +616,15 @@ const createSpendingTrend = async (req, res) => {
     const data = req.body;
 
     if (!data.category_id || !data.category_name || !data.monthly_data) {
-      return res.status(400).json({ success: false, message: 'category_id, category_name, monthly_data are required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'category_id, category_name, monthly_data are required' });
     }
 
     const result = await service.createSpendingTrend(userId, data);
-    return res.status(201).json({ success: true, message: 'Spending trend created successfully', data: result });
+    return res
+      .status(201)
+      .json({ success: true, message: 'Spending trend created successfully', data: result });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
@@ -575,11 +636,15 @@ const upsertSpendingTrend = async (req, res) => {
     const data = req.body;
 
     if (!data.category_id || !data.category_name) {
-      return res.status(400).json({ success: false, message: 'category_id and category_name are required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'category_id and category_name are required' });
     }
 
     const result = await service.upsertSpendingTrend(userId, data);
-    return res.status(200).json({ success: true, message: 'Spending trend upserted successfully', data: result });
+    return res
+      .status(200)
+      .json({ success: true, message: 'Spending trend upserted successfully', data: result });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
@@ -591,7 +656,9 @@ const updateSpendingTrend = async (req, res) => {
     const data = req.body;
 
     const result = await service.updateSpendingTrend(id, data);
-    return res.status(200).json({ success: true, message: 'Spending trend updated successfully', data: result });
+    return res
+      .status(200)
+      .json({ success: true, message: 'Spending trend updated successfully', data: result });
   } catch (err) {
     const status = err.message.includes('not found') ? 404 : 500;
     return res.status(status).json({ success: false, message: err.message });
@@ -602,7 +669,9 @@ const deleteSpendingTrend = async (req, res) => {
   try {
     const { id } = req.params;
     const result = await service.deleteSpendingTrend(id);
-    return res.status(200).json({ success: true, message: 'Spending trend deleted successfully', data: result });
+    return res
+      .status(200)
+      .json({ success: true, message: 'Spending trend deleted successfully', data: result });
   } catch (err) {
     const status = err.message.includes('not found') ? 404 : 500;
     return res.status(status).json({ success: false, message: err.message });
@@ -613,7 +682,9 @@ const deleteAllSpendingTrends = async (req, res) => {
   try {
     const { userId } = req.params;
     const result = await service.deleteAllSpendingTrends(userId);
-    return res.status(200).json({ success: true, message: 'All spending trends deleted', data: result });
+    return res
+      .status(200)
+      .json({ success: true, message: 'All spending trends deleted', data: result });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
@@ -649,7 +720,9 @@ const getTransactionsByDateRange = async (req, res) => {
     const { from, to } = req.query;
 
     if (!from || !to) {
-      return res.status(400).json({ success: false, message: 'from and to query params are required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'from and to query params are required' });
     }
 
     const data = await service.getTransactionsByDateRange(userId, from, to);
@@ -675,11 +748,15 @@ const createTransaction = async (req, res) => {
     const data = req.body;
 
     if (!data.trans_id || data.amount === undefined || !data.transaction_type || !data.date) {
-      return res.status(400).json({ success: false, message: 'trans_id, amount, transaction_type, date are required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'trans_id, amount, transaction_type, date are required' });
     }
 
     const result = await service.createTransaction(userId, data);
-    return res.status(201).json({ success: true, message: 'Transaction created successfully', data: result });
+    return res
+      .status(201)
+      .json({ success: true, message: 'Transaction created successfully', data: result });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
@@ -691,7 +768,9 @@ const updateTransaction = async (req, res) => {
     const data = req.body;
 
     const result = await service.updateTransaction(transId, data);
-    return res.status(200).json({ success: true, message: 'Transaction updated successfully', data: result });
+    return res
+      .status(200)
+      .json({ success: true, message: 'Transaction updated successfully', data: result });
   } catch (err) {
     const status = err.message.includes('not found') ? 404 : 500;
     return res.status(status).json({ success: false, message: err.message });
@@ -702,7 +781,9 @@ const deleteTransaction = async (req, res) => {
   try {
     const { transId } = req.params;
     const result = await service.deleteTransaction(transId);
-    return res.status(200).json({ success: true, message: 'Transaction deleted successfully', data: result });
+    return res
+      .status(200)
+      .json({ success: true, message: 'Transaction deleted successfully', data: result });
   } catch (err) {
     const status = err.message.includes('not found') ? 404 : 500;
     return res.status(status).json({ success: false, message: err.message });
@@ -710,12 +791,12 @@ const deleteTransaction = async (req, res) => {
 };
 
 module.exports = {
-   getUserAnalytics,
+  getUserAnalytics,
   getAllUserAnalytics,
   createUserAnalytics,
   updateUserAnalytics,
   deleteUserAnalytics,
-   getAnomalyLogs,
+  getAnomalyLogs,
   getAnomalyLogById,
   getUnreadAnomalyLogs,
   countUnreadAnomalyLogs,
@@ -725,7 +806,7 @@ module.exports = {
   dismissAnomalyLog,
   deleteAnomalyLog,
   deleteAllAnomalyLogs,
-   getCategorySummary,
+  getCategorySummary,
   getCategorySummaryByMonth,
   getCategorySummaryById,
   getOverBudgetCategories,
@@ -734,11 +815,11 @@ module.exports = {
   updateCategorySummary,
   deleteCategorySummary,
   deleteAllCategorySummary,
-   getDashboardCache,
+  getDashboardCache,
   getDashboardCachebyAccount,
   upsertDashboardCache,
   invalidateDashboardCache,
-   getMonthlyReport,
+  getMonthlyReport,
   getMonthlyReportByMonth,
   getRecentMonthlyReports,
   getMonthlyReportById,
@@ -747,7 +828,7 @@ module.exports = {
   updateMonthlyReport,
   deleteMonthlyReport,
   deleteAllMonthlyReports,
-   getSpendingTrend,
+  getSpendingTrend,
   getSpendingTrendByCategory,
   getSpendingTrendById,
   createSpendingTrend,
@@ -755,7 +836,7 @@ module.exports = {
   updateSpendingTrend,
   deleteSpendingTrend,
   deleteAllSpendingTrends,
-   getTransactions,
+  getTransactions,
   getTransactionByTransId,
   getTransactionsByDateRange,
   getTransactionsByCategory,
