@@ -401,7 +401,10 @@ const service = {
   },
 
   getDashboardCache: async (userId) => {
-    return await repo.findDashboardCacheByuserId(userId);
+    const list = await repo.findDashboardCacheByuserId(userId);
+    const arr = Array.isArray(list) ? list : list ? [list] : [];
+    console.log(`[getDashboardCache] user=${userId} -> ${arr.length} cache doc(s)`);
+    return arr;
   },
 
   getDashboardCachebyAccount: async (accountId) => {
@@ -800,17 +803,26 @@ const service = {
     return Math.ceil(day / 7);
   },
 
-  _updateUserAnalytics: async function (transaction) {
+  _updateUserAnalytics: async function (transaction, sign = 1) {
     const { user_id, amount, transaction_type, date } = transaction;
     const txDate = date ? new Date(date) : new Date();
     const txYear = txDate.getFullYear();
     const txMonth = txDate.getMonth() + 1;
     const isExpense = transaction_type === 'Expense';
     const isIncome = transaction_type === 'Income';
-    const amt = Number(amount);
+    const rawAmt = Number(amount);
+    if (isNaN(rawAmt)) {
+      console.error(`[_updateUserAnalytics] Invalid amount, skipping. amount:`, amount);
+      return null;
+    }
+    const amt = rawAmt * sign;
 
     let ua = await repo.findUserAnalyticsByuserId(user_id);
     if (!ua) {
+      if (sign < 0) {
+        console.warn(`[_updateUserAnalytics] sign=-1 but no user_analytics for user_id: ${user_id} -> skip reverse`);
+        return null;
+      }
       console.log(`[_updateUserAnalytics] user_analytics not found, creating new for user_id: ${user_id}`);
       ua = await repo.createUserAnalytics({
         user_id,
@@ -837,14 +849,14 @@ const service = {
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1;
 
-    const newTotalIncome = isIncome ? (ua.total_income || 0) + amt : (ua.total_income || 0);
-    const newTotalExpense = isExpense ? (ua.total_expense || 0) + amt : (ua.total_expense || 0);
+    const newTotalIncome = isIncome ? Math.max(0, (ua.total_income || 0) + amt) : (ua.total_income || 0);
+    const newTotalExpense = isExpense ? Math.max(0, (ua.total_expense || 0) + amt) : (ua.total_expense || 0);
     const newBalance = newTotalIncome - newTotalExpense;
 
     let currentMonthUpdate = { ...ua.current_month };
     if (txYear === currentYear && txMonth === currentMonth) {
-      if (isIncome) currentMonthUpdate.income = (ua.current_month?.income || 0) + amt;
-      if (isExpense) currentMonthUpdate.expense = (ua.current_month?.expense || 0) + amt;
+      if (isIncome) currentMonthUpdate.income = Math.max(0, (ua.current_month?.income || 0) + amt);
+      if (isExpense) currentMonthUpdate.expense = Math.max(0, (ua.current_month?.expense || 0) + amt);
       currentMonthUpdate.savings = (currentMonthUpdate.income || 0) - (currentMonthUpdate.expense || 0);
       currentMonthUpdate.savings_rate = currentMonthUpdate.income > 0
         ? parseFloat(((currentMonthUpdate.savings / currentMonthUpdate.income) * 100).toFixed(2))
@@ -855,11 +867,13 @@ const service = {
     if (isExpense && transaction.category_id) {
       const idx = topCategories.findIndex(c => c.category_id === transaction.category_id);
       if (idx >= 0) {
-        topCategories[idx] = {
-          ...topCategories[idx],
-          total_amount: (topCategories[idx].total_amount || 0) + amt
-        };
-      } else {
+        const newAmount = (topCategories[idx].total_amount || 0) + amt;
+        if (newAmount <= 0) {
+          topCategories.splice(idx, 1);
+        } else {
+          topCategories[idx] = { ...topCategories[idx], total_amount: newAmount };
+        }
+      } else if (sign > 0) {
         topCategories.push({
           category_id: transaction.category_id,
           category_name: transaction.category_name || '',
@@ -869,7 +883,7 @@ const service = {
       topCategories.sort((a, b) => b.total_amount - a.total_amount);
     }
 
-    return await repo.updateUserAnalyticsByuserId(user_id, {
+    const updated = await repo.updateUserAnalyticsByuserId(user_id, {
       $set: {
         total_income: newTotalIncome,
         total_expense: newTotalExpense,
@@ -879,57 +893,72 @@ const service = {
       },
       $currentDate: { updated_at: true }
     });
+
+    console.log(`[_updateUserAnalytics] sign=${sign} user=${user_id} type=${transaction_type} amt=${rawAmt} -> total_income=${updated?.total_income}, total_expense=${updated?.total_expense}, balance=${updated?.current_balance}`);
+    return updated;
   },
 
-  _updateCategorySummary: async function (transaction) {
+  _updateCategorySummary: async function (transaction, sign = 1) {
     const { user_id, account_id, category_id, amount, transaction_type, date, trans_id } = transaction;
 
-    console.log('[_updateCategorySummary] date:', date, 'type:', typeof date); // thêm dòng này
-
-    if (!category_id) return null;
+    if (!category_id) {
+      console.warn(`[_updateCategorySummary] sign=${sign} no category_id for trans_id=${trans_id}, skip`);
+      return null;
+    }
 
     const txDate = new Date(date);
     const year = txDate.getFullYear();
     const month = txDate.getMonth() + 1;
     const day = txDate.getDate();
-    const amt = Number(amount);
+    const rawAmt = Number(amount);
 
-    if (isNaN(amt)) {
-      throw new Error('Invalid amount');
+    if (isNaN(rawAmt)) {
+      console.error(`[_updateCategorySummary] Invalid amount, skipping. amount:`, amount);
+      return null;
     }
-
     if (isNaN(year) || isNaN(month)) {
       console.error('[_updateCategorySummary] Invalid date, skipping. date:', date);
       return null;
     }
 
-
-    console.log('[_updateCategorySummary] year:', year, 'month:', month); // thêm dòng này
+    const amt = rawAmt * sign;
 
     const existingArr = await repo.findCategorySummaryByAccountMonth2(user_id, category_id, account_id, year, month)
       .catch(() => null);
     const existing = existingArr?.[0] || null;
 
     if (existing) {
-      const newTotal = (existing.total_amount || 0) + amt;
-      const newCount = (existing.transaction_count || 0) + 1;
+      const newTotal = Math.max(0, (existing.total_amount || 0) + amt);
+      const newCount = Math.max(0, (existing.transaction_count || 0) + sign);
       const budgetLimit = existing.budget_limit || 0;
       const isOverBudget = budgetLimit > 0 ? newTotal > budgetLimit : false;
 
-      const breakdown = existing.daily_breakdown ? [...existing.daily_breakdown] : [];
+      const breakdown = existing.daily_breakdown ? existing.daily_breakdown.map(d => ({ ...d, trans_id: [...(d.trans_id || [])] })) : [];
       const dayIdx = breakdown.findIndex(d => d.day === day);
-      if (dayIdx >= 0) {
-        breakdown[dayIdx] = {
-          ...breakdown[dayIdx],
-          amount: breakdown[dayIdx].amount + amt,
-          trans_id: [...(breakdown[dayIdx].trans_id || []), trans_id]
-        };
+      if (sign > 0) {
+        if (dayIdx >= 0) {
+          breakdown[dayIdx] = {
+            ...breakdown[dayIdx],
+            amount: (breakdown[dayIdx].amount || 0) + amt,
+            trans_id: [...(breakdown[dayIdx].trans_id || []), trans_id]
+          };
+        } else {
+          breakdown.push({ day, amount: amt, trans_id: [trans_id] });
+          breakdown.sort((a, b) => a.day - b.day);
+        }
+      } else if (dayIdx >= 0) {
+        const newDayAmount = Math.max(0, (breakdown[dayIdx].amount || 0) + amt);
+        const newTransIds = (breakdown[dayIdx].trans_id || []).filter(id => id !== trans_id);
+        if (newTransIds.length === 0 || newDayAmount === 0) {
+          breakdown.splice(dayIdx, 1);
+        } else {
+          breakdown[dayIdx] = { ...breakdown[dayIdx], amount: newDayAmount, trans_id: newTransIds };
+        }
       } else {
-        breakdown.push({ day, amount: amt, trans_id: [trans_id] });
-        breakdown.sort((a, b) => a.day - b.day);
+        console.warn(`[_updateCategorySummary] sign=-1 but day=${day} not found in breakdown for trans_id=${trans_id}`);
       }
 
-      return await repo.upsertCategorySummary(
+      const result = await repo.upsertCategorySummary(
         user_id,
         category_id,
         account_id,
@@ -945,45 +974,68 @@ const service = {
           $currentDate: { updated_at: true }
         }
       );
-    } else {
-      const categoryInfo = await repo.findCategoryById(user_id, category_id).catch(() => null);
-      const newDoc = {
-        user_id,
-        account_id: account_id || null,
-        category_id,
-        category_name: categoryInfo?.category_name || transaction.category_name || '',
-        category_type: transaction_type === 'Income' ? 'income' : 'expense',
-        year,
-        month,
-        total_amount: amt,
-        transaction_count: 1,
-        budget_limit: 0,
-        is_over_budget: false,
-        daily_breakdown: [{ day, amount: amt, trans_id: [trans_id] }],
-      };
-      return await repo.upsertCategorySummary(
-        user_id,
-        category_id,
-        account_id,
-        year,
-        month,
-        { $set: newDoc, $currentDate: { updated_at: true } }
-      );
+
+      console.log(`[_updateCategorySummary] sign=${sign} cat=${category_id} ${year}/${month} -> total=${result?.total_amount}, count=${result?.transaction_count}, days=${result?.daily_breakdown?.length}`);
+      return result;
     }
+
+    if (sign < 0) {
+      console.warn(`[_updateCategorySummary] sign=-1 but no existing summary for cat=${category_id} ${year}/${month}, skip reverse`);
+      return null;
+    }
+
+    const categoryInfo = await repo.findCategoryById(user_id, category_id).catch(() => null);
+    const newDoc = {
+      user_id,
+      account_id: account_id || null,
+      category_id,
+      category_name: categoryInfo?.category_name || transaction.category_name || '',
+      category_type: transaction_type === 'Income' ? 'income' : 'expense',
+      year,
+      month,
+      total_amount: amt,
+      transaction_count: 1,
+      budget_limit: 0,
+      is_over_budget: false,
+      daily_breakdown: [{ day, amount: amt, trans_id: [trans_id] }],
+    };
+    const created = await repo.upsertCategorySummary(
+      user_id,
+      category_id,
+      account_id,
+      year,
+      month,
+      { $set: newDoc, $currentDate: { updated_at: true } }
+    );
+    console.log(`[_updateCategorySummary] sign=${sign} CREATE cat=${category_id} ${year}/${month} -> total=${created?.total_amount}`);
+    return created;
   },
 
-  _updateDashboardCache: async function (transaction) {
+  _updateDashboardCache: async function (transaction, sign = 1) {
     const { user_id, account_id, trans_id, amount, transaction_type, description, date, category_id } = transaction;
-    if (!account_id) return null;
+    if (!account_id) {
+      console.warn(`[_updateDashboardCache] sign=${sign} no account_id for trans_id=${trans_id}, skip`);
+      return null;
+    }
 
-    const amt = Number(amount);
+    const rawAmt = Number(amount);
+    if (isNaN(rawAmt)) {
+      console.error(`[_updateDashboardCache] Invalid amount, skipping. amount:`, amount);
+      return null;
+    }
+    const amt = rawAmt * sign;
     const isExpense = transaction_type === 'Expense';
     const isIncome = transaction_type === 'Income';
 
-    // Lấy cache hiện tại theo user_id + account_id, tự tạo nếu chưa có
     let cache = await repo.findDashboardCacheByAccountId(account_id).catch(() => null);
+    let isNewCache = false;
     if (!cache) {
+      if (sign < 0) {
+        console.warn(`[_updateDashboardCache] sign=-1 but no cache for account_id=${account_id}, skip reverse`);
+        return null;
+      }
       console.log(`[_updateDashboardCache] dashboard_cache not found, creating new for account_id: ${account_id}`);
+      isNewCache = true;
       cache = {
         user_id,
         account_id,
@@ -994,46 +1046,71 @@ const service = {
           monthly_savings: 0,
           savings_rate: 0,
         },
+        top_categories: [],
         recent_transactions: [],
         streak: { saving_months: 0, unit: 'months' },
-        top_account_id: account_id,
+        top_account_id: null,
       };
     }
 
     const summary = { ...(cache.summary || {}) };
     if (isExpense) {
       summary.current_balance = (summary.current_balance || 0) - amt;
-      summary.monthly_expense = (summary.monthly_expense || 0) + amt;
-      summary.monthly_savings = (summary.monthly_income || 0) - summary.monthly_expense;
-      summary.savings_rate = summary.monthly_income > 0
-        ? parseFloat(((summary.monthly_savings / summary.monthly_income) * 100).toFixed(2))
-        : 0;
+      summary.monthly_expense = Math.max(0, (summary.monthly_expense || 0) + amt);
     } else if (isIncome) {
       summary.current_balance = (summary.current_balance || 0) + amt;
-      summary.monthly_income = (summary.monthly_income || 0) + amt;
-      summary.monthly_savings = summary.monthly_income - (summary.monthly_expense || 0);
-      summary.savings_rate = summary.monthly_income > 0
-        ? parseFloat(((summary.monthly_savings / summary.monthly_income) * 100).toFixed(2))
-        : 0;
+      summary.monthly_income = Math.max(0, (summary.monthly_income || 0) + amt);
+    }
+    summary.monthly_savings = (summary.monthly_income || 0) - (summary.monthly_expense || 0);
+    summary.savings_rate = summary.monthly_income > 0
+      ? parseFloat(((summary.monthly_savings / summary.monthly_income) * 100).toFixed(2))
+      : 0;
+
+    // Recompute top_categories (expense-only, all-time cumulative)
+    let topCategories = cache.top_categories ? cache.top_categories.map(c => ({ ...c })) : [];
+    if (isExpense && category_id) {
+      const idx = topCategories.findIndex(c => c.category_id === category_id);
+      if (idx >= 0) {
+        const newAmount = (topCategories[idx].total_amount || 0) + amt;
+        if (newAmount <= 0) {
+          topCategories.splice(idx, 1);
+        } else {
+          topCategories[idx] = { ...topCategories[idx], total_amount: newAmount };
+        }
+      } else if (sign > 0) {
+        topCategories.push({
+          category_id,
+          category_name: transaction.category_name || '',
+          total_amount: amt,
+        });
+      }
+      topCategories.sort((a, b) => (b.total_amount || 0) - (a.total_amount || 0));
+      topCategories = topCategories.slice(0, 10);
     }
 
-    const newTx = {
-      trans_id,
-      description: description || '',
-      amount: amt,
-      type: transaction_type.toLowerCase(),
-      date: date ? date.toString().slice(0, 10) : new Date().toISOString().slice(0, 10),
-      category_id: category_id || null
-    };
-    const recent = [newTx, ...(cache.recent_transactions || [])].slice(0, 5);
+    let recent;
+    if (sign > 0) {
+      const newTx = {
+        trans_id,
+        description: description || '',
+        amount: rawAmt,
+        type: transaction_type ? transaction_type.toLowerCase() : 'expense',
+        date: date ? date.toString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+        category_id: category_id || null
+      };
+      recent = [newTx, ...(cache.recent_transactions || []).filter(t => t.trans_id !== trans_id)].slice(0, 5);
+    } else {
+      recent = (cache.recent_transactions || []).filter(t => t.trans_id !== trans_id);
+    }
 
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
-    return await repo.upsertDashboardCache(
+    const result = await repo.upsertDashboardCache(
       user_id,
       {
         account_id,
         summary,
+        top_categories: topCategories,
         recent_transactions: recent,
         streak: cache.streak,
         top_account_id: cache.top_account_id,
@@ -1041,20 +1118,56 @@ const service = {
       },
       15 * 60 * 1000
     );
+
+    // Recompute top_account_id across all user's dashboard caches.
+    // top_account_id = account có monthly_expense lớn nhất trong user.
+    try {
+      const allCaches = await repo.findDashboardCacheByuserId(user_id);
+      if (Array.isArray(allCaches) && allCaches.length > 0) {
+        let topAccountId = null;
+        let maxExpense = -1;
+        for (const c of allCaches) {
+          const exp = Number(c?.summary?.monthly_expense || 0);
+          if (exp > maxExpense) {
+            maxExpense = exp;
+            topAccountId = c.account_id;
+          }
+        }
+        if (topAccountId) {
+          await repo.updateDashboardCacheTopAccount(user_id, topAccountId);
+          if (result) result.top_account_id = topAccountId;
+        }
+      }
+    } catch (err) {
+      console.warn(`[_updateDashboardCache] recompute top_account_id failed:`, err.message);
+    }
+
+    console.log(`[_updateDashboardCache] sign=${sign} account=${account_id} type=${transaction_type} amt=${rawAmt} -> balance=${result?.summary?.current_balance}, monthly_inc=${result?.summary?.monthly_income}, monthly_exp=${result?.summary?.monthly_expense}, recent=${result?.recent_transactions?.length}, top_cats=${result?.top_categories?.length}, top_account=${result?.top_account_id}${isNewCache ? ' (NEW)' : ''}`);
+    return result;
   },
 
-  _updateMonthlyReport: async function (transaction) {
+  _updateMonthlyReport: async function (transaction, sign = 1) {
     const { user_id, trans_id, amount, transaction_type, description, date, category_id } = transaction;
-    if (!date) return null;
+    if (!date) {
+      console.warn(`[_updateMonthlyReport] sign=${sign} no date for trans_id=${trans_id}, skip`);
+      return null;
+    }
 
     const txDate = new Date(date);
     const year = txDate.getFullYear();
-
     const month = txDate.getMonth() + 1;
-
     const day = txDate.getDate();
 
-    const amt = Number(amount);
+    const rawAmt = Number(amount);
+    if (isNaN(rawAmt)) {
+      console.error(`[_updateMonthlyReport] Invalid amount, skipping. amount:`, amount);
+      return null;
+    }
+    if (isNaN(year) || isNaN(month)) {
+      console.error('[_updateMonthlyReport] Invalid date, skipping. date:', date);
+      return null;
+    }
+    const amt = rawAmt * sign;
 
     const isExpense = transaction_type === 'Expense';
     const isIncome = transaction_type === 'Income';
@@ -1063,6 +1176,10 @@ const service = {
 
     let report = await repo.findMonthlyReportByAccountMonth(user_id, year, month).catch(() => null);
     if (!report) {
+      if (sign < 0) {
+        console.warn(`[_updateMonthlyReport] sign=-1 but no report for user=${user_id} ${year}/${month}, skip reverse`);
+        return null;
+      }
       console.log(`[_updateMonthlyReport] monthly_report not found, creating new for user_id: ${user_id}, ${year}/${month}`);
       report = {
         user_id,
@@ -1086,25 +1203,30 @@ const service = {
 
     const summary = { ...(report.summary || {}) };
     if (isIncome) {
-      summary.total_income = (summary.total_income || 0) + amt;
+      summary.total_income = Math.max(0, (summary.total_income || 0) + amt);
     }
     if (isExpense) {
-      summary.total_expense = (summary.total_expense || 0) + amt;
+      summary.total_expense = Math.max(0, (summary.total_expense || 0) + amt);
     }
     summary.savings = (summary.total_income || 0) - (summary.total_expense || 0);
     summary.savings_rate = summary.total_income > 0
       ? parseFloat(((summary.savings / summary.total_income) * 100).toFixed(2))
       : 0;
-    summary.transaction_count = (summary.transaction_count || 0) + 1;
+    summary.transaction_count = Math.max(0, (summary.transaction_count || 0) + sign);
 
     const targetCatArray = isIncome ? 'income_by_category' : 'expense_by_category';
     const catArray = report[targetCatArray] ? [...report[targetCatArray]] : [];
     if (category_id) {
       const catIdx = catArray.findIndex(c => c.category_id === category_id);
       if (catIdx >= 0) {
-        catArray[catIdx] = { ...catArray[catIdx], amount: catArray[catIdx].amount + amt };
-      } else {
-        const categoryInfo = await repo.findCategoryById(category_id).catch(() => null);
+        const newAmount = (catArray[catIdx].amount || 0) + amt;
+        if (newAmount <= 0) {
+          catArray.splice(catIdx, 1);
+        } else {
+          catArray[catIdx] = { ...catArray[catIdx], amount: newAmount };
+        }
+      } else if (sign > 0) {
+        const categoryInfo = await repo.findCategoryById(user_id, category_id).catch(() => null);
         catArray.push({
           category_id,
           category_name: transaction.category_name || categoryInfo?.category_name || 'Unknown',
@@ -1116,12 +1238,14 @@ const service = {
     const weeklyTrend = report.weekly_trend ? [...report.weekly_trend] : [];
     const wIdx = weeklyTrend.findIndex(w => w.week === week);
     if (wIdx >= 0) {
-      weeklyTrend[wIdx] = {
-        ...weeklyTrend[wIdx],
-        income: isIncome ? weeklyTrend[wIdx].income + amt : weeklyTrend[wIdx].income,
-        expense: isExpense ? weeklyTrend[wIdx].expense + amt : weeklyTrend[wIdx].expense,
-      };
-    } else {
+      const newIncome = isIncome ? Math.max(0, (weeklyTrend[wIdx].income || 0) + amt) : (weeklyTrend[wIdx].income || 0);
+      const newExpense = isExpense ? Math.max(0, (weeklyTrend[wIdx].expense || 0) + amt) : (weeklyTrend[wIdx].expense || 0);
+      if (newIncome === 0 && newExpense === 0) {
+        weeklyTrend.splice(wIdx, 1);
+      } else {
+        weeklyTrend[wIdx] = { ...weeklyTrend[wIdx], income: newIncome, expense: newExpense };
+      }
+    } else if (sign > 0) {
       weeklyTrend.push({
         week,
         income: isIncome ? amt : 0,
@@ -1133,12 +1257,14 @@ const service = {
     const dailyCashflow = report.daily_cashflow ? [...report.daily_cashflow] : [];
     const dIdx = dailyCashflow.findIndex(d => d.day === day);
     if (dIdx >= 0) {
-      dailyCashflow[dIdx] = {
-        ...dailyCashflow[dIdx],
-        income: isIncome ? dailyCashflow[dIdx].income + amt : dailyCashflow[dIdx].income,
-        expense: isExpense ? dailyCashflow[dIdx].expense + amt : dailyCashflow[dIdx].expense,
-      };
-    } else {
+      const newIncome = isIncome ? Math.max(0, (dailyCashflow[dIdx].income || 0) + amt) : (dailyCashflow[dIdx].income || 0);
+      const newExpense = isExpense ? Math.max(0, (dailyCashflow[dIdx].expense || 0) + amt) : (dailyCashflow[dIdx].expense || 0);
+      if (newIncome === 0 && newExpense === 0) {
+        dailyCashflow.splice(dIdx, 1);
+      } else {
+        dailyCashflow[dIdx] = { ...dailyCashflow[dIdx], income: newIncome, expense: newExpense };
+      }
+    } else if (sign > 0) {
       dailyCashflow.push({
         day,
         income: isIncome ? amt : 0,
@@ -1149,17 +1275,22 @@ const service = {
 
     let topExpenses = report.top_expenses ? [...report.top_expenses] : [];
     if (isExpense && trans_id) {
-      topExpenses.push({
-        trans_id,
-        description: description || '',
-        amount: amt,
-        category_id: category_id || null,
-      });
-      topExpenses.sort((a, b) => b.amount - a.amount);
-      topExpenses = topExpenses.slice(0, 5);
+      if (sign > 0) {
+        topExpenses = topExpenses.filter(t => t.trans_id !== trans_id);
+        topExpenses.push({
+          trans_id,
+          description: description || '',
+          amount: rawAmt,
+          category_id: category_id || null,
+        });
+        topExpenses.sort((a, b) => b.amount - a.amount);
+        topExpenses = topExpenses.slice(0, 5);
+      } else {
+        topExpenses = topExpenses.filter(t => t.trans_id !== trans_id);
+      }
     }
 
-    return await repo.upsertMonthlyReport(
+    const result = await repo.upsertMonthlyReport(
       user_id,
       year,
       month,
@@ -1172,9 +1303,202 @@ const service = {
           top_expenses: topExpenses,
           status: 'generated',
         },
+        // Chỉ set khi insert mới, các update kế tiếp giữ nguyên timestamp tạo đầu tiên
+        $setOnInsert: { generated_at: new Date() },
         $currentDate: { updated_at: true }
       }
     );
+
+    console.log(`[_updateMonthlyReport] sign=${sign} user=${user_id} ${year}/${month} type=${transaction_type} amt=${rawAmt} -> total_inc=${result?.summary?.total_income}, total_exp=${result?.summary?.total_expense}, count=${result?.summary?.transaction_count}, generated_at=${result?.generated_at}`);
+    return result;
+  },
+
+  /**
+   * Cập nhật spending_trends theo (account_id, category_id).
+   * Mỗi document chứa lịch sử chi/thu theo tháng -> dùng tính avg & xu hướng.
+   */
+  _updateSpendingTrend: async function (transaction, sign = 1) {
+    const { user_id, account_id, category_id, amount, transaction_type, date, trans_id } = transaction;
+
+    if (!category_id) {
+      console.warn(`[_updateSpendingTrend] sign=${sign} no category_id for trans_id=${trans_id}, skip`);
+      return null;
+    }
+    if (!account_id) {
+      console.warn(`[_updateSpendingTrend] sign=${sign} no account_id for trans_id=${trans_id}, skip`);
+      return null;
+    }
+
+    const txDate = new Date(date);
+    const year = txDate.getFullYear();
+    const month = txDate.getMonth() + 1;
+    const rawAmt = Number(amount);
+
+    if (isNaN(rawAmt)) {
+      console.error(`[_updateSpendingTrend] Invalid amount, skipping. amount:`, amount);
+      return null;
+    }
+    if (isNaN(year) || isNaN(month)) {
+      console.error('[_updateSpendingTrend] Invalid date, skipping. date:', date);
+      return null;
+    }
+
+    const amt = rawAmt * sign;
+    const categoryTypeNormalized = transaction_type === 'Income' ? 'income' : 'expense';
+
+    let trend = await repo.findSpendingTrendByAccountCategory(account_id, category_id).catch(() => null);
+
+    if (!trend) {
+      if (sign < 0) {
+        console.warn(`[_updateSpendingTrend] sign=-1 but no trend for account=${account_id} cat=${category_id}, skip reverse`);
+        return null;
+      }
+      trend = {
+        user_id,
+        account_id,
+        category_id,
+        category_name: transaction.category_name || '',
+        category_type: categoryTypeNormalized,
+        monthly_data: [],
+        total_months: 0,
+        total_transactions: 0,
+        avg_monthly: 0,
+        trend: 'stable',
+      };
+    }
+
+    // Cập nhật monthly_data theo (year, month)
+    const monthlyData = Array.isArray(trend.monthly_data)
+      ? trend.monthly_data.map(m => ({ ...m }))
+      : [];
+    const mIdx = monthlyData.findIndex(m => m.year === year && m.month === month);
+    if (mIdx >= 0) {
+      const newAmt = Math.max(0, (monthlyData[mIdx].amount || 0) + amt);
+      if (newAmt === 0) {
+        monthlyData.splice(mIdx, 1);
+      } else {
+        monthlyData[mIdx] = { ...monthlyData[mIdx], amount: newAmt };
+      }
+    } else if (sign > 0) {
+      monthlyData.push({ year, month, amount: amt });
+      monthlyData.sort((a, b) => (a.year - b.year) || (a.month - b.month));
+    } else {
+      console.warn(`[_updateSpendingTrend] sign=-1 but ${year}/${month} not in monthly_data for cat=${category_id}, skip`);
+    }
+
+    const totalMonths = monthlyData.length;
+    const totalAmount = monthlyData.reduce((s, m) => s + (m.amount || 0), 0);
+    const avgMonthly = totalMonths > 0 ? Math.round(totalAmount / totalMonths) : 0;
+    const newTotalTransactions = Math.max(0, (trend.total_transactions || 0) + sign);
+
+    // Xác định xu hướng dựa trên tháng cuối so với tháng kế trước
+    let direction = 'stable';
+    if (monthlyData.length >= 2) {
+      const last = monthlyData[monthlyData.length - 1].amount || 0;
+      const prev = monthlyData[monthlyData.length - 2].amount || 0;
+      if (last > prev * 1.1) direction = 'increasing';
+      else if (last < prev * 0.9) direction = 'decreasing';
+      else direction = 'stable';
+    }
+
+    const result = await repo.upsertSpendingTrendByAccountCategory(
+      account_id,
+      category_id,
+      {
+        $set: {
+          user_id,
+          account_id,
+          category_id,
+          category_name: trend.category_name,
+          category_type: trend.category_type || categoryTypeNormalized,
+          monthly_data: monthlyData,
+          avg_monthly: avgMonthly,
+          trend: direction,
+          total_months: totalMonths,
+          total_transactions: newTotalTransactions,
+          updated_at: new Date(),
+        }
+      }
+    );
+
+    console.log(`[_updateSpendingTrend] sign=${sign} user=${user_id} account=${account_id} cat=${category_id} -> months=${totalMonths}, total_tx=${newTotalTransactions}, avg=${avgMonthly}, trend=${direction}`);
+    return result;
+  },
+
+  /**
+   * Tính lại user_analytics.budget_alert.alerts cho 1 (user, category) trong tháng hiện tại.
+   * Tổng hợp dữ liệu từ category_summary (mọi account_id) của user trong (year, month) hiện tại.
+   * - Nếu không có budget_limit > 0 -> xoá alert tương ứng (nếu có).
+   * - Ngược lại upsert alert với percent_used / status.
+   */
+  _updateBudgetAlerts: async function (transaction) {
+    const { user_id, category_id } = transaction;
+    if (!user_id || !category_id) return null;
+
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+
+    const summaries = await repo
+      .findCategorySummariesByUserCategoryMonth(user_id, category_id, year, month)
+      .catch(() => []);
+
+    // Lấy budget_limit lớn nhất trong các account (budget thường set per-category, không per-account)
+    const budgetLimit = (summaries || []).reduce(
+      (mx, s) => Math.max(mx, Number(s?.budget_limit || 0)),
+      0
+    );
+
+    // Không có budget -> đảm bảo không còn alert cho category này
+    if (!budgetLimit || budgetLimit <= 0) {
+      const cleared = await repo.updateUserAnalyticsByuserId(user_id, {
+        $pull: { 'budget_alert.alerts': { category_id } },
+        $set: { 'budget_alert.last_checked': new Date() },
+      });
+      console.log(`[_updateBudgetAlerts] user=${user_id} cat=${category_id} no budget -> alert pulled`);
+      return cleared;
+    }
+
+    const currentSpent = (summaries || []).reduce(
+      (s, x) => s + Number(x?.total_amount || 0),
+      0
+    );
+    const categoryName =
+      (summaries || []).map(s => s?.category_name).find(Boolean) ||
+      transaction.category_name ||
+      '';
+    const percentUsed =
+      budgetLimit > 0
+        ? Math.round((currentSpent / budgetLimit) * 100 * 100) / 100
+        : 0;
+
+    let status = 'ok';
+    if (percentUsed > 100) status = 'exceeded';
+    else if (percentUsed >= 99) status = 'critical';
+    else if (percentUsed >= 70) status = 'warning';
+
+    const newAlert = {
+      category_id,
+      category_name: categoryName,
+      budget_limit: budgetLimit,
+      current_spent: Math.max(0, currentSpent),
+      percent_used: percentUsed,
+      status,
+      alerted_at: status !== 'ok' ? new Date() : null,
+    };
+
+    // Đảm bảo single-entry per category: pull trước, push sau (atomic 2-bước)
+    await repo.updateUserAnalyticsByuserId(user_id, {
+      $pull: { 'budget_alert.alerts': { category_id } },
+    });
+
+    const updated = await repo.updateUserAnalyticsByuserId(user_id, {
+      $push: { 'budget_alert.alerts': newAlert },
+      $set: { 'budget_alert.last_checked': new Date() },
+    });
+
+    console.log(`[_updateBudgetAlerts] user=${user_id} cat=${category_id} spent=${currentSpent}/${budgetLimit} (${percentUsed}%) -> ${status}`);
+    return updated;
   },
 
   
@@ -1184,20 +1508,29 @@ const service = {
     const { account_id, trans_id, user_id } = transaction;
 
     console.log(`[handleTransactionCreated] Processing trans_id: ${trans_id}, user_id: ${user_id}`);
-    console.log(`mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm user_id: ${user_id}`);
     try {
 
-      const [uaResult, csResult, dcResult, mrResult] = await Promise.allSettled([
+      // Phase 1: cập nhật song song các collection chính
+      const [uaResult, csResult, dcResult, mrResult, stResult] = await Promise.allSettled([
         this._updateUserAnalytics(transaction),
         this._updateCategorySummary(transaction),
         this._updateDashboardCache(transaction),
         this._updateMonthlyReport(transaction),
+        this._updateSpendingTrend(transaction),
       ]);
 
       if (uaResult.status === 'rejected') console.error(`[handleTransactionCreated] user_analytics error:`, uaResult.reason);
       if (csResult?.status === 'rejected') console.error(`[handleTransactionCreated] category_summary error:`, csResult.reason);
       if (dcResult?.status === 'rejected') console.error(`[handleTransactionCreated] dashboard_cache error:`, dcResult.reason);
       if (mrResult?.status === 'rejected') console.error(`[handleTransactionCreated] monthly_report error:`, mrResult.reason);
+      if (stResult?.status === 'rejected') console.error(`[handleTransactionCreated] spending_trends error:`, stResult.reason);
+
+      // Phase 2: budget alerts (đọc category_summary vừa cập nhật ở phase 1)
+      try {
+        await this._updateBudgetAlerts(transaction);
+      } catch (err) {
+        console.error(`[handleTransactionCreated] budget_alerts error:`, err.message);
+      }
 
       console.log(`[handleTransactionCreated] Done for trans_id: ${trans_id}`);
       return { account_id, trans_id };
@@ -1205,6 +1538,30 @@ const service = {
       console.error(`[handleTransactionCreated] Fatal error:`, err);
       return null;
     }
+  },
+
+  _logPhaseResults: function (prefix, results) {
+    const names = ['user_analytics', 'category_summary', 'dashboard_cache', 'monthly_report', 'spending_trends'];
+    const report = { ok: 0, skipped: 0, failed: 0, details: {} };
+    results.forEach((r, i) => {
+      const name = names[i];
+      if (r.status === 'fulfilled') {
+        if (r.value && (r.value._id || r.value.user_id || r.value.account_id)) {
+          report.ok++;
+          report.details[name] = 'OK';
+          console.log(`${prefix} ${name}: OK`);
+        } else {
+          report.skipped++;
+          report.details[name] = 'SKIPPED';
+          console.warn(`${prefix} ${name}: SKIPPED (no record returned)`);
+        }
+      } else {
+        report.failed++;
+        report.details[name] = `ERROR: ${r.reason?.message || r.reason}`;
+        console.error(`${prefix} ${name}: ERROR ->`, r.reason?.message || r.reason, r.reason?.stack);
+      }
+    });
+    return report;
   },
 
   handleTransactionUpdated: async function (message) {
@@ -1219,6 +1576,12 @@ const service = {
     } = message;
 
     console.log(`[handleTransactionUpdated] Processing trans_id: ${trans_id}, user_id: ${user_id}`);
+    console.log(`[handleTransactionUpdated] OLD -> account=${account_id}, amount=${amount}, type=${transaction_type}, category=${category_id}`);
+    console.log(`[handleTransactionUpdated] NEW -> account=${account_id_update ?? account_id}, amount=${amount_update ?? amount}, type=${transaction_type_update ?? transaction_type}, category=${category_id}`);
+
+    if (account_id_update && account_id_update !== account_id) {
+      console.warn(`[handleTransactionUpdated] account_id changed (${account_id} -> ${account_id_update}). Reverse will hit OLD account, apply will hit NEW account.`);
+    }
 
     try {
       const oldTransaction = {
@@ -1249,37 +1612,43 @@ const service = {
         note,
       };
 
-      const reverseTransaction = {
-        ...oldTransaction,
-        transaction_type: transaction_type === 'Income' ? 'Expense' : 'Income',
-      };
-
-      const [uaReverse, csReverse, dcReverse, mrReverse] = await Promise.allSettled([
-        this._updateUserAnalytics(reverseTransaction),
-        this._updateCategorySummary(reverseTransaction),
-        this._updateDashboardCache(reverseTransaction),
-        this._updateMonthlyReport(reverseTransaction),
+      console.log(`[handleTransactionUpdated] === Phase 1: REVERSE old transaction (sign=-1) ===`);
+      const reverseResults = await Promise.allSettled([
+        this._updateUserAnalytics(oldTransaction, -1),
+        this._updateCategorySummary(oldTransaction, -1),
+        this._updateDashboardCache(oldTransaction, -1),
+        this._updateMonthlyReport(oldTransaction, -1),
+        this._updateSpendingTrend(oldTransaction, -1),
       ]);
+      const reverseReport = this._logPhaseResults(`[handleTransactionUpdated][REVERSE]`, reverseResults);
 
-      if (uaReverse.status === 'rejected') console.error(`[handleTransactionUpdated] uaReverse error:`, uaReverse.reason);
-      if (csReverse.status === 'rejected') console.error(`[handleTransactionUpdated] csReverse error:`, csReverse.reason);
-      if (dcReverse.status === 'rejected') console.error(`[handleTransactionUpdated] dcReverse error:`, dcReverse.reason);
-      if (mrReverse.status === 'rejected') console.error(`[handleTransactionUpdated] mrReverse error:`, mrReverse.reason);
-
-      const [uaNew, csNew, dcNew, mrNew] = await Promise.allSettled([
-        this._updateUserAnalytics(newTransaction),
-        this._updateCategorySummary(newTransaction),
-        this._updateDashboardCache(newTransaction),
-        this._updateMonthlyReport(newTransaction),
+      console.log(`[handleTransactionUpdated] === Phase 2: APPLY new transaction (sign=+1) ===`);
+      const applyResults = await Promise.allSettled([
+        this._updateUserAnalytics(newTransaction, 1),
+        this._updateCategorySummary(newTransaction, 1),
+        this._updateDashboardCache(newTransaction, 1),
+        this._updateMonthlyReport(newTransaction, 1),
+        this._updateSpendingTrend(newTransaction, 1),
       ]);
+      const applyReport = this._logPhaseResults(`[handleTransactionUpdated][APPLY]`, applyResults);
 
-      if (uaNew.status === 'rejected') console.error(`[handleTransactionUpdated] uaNew error:`, uaNew.reason);
-      if (csNew.status === 'rejected') console.error(`[handleTransactionUpdated] csNew error:`, csNew.reason);
-      if (dcNew.status === 'rejected') console.error(`[handleTransactionUpdated] dcNew error:`, dcNew.reason);
-      if (mrNew.status === 'rejected') console.error(`[handleTransactionUpdated] mrNew error:`, mrNew.reason);
+      // Phase 3: budget alerts (đọc category_summary đã được apply ở phase 2)
+      try {
+        await this._updateBudgetAlerts(newTransaction);
+        // Nếu category thay đổi giữa old/new thì recompute cả category cũ
+        if (oldTransaction.category_id && oldTransaction.category_id !== newTransaction.category_id) {
+          await this._updateBudgetAlerts(oldTransaction);
+        }
+      } catch (err) {
+        console.error(`[handleTransactionUpdated] budget_alerts error:`, err.message);
+      }
 
-      console.log(`[handleTransactionUpdated] Done for trans_id: ${trans_id}`);
-      return { account_id, trans_id };
+      const allOk = reverseReport.failed === 0 && applyReport.failed === 0;
+      const summary = `reverse(ok=${reverseReport.ok}, skip=${reverseReport.skipped}, fail=${reverseReport.failed}) apply(ok=${applyReport.ok}, skip=${applyReport.skipped}, fail=${applyReport.failed})`;
+      console.log(`[handleTransactionUpdated] Done for trans_id: ${trans_id} | ${summary} | overall=${allOk ? 'OK' : 'PARTIAL/FAIL'}`);
+
+      if (!allOk) return null;
+      return { account_id: account_id_update ?? account_id, trans_id, reverseReport, applyReport };
     } catch (err) {
       console.error(`[handleTransactionUpdated] Fatal error:`, err);
       return null;
@@ -1295,15 +1664,16 @@ const service = {
     } = message;
 
     console.log(`[handleTransactionDeleted] Processing trans_id: ${trans_id}, user_id: ${user_id}`);
+    console.log(`[handleTransactionDeleted] account=${account_id}, amount=${amount}, type=${transaction_type}, category=${category_id}`);
 
     try {
-      const reverseTransaction = {
+      const oldTransaction = {
         trans_id,
         user_id,
         account_id,
         category_id,
         amount: Number(amount),
-        transaction_type: transaction_type === 'Income' ? 'Expense' : 'Income',
+        transaction_type,
         category_name,
         account_name,
         description,
@@ -1311,24 +1681,39 @@ const service = {
         note,
       };
 
-      const [uaResult, csResult, dcResult, mrResult] = await Promise.allSettled([
-        this._updateUserAnalytics(reverseTransaction),
-        this._updateCategorySummary(reverseTransaction),
-        this._updateDashboardCache(reverseTransaction),
-        this._updateMonthlyReport(reverseTransaction),
+      console.log(`[handleTransactionDeleted] === REVERSE deleted transaction (sign=-1) ===`);
+      const results = await Promise.allSettled([
+        this._updateUserAnalytics(oldTransaction, -1),
+        this._updateCategorySummary(oldTransaction, -1),
+        this._updateDashboardCache(oldTransaction, -1),
+        this._updateMonthlyReport(oldTransaction, -1),
+        this._updateSpendingTrend(oldTransaction, -1),
       ]);
+      const report = this._logPhaseResults(`[handleTransactionDeleted][REVERSE]`, results);
 
-      if (uaResult.status === 'rejected') console.error(`[handleTransactionDeleted] user_analytics error:`, uaResult.reason);
-      if (csResult.status === 'rejected') console.error(`[handleTransactionDeleted] category_summary error:`, csResult.reason);
-      if (dcResult.status === 'rejected') console.error(`[handleTransactionDeleted] dashboard_cache error:`, dcResult.reason);
-      if (mrResult.status === 'rejected') console.error(`[handleTransactionDeleted] monthly_report error:`, mrResult.reason);
+      // Recompute budget alerts cho category bị ảnh hưởng
+      try {
+        await this._updateBudgetAlerts(oldTransaction);
+      } catch (err) {
+        console.error(`[handleTransactionDeleted] budget_alerts error:`, err.message);
+      }
 
-      await repo.deleteTransactionByTransId(trans_id).catch(err =>
-        console.error(`[handleTransactionDeleted] deleteTransaction error:`, err)
-      );
+      const delResult = await repo.deleteTransactionByTransId(trans_id).catch(err => {
+        console.error(`[handleTransactionDeleted] deleteTransaction error:`, err);
+        return null;
+      });
+      if (delResult) {
+        console.log(`[handleTransactionDeleted] local transaction record deleted: ${trans_id}`);
+      } else {
+        console.warn(`[handleTransactionDeleted] local transaction record not found or already deleted: ${trans_id}`);
+      }
 
-      console.log(`[handleTransactionDeleted] Done for trans_id: ${trans_id}`);
-      return { account_id, trans_id };
+      const allOk = report.failed === 0;
+      const summary = `reverse(ok=${report.ok}, skip=${report.skipped}, fail=${report.failed})`;
+      console.log(`[handleTransactionDeleted] Done for trans_id: ${trans_id} | ${summary} | overall=${allOk ? 'OK' : 'PARTIAL/FAIL'}`);
+
+      if (!allOk) return null;
+      return { account_id, trans_id, report };
     } catch (err) {
       console.error(`[handleTransactionDeleted] Fatal error:`, err);
       return null;

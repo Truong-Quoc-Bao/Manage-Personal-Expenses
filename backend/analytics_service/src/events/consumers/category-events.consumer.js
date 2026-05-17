@@ -2,6 +2,7 @@ const CategorySummary = require('../../model/categorySummary.model');
 const DashboardCache = require('../../model/dashboardCache.model');
 const MonthlyReport = require('../../model/monthlyReport.model');
 const SpendingTrend = require('../../model/spendingTrend.model');
+const UserAnalytics = require('../../model/userAnalytics.model');
 
 async function handleCategoryCreated(content, msg) {
   const { category_id, user_id, category_name, type } = content;
@@ -46,6 +47,18 @@ async function handleCategoryUpdated(content, msg) {
     );
     console.log(`[Analytics] Updated spending_trends for category ${category_id}`);
 
+    // user_analytics.top_categories[].category_name
+    await UserAnalytics.updateMany(
+      { user_id, "top_categories.category_id": category_id },
+      { $set: { "top_categories.$.category_name": category_name } }
+    );
+    // user_analytics.budget_alert.alerts[].category_name
+    await UserAnalytics.updateMany(
+      { user_id, "budget_alert.alerts.category_id": category_id },
+      { $set: { "budget_alert.alerts.$.category_name": category_name } }
+    );
+    console.log(`[Analytics] Updated user_analytics top_categories & budget_alert.alerts for category ${category_id}`);
+
   } catch (err) {
     console.error(`[Analytics] Error handling category.updated:`, err.message);
   }
@@ -83,6 +96,18 @@ async function handleCategoryDeleted(content, msg) {
 
      await SpendingTrend.deleteMany({ user_id, category_id });
     console.log(`[Analytics] Deleted spending_trends for category ${category_id}`);
+
+    // user_analytics: pull khỏi top_categories và budget_alert.alerts
+    await UserAnalytics.updateMany(
+      { user_id },
+      {
+        $pull: {
+          top_categories: { category_id },
+          "budget_alert.alerts": { category_id },
+        },
+      }
+    );
+    console.log(`[Analytics] Pulled category ${category_id} from user_analytics top_categories & budget_alert.alerts`);
 
   } catch (err) {
     console.error(`[Analytics] Error handling category.deleted:`, err.message);

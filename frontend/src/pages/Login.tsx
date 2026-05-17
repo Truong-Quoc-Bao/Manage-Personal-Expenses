@@ -55,24 +55,23 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-[480px]">
-        <div className="bg-white rounded-3xl shadow-xl p-8 md:p-9">
+    <div className="w-full">
+      <div className="rounded-3xl bg-white p-8 shadow-xl md:p-9">
           <div className="mb-6 text-center">
-            <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-r from-orange-400 to-rose-400 shadow-lg flex items-center justify-center text-white text-3xl mb-4">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-r from-orange-500 to-rose-500 text-3xl text-white shadow-lg">
               💰
             </div>
-            <h1 className="text-3xl font-semibold text-gray-800 mb-1">
+            <h1 className="mb-1 text-3xl font-semibold text-gray-900">
               Đăng nhập
             </h1>
-            <p className="text-base text-gray-600">
+            <p className="text-base text-gray-500">
               Kiểm soát chi tiêu, nắm bắt tài chính
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-base text-gray-700 mb-2">
+              <label className="mb-2 block text-base font-medium text-gray-800">
                 Email hoặc Tên đăng nhập
               </label>
               <input
@@ -81,14 +80,14 @@ export function Login() {
                 onChange={(e) =>
                   setFormData({ ...formData, email: e.target.value })
                 }
-                className="w-full px-4 py-4 rounded-2xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all text-lg"
+                className="w-full rounded-2xl border border-gray-300 px-4 py-4 text-lg text-gray-900 placeholder:text-gray-400 transition-all focus:border-transparent focus:outline-none focus:ring-2 focus:ring-orange-400"
                 placeholder="Nhập email hoặc tên đăng nhập"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-base text-gray-700 mb-2">
+              <label className="mb-2 block text-base font-medium text-gray-800">
                 Mật khẩu
               </label>
               <div className="relative">
@@ -98,7 +97,7 @@ export function Login() {
                   onChange={(e) =>
                     setFormData({ ...formData, password: e.target.value })
                   }
-                  className="w-full px-4 py-4 pr-14 rounded-2xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all text-lg"
+                  className="w-full rounded-2xl border border-gray-300 px-4 py-4 pr-14 text-lg text-gray-900 placeholder:text-gray-400 transition-all focus:border-transparent focus:outline-none focus:ring-2 focus:ring-orange-400"
                   placeholder="Nhập mật khẩu"
                   required
                 />
@@ -117,7 +116,7 @@ export function Login() {
             </div>
 
             <div className="flex items-center justify-between text-base">
-              <label className="flex items-center gap-2 text-gray-700 cursor-pointer">
+              <label className="flex cursor-pointer items-center gap-2 text-gray-600">
                 <input
                   type="checkbox"
                   className="w-4 h-4 rounded border-gray-300 text-orange-500 focus:ring-orange-400"
@@ -126,7 +125,7 @@ export function Login() {
               </label>
               <Link
                 to="/forgot-password"
-                className="text-orange-500 hover:text-orange-600"
+                className="font-medium text-orange-600 hover:text-orange-700"
               >
                 Quên mật khẩu?
               </Link>
@@ -135,22 +134,21 @@ export function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-orange-400 to-rose-400 text-white text-xl font-semibold hover:from-orange-500 hover:to-rose-500 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full rounded-2xl bg-gradient-to-r from-orange-500 to-rose-500 py-4 text-xl font-semibold text-white shadow-lg transition-all hover:from-orange-600 hover:to-rose-600 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? "Đang đăng nhập..." : "Đăng nhập"}
             </button>
           </form>
 
-          <div className="mt-7 text-center text-base text-gray-600">
+          <div className="mt-7 text-center text-base text-gray-500">
             Chưa có tài khoản?{" "}
             <Link
               to="/register"
-              className="text-orange-500 hover:text-orange-600 font-medium"
+              className="font-semibold text-orange-600 hover:text-orange-700"
             >
               Đăng ký ngay
             </Link>
           </div>
-        </div>
       </div>
     </div>
   );

@@ -84,6 +84,8 @@ const updateAccountRepo = async ({ accountId, accountName, type }) => {
       type: type,
     },
     select: {
+      account_id: true,
+      user_id: true,
       account_name: true,
       type: true,
       balance: true,
@@ -144,6 +146,8 @@ const createAccount = async ({
       currency: currency,
     },
     select: {
+      account_id: true,
+      user_id: true,
       account_name: true,
       type: true,
       balance: true,

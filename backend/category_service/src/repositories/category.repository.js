@@ -61,6 +61,7 @@ const updateCategory = async ({ userId, category_id, cat }) => {
       category_id: category_id,
     },
     data: {
+      category_id: category_id,
       user_id: userId,
       icon_id: cat.icon_id,
       category_name: cat.category_name,

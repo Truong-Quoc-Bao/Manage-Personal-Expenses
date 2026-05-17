@@ -22,8 +22,10 @@ async function handleTransactionUpdated(content, msg) {
         const result = await service.handleTransactionUpdated(content);
         if (result) {
             console.log(`[Analytics][transaction.updated] SUCCESS | trans_id: ${result.trans_id}, account_id: ${result.account_id}`);
+            console.log(`[Analytics][transaction.updated] REVERSE details:`, JSON.stringify(result.reverseReport?.details));
+            console.log(`[Analytics][transaction.updated] APPLY  details:`, JSON.stringify(result.applyReport?.details));
         } else {
-            console.error(`[Analytics][transaction.updated] FAILED (returned null) | trans_id: ${content.trans_id}`);
+            console.error(`[Analytics][transaction.updated] FAILED (returned null) | trans_id: ${content.trans_id} - one or more sub-updates failed, check logs above`);
         }
     } catch (err) {
         console.error(`[Analytics][transaction.updated] ERROR | trans_id: ${content.trans_id}`, err.message, err.stack);
@@ -37,8 +39,9 @@ async function handleTransactionDeleted(content, msg) {
         const result = await service.handleTransactionDeleted(content);
         if (result) {
             console.log(`[Analytics][transaction.deleted] SUCCESS | trans_id: ${result.trans_id}, account_id: ${result.account_id}`);
+            console.log(`[Analytics][transaction.deleted] REVERSE details:`, JSON.stringify(result.report?.details));
         } else {
-            console.error(`[Analytics][transaction.deleted] FAILED (returned null) | trans_id: ${content.trans_id}`);
+            console.error(`[Analytics][transaction.deleted] FAILED (returned null) | trans_id: ${content.trans_id} - one or more sub-updates failed, check logs above`);
         }
     } catch (err) {
         console.error(`[Analytics][transaction.deleted] ERROR | trans_id: ${content.trans_id}`, err.message, err.stack);

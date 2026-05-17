@@ -31,7 +31,7 @@ const createCategorySchema = Joi.object({
   body: Joi.object({
     category_name: Joi.string().trim().min(1).required(),
     type: Joi.string().valid("income", "expense").required(),
-    icon_id: Joi.string().uuid().required(),
+    // icon_id: Joi.string().uuid().optional(),
     color: Joi.string().optional(),
   }),
 });
@@ -44,7 +44,7 @@ const updateCategorySchema = Joi.object({
   body: Joi.object({
     category_name: Joi.string().trim().min(1),
     type: Joi.string().valid("income", "expense"),
-    icon_id: Joi.string().uuid(),
+    // icon_id: Joi.uuid().optional(),
     color: Joi.string(),
   }).min(1),
 });

@@ -1,11 +1,25 @@
-import { useEffect, useState, useCallback } from 'react';
-import { Plus, Edit2, Trash2, AlertCircle, TrendingDown, Calendar, RefreshCw } from 'lucide-react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  AlertCircle,
+  TrendingDown,
+  Calendar,
+  Target,
+  Wallet,
+  CheckCircle2,
+  Clock,
+  PauseCircle,
+} from 'lucide-react';
 import { budgetApi } from '../api/budget.api';
 import { categoryApi } from '../api/category.api';
 import { AddBudgetModal } from '../components/modals/AddBudgetModal';
 import { EditBudgetModal } from '../components/modals/EditBudgetModal';
 import { DeleteBudgetModal } from '../components/modals/DeleteBudgetModal';
 import { toast } from 'sonner';
+
+type BudgetKind = 'limit' | 'goal';
 
 type Budget = {
   budget_id: string;
@@ -15,6 +29,7 @@ type Budget = {
   date?: string | null;
   date_start?: string | null;
   date_end?: string | null;
+  type?: string | null;
   status?: string | null;
   status_active?: boolean | null;
   note?: string | null;
@@ -28,6 +43,45 @@ type Category = {
   color?: string | null;
 };
 
+const getBudgetKind = (budget: Budget): BudgetKind => {
+  if (budget.status === 'goal' || budget.type === 'plan') return 'goal';
+  return 'limit';
+};
+
+// Mirrors the backend `computeStatusActive` so the UI stays correct even if the
+// stored value gets stale between writes (e.g. user keeps the page open past
+// date_end without a refetch).
+const computeStatusActive = (
+  dateStart?: string | null,
+  dateEnd?: string | null,
+  now: Date = new Date(),
+): boolean => {
+  if (!dateStart) return false;
+  const start = new Date(dateStart);
+  if (Number.isNaN(start.getTime())) return false;
+  if (now < start) return false;
+
+  if (dateEnd) {
+    const end = new Date(dateEnd);
+    if (!Number.isNaN(end.getTime()) && now > end) return false;
+  }
+  return true;
+};
+
+type ActiveState = 'active' | 'pending' | 'ended';
+
+const resolveActiveState = (budget: Budget, now: Date = new Date()): ActiveState => {
+  if (budget.date_start) {
+    const start = new Date(budget.date_start);
+    if (!Number.isNaN(start.getTime()) && now < start) return 'pending';
+  }
+  if (budget.date_end) {
+    const end = new Date(budget.date_end);
+    if (!Number.isNaN(end.getTime()) && now > end) return 'ended';
+  }
+  return 'active';
+};
+
 export function Budgets() {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -36,8 +90,8 @@ export function Budgets() {
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [deletingBudget, setDeletingBudget] = useState<Budget | null>(null);
   const [filterPeriod, setFilterPeriod] = useState<'all' | 'daily' | 'monthly'>('all');
+  const [filterKind, setFilterKind] = useState<'all' | BudgetKind>('all');
 
-  // ✅ BƯỚC 1: Dùng useCallback cho hàm fetch
   const fetchBudgets = useCallback(async () => {
     try {
       setLoading(true);
@@ -58,18 +112,12 @@ export function Budgets() {
     }
   }, []);
 
-  // ✅ BƯỚC 2: "ĂNG-TEN" ĐÓN SÓNG TỪ AI CHAT
   useEffect(() => {
     const handleAISync = async () => {
       console.log('🤖 Budgets: AI vừa ra lệnh cập nhật ngân sách!');
 
-      // Hiện thông báo đang xử lý
       const loader = toast.loading('Money Guard đang thiết lập ngân sách mới...');
-
-      // Gọi hàm nạp lại dữ liệu
       await fetchBudgets();
-
-      // Đổi thông báo sang thành công
       toast.dismiss(loader);
       toast.success('Ngân sách đã được cập nhật!', {
         icon: '📊',
@@ -77,69 +125,107 @@ export function Budgets() {
       });
     };
 
-    // Lắng nghe sự kiện từ FloatingChat.tsx
     window.addEventListener('money-guard-sync', handleAISync);
-
-    return () => {
-      window.removeEventListener('money-guard-sync', handleAISync);
-    };
+    return () => window.removeEventListener('money-guard-sync', handleAISync);
   }, [fetchBudgets]);
 
-  // Load lần đầu khi vào trang
   useEffect(() => {
     fetchBudgets();
   }, [fetchBudgets]);
 
   const getCategoryName = (categoryId?: string | null) => {
     if (!categoryId) return 'Chưa có danh mục';
-
     const category = categories.find((cat) => cat.category_id === categoryId);
-
     return category?.category_name || 'Không tìm thấy danh mục';
   };
 
   const getBudgetTitle = (budget: Budget) => {
     if (budget.title && budget.title.trim()) return budget.title;
-    return `Ngân sách ${getCategoryName(budget.category_id)}`;
+    const kind = getBudgetKind(budget);
+    return `${kind === 'goal' ? 'Mục tiêu' : 'Ngân sách'} ${getCategoryName(budget.category_id)}`;
   };
 
   const getBudgetPeriod = (budget: Budget): 'daily' | 'monthly' => {
     if (!budget.date_start || !budget.date_end) return 'monthly';
-
     const start = new Date(budget.date_start);
     const end = new Date(budget.date_end);
-
     const diffDays = Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
-
     return diffDays <= 1 ? 'daily' : 'monthly';
   };
 
-  const filteredBudgets = budgets.filter((budget) => {
-    if (filterPeriod === 'all') return true;
-    return getBudgetPeriod(budget) === filterPeriod;
-  });
+  const filteredBudgets = useMemo(
+    () =>
+      budgets.filter((budget) => {
+        if (filterPeriod !== 'all' && getBudgetPeriod(budget) !== filterPeriod) return false;
+        if (filterKind !== 'all' && getBudgetKind(budget) !== filterKind) return false;
+        return true;
+      }),
+    [budgets, filterPeriod, filterKind],
+  );
 
-  const formatCurrency = (amount: number | string | null | undefined) => {
-    return new Intl.NumberFormat('vi-VN', {
+  const formatCurrency = (amount: number | string | null | undefined) =>
+    new Intl.NumberFormat('vi-VN', {
       style: 'currency',
       currency: 'VND',
     }).format(Number(amount || 0));
-  };
 
   const getProgressPercentage = (spent: number, amount: number) => {
     if (!amount || amount <= 0) return 0;
     return Math.min((spent / amount) * 100, 100);
   };
 
-  const getProgressColor = (percentage: number) => {
+  const getProgressColor = (percentage: number, kind: BudgetKind) => {
+    if (kind === 'goal') {
+      if (percentage >= 100) return 'bg-emerald-500';
+      if (percentage >= 70) return 'bg-teal-500';
+      return 'bg-emerald-400';
+    }
     if (percentage >= 90) return 'bg-red-500';
     if (percentage >= 70) return 'bg-orange-500';
     return 'bg-green-500';
   };
 
   const formatDate = (date?: string | null) => {
-    if (!date) return 'Chưa có ngày';
+    if (!date) return '—';
     return new Date(date).toLocaleDateString('vi-VN');
+  };
+
+  const renderKindBadge = (kind: BudgetKind) =>
+    kind === 'goal' ? (
+      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+        <Target className="h-3 w-3" />
+        Mục tiêu
+      </span>
+    ) : (
+      <span className="inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-50 px-2.5 py-0.5 text-xs font-medium text-orange-700">
+        <Wallet className="h-3 w-3" />
+        Hạn mức
+      </span>
+    );
+
+  const renderActiveBadge = (state: ActiveState) => {
+    if (state === 'active') {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
+          <CheckCircle2 className="h-3 w-3" />
+          Đang áp dụng
+        </span>
+      );
+    }
+    if (state === 'pending') {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+          <Clock className="h-3 w-3" />
+          Chưa bắt đầu
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">
+        <PauseCircle className="h-3 w-3" />
+        Đã kết thúc
+      </span>
+    );
   };
 
   return (
@@ -148,7 +234,9 @@ export function Budgets() {
         <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <h1 className="mb-1 text-4xl font-bold text-gray-900">Ngân sách</h1>
-            <p className="text-gray-600">Quản lý và theo dõi ngân sách chi tiêu của bạn</p>
+            <p className="text-gray-600">
+              Quản lý hạn mức chi tiêu và mục tiêu thu nhập của bạn
+            </p>
           </div>
 
           <button
@@ -161,41 +249,60 @@ export function Budgets() {
           </button>
         </div>
 
-        <div className="mb-6 flex gap-3">
-          <button
-            type="button"
-            onClick={() => setFilterPeriod('all')}
-            className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-              filterPeriod === 'all'
-                ? '!bg-gradient-to-r !from-orange-400 !to-rose-400 text-white shadow-md'
-                : '!bg-white text-gray-700 hover:!bg-gray-50 border border-gray-200'
-            }`}
-          >
-            Tất cả
-          </button>
+        {/* Period filter */}
+        <div className="mb-3 flex flex-wrap gap-3">
+          {(['all', 'daily', 'monthly'] as const).map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setFilterPeriod(p)}
+              className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+                filterPeriod === p
+                  ? '!bg-gradient-to-r !from-orange-400 !to-rose-400 text-white shadow-md'
+                  : '!bg-white text-gray-700 hover:!bg-gray-50 border border-gray-200'
+              }`}
+            >
+              {p === 'all' ? 'Tất cả chu kỳ' : p === 'daily' ? 'Theo ngày' : 'Theo tháng'}
+            </button>
+          ))}
+        </div>
 
+        {/* Kind filter */}
+        <div className="mb-6 flex flex-wrap gap-3">
           <button
             type="button"
-            onClick={() => setFilterPeriod('daily')}
-            className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-              filterPeriod === 'daily'
-                ? '!bg-gradient-to-r !from-orange-400 !to-rose-400 text-white shadow-md'
+            onClick={() => setFilterKind('all')}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition ${
+              filterKind === 'all'
+                ? '!bg-gray-900 text-white shadow-md'
                 : '!bg-white text-gray-700 hover:!bg-gray-50 border border-gray-200'
             }`}
           >
-            Theo ngày
+            Tất cả loại
           </button>
-
           <button
             type="button"
-            onClick={() => setFilterPeriod('monthly')}
-            className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-              filterPeriod === 'monthly'
-                ? '!bg-gradient-to-r !from-orange-400 !to-rose-400 text-white shadow-md'
-                : '!bg-white text-gray-700 hover:!bg-gray-50 border border-gray-200'
+            onClick={() => setFilterKind('limit')}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition ${
+              filterKind === 'limit'
+                ? '!bg-orange-500 text-white shadow-md'
+                : '!bg-white text-orange-700 hover:!bg-orange-50 border border-orange-200'
             }`}
           >
-            Theo tháng
+            <Wallet className="h-4 w-4" />
+            Hạn mức chi
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterKind('goal')}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition ${
+              filterKind === 'goal'
+                ? '!bg-emerald-500 text-white shadow-md'
+                : '!bg-white text-emerald-700 hover:!bg-emerald-50 border border-emerald-200'
+            }`}
+          >
+            <Target className="h-4 w-4" />
+            Mục tiêu thu
           </button>
         </div>
 
@@ -225,40 +332,71 @@ export function Budgets() {
         ) : (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {filteredBudgets.map((budget) => {
+              const kind = getBudgetKind(budget);
+              const isGoal = kind === 'goal';
               const spent = Number(budget.current_amount || 0);
               const amount = Number(budget.amount_limit || 0);
               const percentage = getProgressPercentage(spent, amount);
-              const isOverBudget = spent > amount;
               const remaining = amount - spent;
+              const isOverLimit = !isGoal && spent > amount;
+              const goalReached = isGoal && spent >= amount && amount > 0;
+              const activeState = resolveActiveState(budget);
+              const isActive =
+                typeof budget.status_active === 'boolean'
+                  ? budget.status_active
+                  : computeStatusActive(budget.date_start, budget.date_end);
+
+              const cardAccent = isGoal
+                ? 'before:bg-gradient-to-r before:from-emerald-400 before:to-teal-400'
+                : 'before:bg-gradient-to-r before:from-orange-400 before:to-rose-400';
+
+              const iconWrapper = isGoal
+                ? '!bg-gradient-to-br !from-emerald-400 !to-teal-400'
+                : '!bg-gradient-to-br !from-orange-400 !to-amber-400';
 
               return (
                 <div
                   key={budget.budget_id}
-                  className="flex flex-col rounded-2xl border border-gray-100 bg-white p-6 shadow-lg transition hover:shadow-xl"
+                  className={`relative flex flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white p-6 shadow-lg transition hover:shadow-xl before:absolute before:left-0 before:top-0 before:h-1 before:w-full ${cardAccent} ${
+                    !isActive ? 'opacity-75' : ''
+                  }`}
                 >
-                  <div className="mb-4 flex items-start">
-                    <div className="flex flex-1 items-center gap-3">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-xl !bg-gradient-to-br !from-orange-400 !to-amber-400 text-2xl shadow-md">
-                        💰
-                      </div>
+                  <div className="mb-4 flex items-start gap-3">
+                    <div
+                      className={`flex h-12 w-12 items-center justify-center rounded-xl ${iconWrapper} text-2xl shadow-md`}
+                    >
+                      {isGoal ? '🎯' : '💰'}
+                    </div>
 
-                      <div className="min-w-0 flex-1">
-                        <h3 className="truncate font-semibold text-gray-900">
-                          {getBudgetTitle(budget)}
-                        </h3>
-
-                        <p className="text-xs text-gray-500">
-                          {getCategoryName(budget.category_id)}
-                        </p>
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                        {renderKindBadge(kind)}
+                        {renderActiveBadge(activeState)}
                       </div>
+                      <h3 className="truncate font-semibold text-gray-900">
+                        {getBudgetTitle(budget)}
+                      </h3>
+                      <p className="truncate text-xs text-gray-500">
+                        {getCategoryName(budget.category_id)}
+                      </p>
                     </div>
                   </div>
 
                   <div className="flex-1 space-y-3">
                     <div>
                       <div className="mb-2 flex items-center justify-between text-sm">
-                        <span className="text-gray-600">Đã chi</span>
-                        <span className={isOverBudget ? 'text-red-600' : 'text-gray-800'}>
+                        <span className="text-gray-600">
+                          {isGoal ? 'Đã đạt' : 'Đã chi'}
+                        </span>
+                        <span
+                          className={
+                            isOverLimit
+                              ? 'text-red-600'
+                              : goalReached
+                                ? 'text-emerald-600'
+                                : 'text-gray-800'
+                          }
+                        >
                           {formatCurrency(spent)}
                         </span>
                       </div>
@@ -267,6 +405,7 @@ export function Budgets() {
                         <div
                           className={`h-full ${getProgressColor(
                             percentage,
+                            kind,
                           )} transition-all duration-300`}
                           style={{ width: `${percentage}%` }}
                         />
@@ -278,7 +417,23 @@ export function Budgets() {
                       </div>
                     </div>
 
-                    {isOverBudget ? (
+                    {isGoal ? (
+                      goalReached ? (
+                        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+                          <span className="text-sm text-emerald-700">
+                            Đã đạt mục tiêu!
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                          <Target className="h-4 w-4 shrink-0 text-emerald-500" />
+                          <span className="text-sm text-emerald-700">
+                            Còn thiếu: {formatCurrency(Math.max(remaining, 0))}
+                          </span>
+                        </div>
+                      )
+                    ) : isOverLimit ? (
                       <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3">
                         <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
                         <span className="text-sm text-red-600">

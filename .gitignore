@@ -44,6 +44,7 @@ logs/
 # =========================
 .DS_Store
 Thumbs.db
+*.stackdump
 
 .vscode/*
 !.vscode/extensions.json
@@ -114,7 +115,6 @@ TestResults/
 # =========================
 *.dbmdl
 
-# GitNexus — local graph index (regenerate: gitnexus analyze)
 .gitnexus/
 AGENTS.md
 CLAUDE.md

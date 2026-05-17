@@ -314,6 +314,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    container_name: finance-frontend
     env_file:
       - .env
     ports:

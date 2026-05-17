@@ -328,10 +328,12 @@ const deleteAllCategorySummary = async (req, res) => {
 
 const getDashboardCache = async (req, res) => {
   try {
-    const userId = requireUserId(req, res);
-    if (!userId) return;
+    const userId = resolveUserId(req);
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
     const data = await service.getDashboardCache(userId);
-    return res.status(200).json({ success: true, data });
+    return res.status(200).json({ success: true, count: Array.isArray(data) ? data.length : 0, data });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
