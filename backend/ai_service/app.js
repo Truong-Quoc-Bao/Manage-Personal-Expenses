@@ -16,6 +16,32 @@ import got from 'got';
 import { getBestModel, getStatusData } from './super_check.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getMoneyGuardRules } from './systemRules.js';
+import {
+  getUserProfile,
+  listAccounts,
+  createAccount as createAccountApi,
+  getOrCreateDefaultAccount,
+  listCategories,
+  createCategory as createCategoryApi,
+  updateCategory as updateCategoryApi,
+  deleteCategory as deleteCategoryApi,
+  findCategoryByName,
+  findOrCreateCategoryByName,
+  listTransactionsPage,
+  listAllTransactions,
+  createTransaction as createTransactionApi,
+  getTransactionById,
+  updateTransactionApi,
+  deleteTransactionApi,
+  listBudgets,
+  listBudgetsByMonth,
+  upsertBudget,
+  findBudgetByCategoryAndMonth,
+  deleteBudgetApi,
+} from './serviceClients.js';
+
+const createBankAccount = (userId, accountName) =>
+  createAccountApi(userId, { accountName, type: 'bank', balance: 0, currency: 'VND' });
 
 import { setDefaultResultOrder } from 'dns';
 setDefaultResultOrder('ipv4first');
@@ -129,6 +155,408 @@ webpush.setVapidDetails(
   process.env.PRIVATE_VAPID_KEY,
 );
 
+// ===========================================================================
+// HELPER tổng hợp dữ liệu từ các microservice (thay cho các SQL JOIN cross-schema cũ)
+// ===========================================================================
+
+const monthDateRange = (month, year) => {
+  const m = Number(month);
+  const y = Number(year);
+  const start = `${y}-${String(m).padStart(2, '0')}-01`;
+  const lastDay = new Date(y, m, 0).getDate();
+  const end = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  return { start, end };
+};
+
+const toNumber = (value) => {
+  const n = parseFloat(value);
+  return Number.isFinite(n) ? n : 0;
+};
+
+// Lấy toàn bộ giao dịch trong tháng (đã include_details=true để có category_name).
+async function fetchTransactionsByMonth(userId, month, year, transactionType) {
+  const { start, end } = monthDateRange(month, year);
+  return await listAllTransactions(userId, {
+    dateFrom: start,
+    dateTo: end,
+    transactionType,
+    includeDetails: true,
+    pageSize: 200,
+  });
+}
+
+// Tính tổng thu/chi/đếm số giao dịch trong tháng.
+async function aggregateMonthlyTotals(userId, month, year) {
+  const txs = await fetchTransactionsByMonth(userId, month, year);
+  let totalIncome = 0;
+  let totalExpense = 0;
+  let incomeCount = 0;
+  let expenseCount = 0;
+  for (const t of txs) {
+    const type = String(t.transactionType || t.transaction_type || '').toLowerCase();
+    const amount = toNumber(t.amount);
+    if (type === 'income') {
+      totalIncome += amount;
+      incomeCount += 1;
+    } else if (type === 'expense') {
+      totalExpense += amount;
+      expenseCount += 1;
+    }
+  }
+  return { totalIncome, totalExpense, incomeCount, expenseCount, transactions: txs };
+}
+
+// Gom giao dịch theo (category_name, transaction_type) cho dashboard /stats.
+function groupByCategoryAndType(transactions) {
+  const grouped = new Map();
+  for (const t of transactions) {
+    const type = String(t.transactionType || t.transaction_type || '').toLowerCase();
+    const name = t.categoryName || t.category_name || 'Chưa phân loại';
+    const amount = toNumber(t.amount);
+    const key = `${name}__${type}`;
+    if (!grouped.has(key)) {
+      grouped.set(key, { category_name: name, transaction_type: type, amount: 0 });
+    }
+    grouped.get(key).amount += amount;
+  }
+  return Array.from(grouped.values());
+}
+
+// Lấy báo cáo theo từng category cho tháng (spent + limit_amount), chỉ cho expense.
+async function buildCategoryReport(userId, month, year) {
+  const [categories, monthTxs, monthBudgets] = await Promise.all([
+    listCategories(userId),
+    fetchTransactionsByMonth(userId, month, year, 'expense'),
+    listBudgetsByMonth(userId, month, year),
+  ]);
+
+  const spentByCat = new Map();
+  for (const t of monthTxs) {
+    const cid = t.categoryId || t.category_id;
+    if (!cid) continue;
+    spentByCat.set(cid, (spentByCat.get(cid) || 0) + toNumber(t.amount));
+  }
+
+  const budgetByCat = new Map();
+  for (const b of monthBudgets) {
+    if (b.category_id) budgetByCat.set(b.category_id, toNumber(b.amount_limit));
+  }
+
+  return categories.map((c) => ({
+    category_id: c.category_id,
+    category_name: c.category_name,
+    icon: c.icon?.icon_code || c.icon_code || '',
+    spent: spentByCat.get(c.category_id) || 0,
+    limit_amount: budgetByCat.get(c.category_id) || null,
+  }));
+}
+
+// Tổng amount_limit của tháng/năm.
+async function totalBudgetLimit(userId, month, year) {
+  const monthBudgets = await listBudgetsByMonth(userId, month, year);
+  return monthBudgets.reduce((sum, b) => sum + toNumber(b.amount_limit), 0);
+}
+
+// Lấy top N giao dịch gần nhất.
+async function fetchRecentTransactions(userId, limit = 10) {
+  const page = await listTransactionsPage(userId, {
+    page: 1,
+    pageSize: limit,
+    includeDetails: true,
+  });
+  return page.items || [];
+}
+
+// ===========================================================================
+// Bộ xử lý <query_db> qua API (thay thế nguyên block SQL trong /chat).
+// Trả về `null` nếu không khớp loại nào, hoặc một object data theo shape cũ
+// để phần render bên dưới (`dataFound`) tiếp tục dùng được.
+// ===========================================================================
+async function runQueryDbViaApi(queryData, userId, currentMonth, currentYear) {
+  // 1. last_week: tổng chi tuần trước.
+  if (queryData.time_range === 'last_week') {
+    const now = new Date();
+    const day = now.getDay() || 7;
+    const startOfThisWeek = new Date(now);
+    startOfThisWeek.setDate(now.getDate() - day + 1);
+    startOfThisWeek.setHours(0, 0, 0, 0);
+    const startOfLastWeek = new Date(startOfThisWeek);
+    startOfLastWeek.setDate(startOfThisWeek.getDate() - 7);
+
+    const txs = await listAllTransactions(userId, {
+      dateFrom: startOfLastWeek.toISOString(),
+      dateTo: new Date(startOfThisWeek.getTime() - 1).toISOString(),
+      transactionType: 'expense',
+      includeDetails: false,
+    });
+    const total = txs.reduce((s, t) => s + toNumber(t.amount), 0);
+    return { total, count: txs.length };
+  }
+
+  // 2. start_date + end_date (không kèm category): tổng chi trong khoảng.
+  if (queryData.start_date && queryData.end_date && queryData.type !== 'category_spending_range') {
+    const txs = await listAllTransactions(userId, {
+      dateFrom: queryData.start_date,
+      dateTo: queryData.end_date,
+      transactionType: 'expense',
+      includeDetails: false,
+    });
+    return {
+      total: txs.reduce((s, t) => s + toNumber(t.amount), 0),
+      count: txs.length,
+    };
+  }
+
+  // 3. total_spending tháng (dùng cho cả income lẫn expense gốc — gốc cũ chỉ dùng expense).
+  if (queryData.type === 'total_spending') {
+    const month = Number(queryData.month || currentMonth);
+    const year = Number(queryData.year || currentYear);
+    const stats = await aggregateMonthlyTotals(userId, month, year);
+    return {
+      total: stats.totalExpense,
+      total_income: stats.totalIncome,
+      total_expense: stats.totalExpense,
+      count: stats.expenseCount + stats.incomeCount,
+    };
+  }
+
+  // 5. category_spending theo tháng.
+  if (queryData.type === 'category_spending' && queryData.category) {
+    const month = Number(queryData.month || currentMonth);
+    const year = Number(queryData.year || currentYear);
+    const cat = await findCategoryByName(userId, queryData.category);
+    if (!cat) return { total: 0, count: 0 };
+    const { start, end } = monthDateRange(month, year);
+    const txs = await listAllTransactions(userId, {
+      dateFrom: start,
+      dateTo: end,
+      transactionType: 'expense',
+      categoryId: cat.category_id,
+      includeDetails: false,
+    });
+    return {
+      total: txs.reduce((s, t) => s + toNumber(t.amount), 0),
+      count: txs.length,
+    };
+  }
+
+  // 6. top_spending_day: ngày trong tuần tiêu nhiều nhất tháng hiện tại.
+  if (queryData.type === 'top_spending_day') {
+    const txs = await fetchTransactionsByMonth(userId, currentMonth, currentYear, 'expense');
+    const dayNames = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+    const buckets = new Map();
+    for (const t of txs) {
+      const d = new Date(t.date);
+      const dow = d.getDay();
+      const cur = buckets.get(dow) || { total: 0, count: 0 };
+      cur.total += toNumber(t.amount);
+      cur.count += 1;
+      buckets.set(dow, cur);
+    }
+    if (!buckets.size) return null;
+    let bestDow = 0;
+    let best = { total: 0, count: 0 };
+    for (const [dow, val] of buckets) {
+      if (val.total > best.total) {
+        best = val;
+        bestDow = dow;
+      }
+    }
+    return { day_name: dayNames[bestDow], total_day: best.total, count: best.count };
+  }
+
+  // 7. compare_weeks: so sánh chi tiêu tuần này vs tuần trước.
+  if (queryData.type === 'compare_weeks') {
+    const now = new Date();
+    const day = now.getDay() || 7;
+    const startOfThisWeek = new Date(now);
+    startOfThisWeek.setDate(now.getDate() - day + 1);
+    startOfThisWeek.setHours(0, 0, 0, 0);
+    const startOfLastWeek = new Date(startOfThisWeek);
+    startOfLastWeek.setDate(startOfThisWeek.getDate() - 7);
+
+    const txs = await listAllTransactions(userId, {
+      dateFrom: startOfLastWeek.toISOString(),
+      transactionType: 'expense',
+      includeDetails: false,
+    });
+    let thisWeek = 0;
+    let lastWeek = 0;
+    for (const t of txs) {
+      const d = new Date(t.date);
+      const amt = toNumber(t.amount);
+      if (d >= startOfThisWeek) thisWeek += amt;
+      else if (d >= startOfLastWeek) lastWeek += amt;
+    }
+    return { this_week: thisWeek, last_week: lastWeek };
+  }
+
+  // 8. budget_check: kiểm tra hạn mức cho category trong tháng.
+  if (queryData.type === 'budget_check') {
+    const month = Number(queryData.month || currentMonth);
+    const year = Number(queryData.year || currentYear);
+    let cat = null;
+    if (queryData.category) {
+      cat = await findCategoryByName(userId, queryData.category);
+      if (!cat) return null;
+    }
+    const monthBudgets = await listBudgetsByMonth(userId, month, year);
+    const budget = cat
+      ? monthBudgets.find((b) => String(b.category_id) === String(cat.category_id))
+      : monthBudgets[0];
+    if (!budget) return null;
+    const { start, end } = monthDateRange(month, year);
+    const txs = await listAllTransactions(userId, {
+      dateFrom: start,
+      dateTo: end,
+      transactionType: 'expense',
+      categoryId: budget.category_id,
+      includeDetails: false,
+    });
+    const spent = txs.reduce((s, t) => s + toNumber(t.amount), 0);
+    return {
+      category_name: cat?.category_name || queryData.category || '',
+      amount_limit: toNumber(budget.amount_limit),
+      spent,
+      remaining: toNumber(budget.amount_limit) - spent,
+      month,
+      year,
+    };
+  }
+
+  // 9. budget_upsert.
+  if (queryData.type === 'budget_upsert') {
+    const month = Number(queryData.month || currentMonth);
+    const year = Number(queryData.year || currentYear);
+    const { start, end } = monthDateRange(month, year);
+    const cat = await findOrCreateCategoryByName(userId, queryData.category, { type: 'expense' });
+    const result = await upsertBudget(userId, {
+      title: queryData.category,
+      categoryId: cat.category_id,
+      type: 'limit',
+      amountLimit: toNumber(queryData.amount),
+      dateStart: queryData.start_date || start,
+      dateEnd: queryData.end_date || end,
+      month,
+      year,
+    });
+    return {
+      category_name: queryData.category,
+      amount_limit: toNumber(result?.amount_limit ?? queryData.amount),
+      spent: 0,
+      remaining: toNumber(result?.amount_limit ?? queryData.amount),
+      month,
+      year,
+    };
+  }
+
+  // 10. budget_delete.
+  if (queryData.type === 'budget_delete') {
+    const month = Number(queryData.month || currentMonth);
+    const year = Number(queryData.year || currentYear);
+    const cat = await findCategoryByName(userId, queryData.category);
+    if (!cat) return null;
+    const budget = await findBudgetByCategoryAndMonth(userId, cat.category_id, month, year);
+    if (!budget) return null;
+    await deleteBudgetApi(userId, budget.budget_id);
+    return { category_name: cat.category_name, amount_limit: 0, spent: 0, remaining: 0 };
+  }
+
+  // 11. budget_summary: list tất cả budget của tháng + spent.
+  if (queryData.type === 'budget_summary') {
+    const month = Number(queryData.month || currentMonth);
+    const year = Number(queryData.year || currentYear);
+    const monthBudgets = await listBudgetsByMonth(userId, month, year);
+    if (!monthBudgets.length) return null;
+    // Trả về row đầu tiên (giữ tương thích với render dùng dataFound = rows[0]).
+    const first = monthBudgets[0];
+    const cat = (await listCategories(userId)).find(
+      (c) => String(c.category_id) === String(first.category_id),
+    );
+    const { start, end } = monthDateRange(month, year);
+    const txs = await listAllTransactions(userId, {
+      dateFrom: start,
+      dateTo: end,
+      transactionType: 'expense',
+      categoryId: first.category_id,
+      includeDetails: false,
+    });
+    const spent = txs.reduce((s, t) => s + toNumber(t.amount), 0);
+    return {
+      category_name: cat?.category_name || '',
+      amount_limit: toNumber(first.amount_limit),
+      spent,
+      remaining: toNumber(first.amount_limit) - spent,
+    };
+  }
+
+  // 12. category_upsert.
+  if (queryData.type === 'category_upsert') {
+    if (queryData.old_name) {
+      const cat = await findCategoryByName(userId, queryData.old_name);
+      if (cat) {
+        await updateCategoryApi(userId, cat.category_id, {
+          ...cat,
+          category_name: queryData.new_name,
+        });
+      }
+    } else {
+      await findOrCreateCategoryByName(userId, queryData.category_name, { type: 'expense' });
+    }
+    return { total: 0, count: 0 };
+  }
+
+  // 13. category_delete.
+  if (queryData.type === 'category_delete') {
+    const cat = await findCategoryByName(userId, queryData.category_name);
+    if (cat) await deleteCategoryApi(userId, cat.category_id);
+    return { total: 0, count: 0 };
+  }
+
+  // 14. category_spending_range.
+  if (queryData.type === 'category_spending_range' && queryData.category) {
+    const cat = await findCategoryByName(userId, queryData.category);
+    if (!cat) return { total: 0, count: 0 };
+    const { start: defStart, end: defEnd } = monthDateRange(currentMonth, currentYear);
+    const txs = await listAllTransactions(userId, {
+      dateFrom: queryData.start_date || defStart,
+      dateTo: queryData.end_date || defEnd,
+      transactionType: 'expense',
+      categoryId: cat.category_id,
+      includeDetails: false,
+    });
+    return {
+      total: txs.reduce((s, t) => s + toNumber(t.amount), 0),
+      count: txs.length,
+    };
+  }
+
+  return null;
+}
+
+// Anomaly detector: trung bình chi tiêu của 1 category dựa trên list giao dịch.
+async function getAnomalyStatusByApi(userId, categoryName, amount) {
+  try {
+    const cat = await findCategoryByName(userId, categoryName);
+    if (!cat) return { isAnomaly: false };
+    const txs = await listAllTransactions(userId, {
+      categoryId: cat.category_id,
+      transactionType: 'expense',
+      includeDetails: false,
+      pageSize: 200,
+    });
+    if (!txs.length) return { isAnomaly: false };
+    const avg = txs.reduce((s, t) => s + toNumber(t.amount), 0) / txs.length;
+    if (avg > 0 && Number(amount) > avg * 3) {
+      return { isAnomaly: true, factor: Math.round(Number(amount) / avg) };
+    }
+    return { isAnomaly: false };
+  } catch (err) {
+    console.error('❌ Anomaly check lỗi:', err.message);
+    return { isAnomaly: false };
+  }
+}
+
 const WEBHOOK_SECRET = 'my_super_secret_123';
 // --- LOG QUÁ TRÌNH XỬ LÝ GIAO DỊCH (BANK) ---
 app.post('/webhook/bank-transfer', async (req, res) => {
@@ -184,32 +612,13 @@ app.post('/webhook/bank-transfer', async (req, res) => {
 
     console.log(`💰 [${transactionType.toUpperCase()}] Số tiền: ${finalAmount}đ`);
 
-    // 1. Tìm tài khoản của User (lấy cái đầu tiên nếu có nhiều)
-    let accRes = await pool.query(
-      'SELECT account_id, balance FROM account_service.accounts WHERE user_id = $1 LIMIT 1',
-      [userId],
-    );
+    // 1. Tìm hoặc tạo tài khoản mặc định cho user qua account-service API.
+    const defaultAccount = await getOrCreateDefaultAccount(userId, 'Tài khoản mặc định');
+    const accountId = defaultAccount?.account_id || defaultAccount?.accountId;
 
-    let accountId;
-    // Nếu chưa có tài khoản, tạo mới cho user
-    if (accRes.rows.length === 0) {
-      const newAcc = await pool.query(
-        `INSERT INTO account_service.accounts (user_id, account_name, balance, type, currency) 
-         VALUES ($1, $2, 0, 'bank', 'VND') RETURNING account_id`,
-        [userId, 'Tài khoản mặc định'],
-      );
-      accountId = newAcc.rows[0].account_id;
-    } else {
-      accountId = accRes.rows[0].account_id;
-    }
-
-    // 2. Cập nhật số dư (Balance) trong bảng accounts
-    // Nếu tiền vào (Income) thì cộng, nếu tiền ra (Expense) thì trừ
-    const balanceChange = isIncome ? finalAmount : -finalAmount;
-    await pool.query(
-      'UPDATE account_service.accounts SET balance = balance + $1, updated_at = NOW() WHERE account_id = $2',
-      [balanceChange, accountId],
-    );
+    // Lưu ý: Không tự UPDATE balance trên bảng accounts nữa.
+    // account_service đã có consumer `transaction.created` để tự cộng/trừ số dư
+    // từ event do transaction_service phát ra (xem account_service/src/events/consumers/transaction_created.consumer.js).
 
     // NHỜ AI PHÂN LOẠI (Gửi thêm ngữ cảnh là Tiền vào hay Tiền ra)
     const model = genAI.getGenerativeModel({ model: 'gemini-flash-lite-latest' });
@@ -263,41 +672,31 @@ app.post('/webhook/bank-transfer', async (req, res) => {
       };
     }
 
-    // 3. LƯU DATABASE (Dùng đúng transactionType)
-    let catRes = await pool.query(
-      `SELECT category_id FROM category_service.categories WHERE category_name ILIKE $1 AND user_id = $2 LIMIT 1`,
-      [aiData.category_name, userId],
-    );
+    // 2. Tìm hoặc tạo category qua category-service API.
+    const category = await findOrCreateCategoryByName(userId, aiData.category_name, {
+      type: transactionType,
+      color: 'blue',
+    });
+    const categoryId = category?.category_id || category?.categoryId;
 
-    let categoryId;
-    if (catRes.rows.length > 0) {
-      categoryId = catRes.rows[0].category_id;
-    } else {
-      const newCat = await pool.query(
-        "INSERT INTO category_service.categories (user_id, category_name, type, icon, color) VALUES ($1, $2, $3, '🏦', 'blue') RETURNING category_id",
-        [userId, aiData.category_name, transactionType],
+    // 3. Tạo giao dịch qua transaction-service API (event sẽ tự cập nhật balance).
+    try {
+      await createTransactionApi(userId, {
+        account_id: accountId,
+        category_id: categoryId,
+        amount: finalAmount,
+        transaction_type: transactionType === 'income' ? 'Income' : 'Expense',
+        description: aiData.clean_name,
+        date: new Date().toISOString(),
+        note: `Nguồn: ${gateway || 'Bank'}`,
+      });
+    } catch (txErr) {
+      console.error(
+        '❌ Lỗi tạo giao dịch ngân hàng qua transaction-service:',
+        txErr.response?.data || txErr.message,
       );
-      categoryId = newCat.rows[0].category_id;
+      throw txErr;
     }
-
-    const nowICT = new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' });
-
-    await pool.query(
-      `INSERT INTO transaction_service.transactions (account_id, category_id, amount, transaction_type, description, date, note, user_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [
-        // 1,
-        // 'd4ffbef0-8bcc-445e-9ea3-7bc854e2ad76',
-        accountId,
-        categoryId,
-        finalAmount,
-        transactionType,
-        aiData.clean_name,
-        nowICT,
-        `Nguồn: ${gateway || 'Bank'}`,
-        userId,
-      ],
-    );
 
     // 4. THÔNG BÁO THÔNG MINH (Thay đổi câu chữ dựa trên isIncome)
     let notificationMsg = '';
@@ -891,25 +1290,27 @@ app.post('/save-bank-account', async (req, res) => {
     // Ghép tên tài khoản: "Tên ngân hàng - Số tài khoản" hoặc chỉ số tài khoản nếu không có bank_name
     const accName = bank_name ? `${bank_name} - ${account_number}` : account_number;
 
-    const insertAccQuery = `
-      INSERT INTO account_service.accounts 
-      (user_id, account_name, balance, type, currency) 
-      VALUES ($1, $2, 0, 'bank', 'VND')
-      ON CONFLICT (user_id, account_name) DO NOTHING 
-      RETURNING account_id`;
-
-    const result = await pool.query(insertAccQuery, [userId, accName]);
-
-    if (result.rows.length === 0) {
+    // Kiểm tra trùng tên qua API (account-service không expose unique-conflict, nên check thủ công).
+    const existing = await listAccounts(userId);
+    const dup = (existing || []).find(
+      (a) => String(a.account_name || a.accountName || '').trim() === accName.trim(),
+    );
+    if (dup) {
       console.log('⚠️ Tài khoản đã tồn tại, bỏ qua:', accName);
       return res.json({ success: true, message: 'Tài khoản đã tồn tại' });
     }
 
-    console.log('✅ Đã lưu tài khoản:', accName, '| account_id:', result.rows[0].account_id);
-    return res.json({ success: true, account_id: result.rows[0].account_id });
+    const created = await createBankAccount(userId, accName);
+    console.log(
+      '✅ Đã lưu tài khoản:',
+      accName,
+      '| account_id:',
+      created?.account_id || created?.accountId,
+    );
+    return res.json({ success: true, account_id: created?.account_id || created?.accountId });
   } catch (err) {
-    console.error('❌ Lỗi lưu DB:', err.message);
-    return res.status(500).json({ error: err.message });
+    console.error('❌ Lỗi lưu tài khoản qua account-service:', err.response?.data || err.message);
+    return res.status(500).json({ error: err.response?.data?.message || err.message });
   }
 });
 
@@ -973,12 +1374,14 @@ app.get('/api/callback/:userId', async (req, res) => {
 
     const accName = `${bankAccount.bank_name} - ${bankAccount.account_number}`;
 
-    await pool.query(
-      `INSERT INTO account_service.accounts (user_id, account_name, balance, type, currency)
-       VALUES ($1, $2, 0, 'bank', 'VND')
-       ON CONFLICT (user_id, account_name) DO UPDATE SET updated_at = NOW()`,
-      [userId, accName],
+    // Kiểm tra trùng tên trước khi tạo qua account-service.
+    const existingAccs = await listAccounts(userId);
+    const existed = (existingAccs || []).find(
+      (a) => String(a.account_name || a.accountName || '').trim() === accName.trim(),
     );
+    if (!existed) {
+      await createBankAccount(userId, accName);
+    }
 
     console.log('✅ Đã lưu tài khoản ngân hàng:', accName);
     return res.redirect(
@@ -1341,6 +1744,10 @@ app.post('/chat', upload.single('image'), async (req, res) => {
        THIẾT LẬP NGÂN SÁCH (QUAN TRỌNG): Khi người dùng nói "Đặt ngân sách...", "Hạn mức cho mục X là...", "Tháng này chỉ tiêu Y cho Z"... 
          => BẠN BẮT BUỘC PHẢI nhả thẻ: <manage_budget>{"category_name": "tên_mục", "amount_limit": số_tiền, "month": ${currentMonth}, "year": ${currentYear}}</manage_budget>
          => Lưu ý: Phải xuất thẻ này ở CUỐI câu trả lời, không được thiếu!
+         => CẢNH BÁO: Thẻ <manage_budget> CHỈ DÙNG để TẠO/ĐẶT/CẬP NHẬT (set) ngân sách có kèm số tiền. TUYỆT ĐỐI KHÔNG dùng thẻ này khi người dùng muốn XÓA / BỎ / HỦY / REMOVE ngân sách.
+       XÓA NGÂN SÁCH: Khi người dùng nói "Xóa ngân sách...", "Bỏ hạn mức...", "Hủy ngân sách tháng này của mục X"... (KHÔNG có số tiền, hoặc rõ ràng yêu cầu xóa)
+         => BẠN BẮT BUỘC PHẢI nhả thẻ: <query_db>{"type": "budget_delete", "category": "tên_hạng_mục", "month": ${currentMonth}, "year": ${currentYear}}</query_db>
+         => TUYỆT ĐỐI KHÔNG được dùng <manage_budget> cho thao tác xóa.
        - Nếu người dùng muốn tạo danh mục (VD: "Tạo danh mục X"): 
          => Trả về thẻ: <manage_category>{"action": "create", "category_name": "X"}</manage_category>
        - Nếu người dùng muốn sửa tên danh mục (VD: "Đổi tên danh mục X thành Y"):
@@ -1372,6 +1779,8 @@ app.post('/chat', upload.single('image'), async (req, res) => {
        - "Tháng này ăn uống mấy lần?" -> <query_db>{"type": "category_spending", "category": "ăn uống", "month": ${currentMonth}, "year": ${currentYear}}</query_db>
        - "Hạn mức tiền ăn/xăng/... còn bao nhiêu?", "Tao tiêu lố ngân sách chưa?" -> <query_db>{"type": "budget_check", "category": "tên_hạng_mục", "month": ${currentMonth}, "year": ${currentYear}}</query_db>
        - "Ngân sách tháng này của tao thế nào?" -> <query_db>{"type": "budget_check", "month": ${currentMonth}, "year": ${currentYear}}</query_db>
+       - "Xóa ngân sách ăn uống", "Bỏ hạn mức tiền xăng tháng này đi", "Hủy budget mục Cafe" -> <query_db>{"type": "budget_delete", "category": "tên_hạng_mục", "month": ${currentMonth}, "year": ${currentYear}}</query_db>
+       - "Đặt ngân sách ăn uống 5 triệu tháng này" (chỉ khi KHÔNG tiện dùng <manage_budget>) -> <query_db>{"type": "budget_upsert", "category": "ăn uống", "amount": 5000000, "month": ${currentMonth}, "year": ${currentYear}}</query_db>
     
     Nếu ${currentUserName} vừa nhập một món đồ mà trong 7 ngày qua ${currentUserName} đã mua món đó hơn 3 lần (ví dụ Trà sữa), bạn PHẢI khịa ${currentUserName} về việc nghiện món này và tính tổng tiền ${currentUserName} đã 'cúng' cho món đó trong tuần.
     Dựa vào số dư ${
@@ -1383,6 +1792,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
     [QUY TẮC PHẢN HỒI]:
      Trình bày theo phong cách hiện đại, sử dụng icon 🚨, 💸, 🛡️, 📈. Tuyệt đối không để lộ mã JSON rác ra ngoài các thẻ quy định.
      Dù bạn đang nhập vai "mỏ hỗn" hay đang mắng người dùng, nếu người dùng đưa ra một con số để Ghi sổ hoặc Đặt ngân sách, bạn TUYỆT ĐỐI KHÔNG ĐƯỢC QUÊN xuất thẻ <transaction> hoặc <manage_budget>. Thiếu thẻ lệnh là bạn sẽ bị "đăng xuất" khỏi hệ thống!
+     Nếu người dùng yêu cầu XÓA/BỎ/HỦY ngân sách, bạn BẮT BUỘC phải xuất thẻ <query_db>{"type":"budget_delete",...}</query_db> ở CUỐI câu trả lời — KHÔNG được thay bằng <manage_budget>, vì <manage_budget> sẽ làm thao tác upsert sai ý người dùng.
   `;
 
     if (message.length > 30000) {
@@ -1592,10 +2002,40 @@ app.post('/chat', upload.single('image'), async (req, res) => {
               if (queryData.category) params.push(`%${queryData.category}%`);
             }
 
-            // 9. THÊM HOẶC CẬP NHẬT NGÂN SÁCH (Upsert)
+            // 10. XÓA NGÂN SÁCH — qua API budget-service
+            // Dùng khi: "Xóa ngân sách tiền điện tháng này đi"
+            else if (queryData.type === 'budget_delete') {
+              console.log('🔍 [budget_delete qua API] queryData:', queryData);
+              try {
+                const cat = await findCategoryByName(currentUserId, queryData.category);
+                if (cat) {
+                  const budget = await findBudgetByCategoryAndMonth(
+                    currentUserId,
+                    cat.category_id,
+                    Number(queryData.month || currentMonth),
+                    Number(queryData.year || currentYear),
+                  );
+                  if (budget) {
+                    await deleteBudgetApi(currentUserId, budget.budget_id);
+                    console.log(
+                      `🗑️ [budget_delete qua API] đã xóa budget ${budget.budget_id} của "${queryData.category}"`,
+                    );
+                  } else {
+                    console.log(
+                      `ℹ️ [budget_delete qua API] không tìm thấy budget của "${queryData.category}" tháng ${queryData.month || currentMonth}/${queryData.year || currentYear}`,
+                    );
+                  }
+                }
+              } catch (e) {
+                console.log('❌ [budget_delete qua API] Lỗi:', e.response?.data || e.message);
+              }
+              sql = '';
+              params = [];
+            }
+
+            // 9. THÊM HOẶC CẬP NHẬT NGÂN SÁCH (Upsert) — qua API budget-service
             // Dùng khi: "Đặt ngân sách ăn uống tháng này 5 triệu"
             else if (queryData.type === 'budget_upsert') {
-              // 1. Tự động tính ngày nếu không có
               const start = queryData.start_date || `${currentYear}-${currentMonth}-01`;
               const end =
                 queryData.end_date ||
@@ -1604,63 +2044,32 @@ app.post('/chat', upload.single('image'), async (req, res) => {
                   currentMonth,
                   0,
                 ).getDate()}`;
-
-              // 2. SQL với cấu trúc bảng thực tế của bạn
-              sql = `
-                INSERT INTO budgets_service.budgets (
-                  user_id, 
-                  category_id, 
-                  amount_limit, 
-                  title, 
-                  date_start, 
-                  date_end, 
-                  month, 
-                  year,
-                  updated_at
-                )
-                VALUES (
-                  $1, 
-                  (SELECT category_id FROM category_service.categories WHERE category_name ILIKE $2 AND user_id = $1 LIMIT 1), 
-                  $3, $4, $5, $6, $7, $8, NOW()
-                )
-                ON CONFLICT (user_id, category_id, month, year) -- Giả định constraint này tồn tại
-                DO UPDATE SET 
-                  amount_limit = EXCLUDED.amount_limit,
-                  title = EXCLUDED.title,
-                  date_start = EXCLUDED.date_start,
-                  date_end = EXCLUDED.date_end,
-                  updated_at = NOW();
-              `;
-
-              params = [
-                currentUserId,
-                queryData.category, // $2
-                queryData.amount, // $3
-                queryData.category, // $4: title
-                start, // $5: date_start
-                end, // $6: date_end
-                currentMonth, // $7: month
-                currentYear, // $8: year
-              ];
+              try {
+                const cat = await findOrCreateCategoryByName(currentUserId, queryData.category, {
+                  type: 'expense',
+                });
+                const categoryId = cat?.category_id || cat?.categoryId;
+                await upsertBudget(currentUserId, {
+                  title: queryData.category,
+                  categoryId,
+                  type: 'limit',
+                  amountLimit: Number(queryData.amount),
+                  dateStart: start,
+                  dateEnd: end,
+                  month: Number(currentMonth),
+                  year: Number(currentYear),
+                });
+                console.log(
+                  `💎 [budget_upsert qua API] "${queryData.category}" = ${queryData.amount}đ`,
+                );
+              } catch (e) {
+                console.error('❌ [budget_upsert qua API] Lỗi:', e.response?.data || e.message);
+              }
+              // Đã xử lý hoàn toàn qua API → bỏ qua nhánh pool.query bên dưới.
+              sql = '';
+              params = [];
             }
 
-            // 10. XÓA NGÂN SÁCH
-            // Dùng khi: "Xóa ngân sách tiền điện tháng này đi"
-            else if (queryData.type === 'budget_delete') {
-              sql = `
-              DELETE FROM budgets_service.budgets 
-              WHERE user_id = $1 
-              AND category_id = (SELECT category_id FROM category_service.categories WHERE category_name ILIKE $2 AND user_id = $1 LIMIT 1)
-              AND month = $3 
-              AND year = $4
-              RETURNING *`;
-
-              params.push(
-                queryData.category,
-                queryData.month || currentMonth,
-                queryData.year || currentYear,
-              );
-            }
 
             // 11. DANH SÁCH TẤT CẢ NGÂN SÁCH (Budget Summary)
             // Dùng khi: "Tháng này tôi đã chi tiêu thế nào so với ngân sách?"
@@ -1686,32 +2095,56 @@ app.post('/chat', upload.single('image'), async (req, res) => {
               params.push(queryData.month || currentMonth, queryData.year || currentYear);
             }
 
-            // --- 12. TẠO HOẶC CẬP NHẬT DANH MỤC CHI TIÊU (Upsert) ---
+            // --- 12. TẠO HOẶC CẬP NHẬT DANH MỤC CHI TIÊU — qua API category-service ---
             // VD: "Tạo danh mục ăn uống" hoặc "Sửa danh mục cafe thành tiền nước"
             else if (queryData.type === 'category_upsert') {
-              // Nếu có old_name thì là Sửa, không thì là Tạo mới
-              if (queryData.old_name) {
-                sql = `
-                  UPDATE category_service.categories 
-                  SET category_name = $1, updated_at = CURRENT_TIMESTAMP
-                  WHERE user_id = $2 AND category_name ILIKE $3
-                  RETURNING *`;
-                params = [queryData.new_name, currentUserId, queryData.old_name];
-              } else {
-                sql = `
-                  INSERT INTO category_service.categories (user_id, category_name)
-                  VALUES ($1, $2)
-                  ON CONFLICT (user_id, category_name) DO NOTHING
-                  RETURNING *`;
-                params = [currentUserId, queryData.category_name];
+              try {
+                if (queryData.old_name) {
+                  const target = await findCategoryByName(currentUserId, queryData.old_name);
+                  if (target) {
+                    await updateCategoryApi(currentUserId, target.category_id, {
+                      ...target,
+                      category_name: queryData.new_name,
+                    });
+                    console.log(
+                      `✏️ [category_upsert qua API] đổi tên "${queryData.old_name}" → "${queryData.new_name}"`,
+                    );
+                  } else {
+                    console.log(
+                      `ℹ️ [category_upsert qua API] không tìm thấy danh mục "${queryData.old_name}" để sửa`,
+                    );
+                  }
+                } else if (queryData.category_name) {
+                  await findOrCreateCategoryByName(currentUserId, queryData.category_name, {
+                    type: 'expense',
+                  });
+                  console.log(`✨ [category_upsert qua API] tạo "${queryData.category_name}"`);
+                }
+              } catch (e) {
+                console.error('❌ [category_upsert qua API] Lỗi:', e.response?.data || e.message);
               }
+              sql = '';
+              params = [];
             }
 
-            // --- 13. XÓA DANH MỤC ---
+            // --- 13. XÓA DANH MỤC — qua API category-service ---
             // VD: "Xóa danh mục game"
             else if (queryData.type === 'category_delete') {
-              sql = `DELETE FROM category_service.categories WHERE user_id = $1 AND category_name ILIKE $2 RETURNING *`;
-              params = [currentUserId, queryData.category_name];
+              try {
+                const target = await findCategoryByName(currentUserId, queryData.category_name);
+                if (target) {
+                  await deleteCategoryApi(currentUserId, target.category_id);
+                  console.log(`🗑️ [category_delete qua API] đã xóa "${queryData.category_name}"`);
+                } else {
+                  console.log(
+                    `ℹ️ [category_delete qua API] không tìm thấy "${queryData.category_name}"`,
+                  );
+                }
+              } catch (e) {
+                console.error('❌ [category_delete qua API] Lỗi:', e.response?.data || e.message);
+              }
+              sql = '';
+              params = [];
             }
 
             // --- 14. TRUY VẤN CÓ KHOẢNG NGÀY (Nâng cấp) ---
@@ -1896,85 +2329,113 @@ app.post('/chat', upload.single('image'), async (req, res) => {
             }
 
             if (catName) {
-              // Tìm theo cột category_name
-              const checkCat = await pool.query(
-                'SELECT category_id FROM category_service.categories WHERE category_name ILIKE $1 AND user_id = $2',
-                [catName, userId],
-              );
-
-              if (checkCat.rows.length === 0) {
-                // dùng toán tử || để nối chuỗi tìm kiếm trong SQL
-                let iconLookup = await pool.query(
-                  `SELECT icon_id FROM category_service.icons 
-                   WHERE $1 ILIKE '%' || name || '%' OR $1 ILIKE '%' || icon_code || '%' 
-                   LIMIT 1`,
-                  [catName], // Đã sửa từ catNameFromAI thành catName
-                );
-
-                let finalIconId;
-
-                if (iconLookup.rows.length > 0) {
-                  // Nếu có sẵn icon trong kho thì dùng luôn
-                  finalIconId = iconLookup.rows[0].icon_id;
-                  console.log(`🎯 Dùng icon có sẵn cho: ${catName}`);
-                } else {
-                  const iconModel = genAI.getGenerativeModel({
-                    model: 'gemini-3.1-flash-lite-preview',
-                  });
-                  const iconPrompt = `Bạn là chuyên gia thiết kế icon. Hãy gợi ý đúng 1 emoji duy nhất đại diện cho danh mục: "${catName}". 
-                  Chỉ trả về đúng 1 ký tự emoji, không giải thích, không backticks, không thêm chữ.`;
-
-                  const aiIconRes = await iconModel.generateContent(iconPrompt);
-                  let suggestedEmoji = aiIconRes.response.text().trim();
-
-                  // Làm sạch emoji (phòng hờ AI nhả ra markdown hoặc text)
-                  suggestedEmoji = suggestedEmoji.match(/\p{Emoji}/u)?.[0] || '📁';
-
-                  // 4. LƯU ICON MỚI NÀY VÀO KHO ICONS ĐỂ DÙNG LẠI SAU NÀY
-                  const newIcon = await pool.query(
-                    `INSERT INTO category_service.icons (name, icon_code, category) 
-                     VALUES ($1, $2, $3) 
-                     RETURNING icon_id`,
-                    [catName + ' Icon', suggestedEmoji, catType], // Đã sửa transactionType thành catType
-                  );
-
-                  finalIconId = newIcon.rows[0].icon_id;
-                  console.log(`✅ Đã tự tạo Icon mới thành công: ${suggestedEmoji}`);
-                }
-
-                await pool.query(
-                  "INSERT INTO category_service.categories (user_id, category_name, type, icon_id, color) VALUES ($1, $2, 'expense', $3, $4)",
-                  [userId, catName, finalIconId, 'blue'],
-                );
-                console.log(`✨ Đã tạo danh mục mới: ${catName}`);
-              } else {
+              const existed = await findCategoryByName(userId, catName);
+              if (existed) {
                 console.log(`🟡 Danh mục "${catName}" đã tồn tại rồi.`);
+              } else {
+                await createCategoryApi(userId, {
+                  category_name: catName,
+                  type: catType,
+                  color: 'blue',
+                });
+                console.log(`✨ Đã tạo danh mục mới qua API: ${catName}`);
               }
             }
           } catch (e) {
-            console.error('❌ Lỗi tạo danh mục:', e.message);
+            console.error('❌ Lỗi tạo danh mục qua API:', e.response?.data || e.message);
           }
         }
 
         // --- XỬ LÝ XÓA GIAO DỊCH QUA CHAT
         const deleteMatch = reply.match(/<delete_transaction>(.*?)<\/delete_transaction>/s);
         if (deleteMatch) {
-          const { id } = JSON.parse(deleteMatch[1]);
-          await pool.query('DELETE FROM transaction_service.transactions WHERE trans_id = $1', [
-            id,
-          ]);
-          console.log(`🗑️ Đã xóa giao dịch ID: ${id}`);
+          try {
+            const { id } = JSON.parse(deleteMatch[1]);
+            await deleteTransactionApi(currentUserId, id);
+            console.log(`🗑️ Đã xóa giao dịch ID qua API: ${id}`);
+          } catch (e) {
+            console.error('❌ Lỗi xóa giao dịch qua API:', e.response?.data || e.message);
+          }
         }
 
         // --- XỬ LÝ CẬP NHẬT GIAO DỊCH QUA CHAT
         const updateMatch = reply.match(/<update_transaction>(.*?)<\/update_transaction>/s);
         if (updateMatch) {
-          const { id, amount, description, category_name } = JSON.parse(updateMatch[1]);
-          await pool.query(
-            'UPDATE transaction_service.transactions SET amount = COALESCE($1, amount), description = COALESCE($2, description) WHERE trans_id = $3',
-            [amount, description, id],
-          );
-          console.log(`✏️ Đã cập nhật giao dịch ID: ${id} thành ${amount}đ`);
+          try {
+            const parsed = JSON.parse(updateMatch[1]);
+            const {
+              id,
+              amount,
+              description,
+              note,
+              date,
+              transaction_type: rawType,
+              transactionType: rawTypeCamel,
+              category_id: rawCatId,
+              categoryId: rawCatIdCamel,
+              account_id: rawAccId,
+              accountId: rawAccIdCamel,
+            } = parsed;
+
+            if (!id) {
+              throw new Error('Thiếu transaction id trong <update_transaction>');
+            }
+
+            // Transaction service PUT /:id yêu cầu full payload (AccountId, Amount,
+            // TransactionType, Date). Lấy đúng bản ghi cũ qua GET /:id để có account_id /
+            // category_id chính xác, rồi merge các field AI muốn đổi.
+            const existing = await getTransactionById(currentUserId, id, {
+              includeDetails: false,
+            });
+
+            if (!existing) {
+              throw new Error(`Không tìm thấy giao dịch ${id} của user ${currentUserId}`);
+            }
+
+            const existingAccountId = existing.account_id ?? existing.accountId;
+            const existingCategoryId = existing.category_id ?? existing.categoryId;
+            const existingAmount = existing.amount;
+            const existingType = existing.transaction_type ?? existing.transactionType;
+            const existingDate = existing.date;
+            const existingDesc = existing.description;
+            const existingNote = existing.note;
+
+            const nextAccountId = rawAccId ?? rawAccIdCamel ?? existingAccountId;
+            if (!nextAccountId) {
+              throw new Error(
+                `Giao dịch ${id} không có account_id (existing=${JSON.stringify(existing)})`,
+              );
+            }
+
+            // category_id là optional ở DTO; cho phép AI set null để clear.
+            const nextCategoryId =
+              rawCatId !== undefined
+                ? rawCatId
+                : rawCatIdCamel !== undefined
+                  ? rawCatIdCamel
+                  : existingCategoryId ?? null;
+
+            const mergedType = String(rawType ?? rawTypeCamel ?? existingType ?? 'expense')
+              .toLowerCase();
+            const normalizedType = mergedType === 'income' ? 'Income' : 'Expense';
+
+            const payload = {
+              account_id: nextAccountId,
+              category_id: nextCategoryId,
+              amount: amount != null ? Number(amount) : Number(existingAmount ?? 0),
+              transaction_type: normalizedType,
+              description: description ?? existingDesc ?? '',
+              date: date ?? existingDate ?? new Date().toISOString(),
+              note: note ?? existingNote ?? '',
+            };
+
+            await updateTransactionApi(currentUserId, id, payload);
+            console.log(
+              `✏️ Đã cập nhật giao dịch ID qua API: ${id} → amount=${payload.amount}, type=${payload.transaction_type}`,
+            );
+          } catch (e) {
+            console.error('❌ Lỗi cập nhật giao dịch qua API:', e.response?.data || e.message);
+          }
         }
 
         // --- LOGIC XỬ LÝ ĐẶT NGÂN SÁCH (ĐÃ TỐI ƯU & RENDER NGAY) ---
@@ -2000,60 +2461,39 @@ app.post('/chat', upload.single('image'), async (req, res) => {
             const targetMonth = bData.month || new Date().getMonth() + 1;
             const targetYear = bData.year || new Date().getFullYear();
 
-            // Xử lý ngày bắt đầu/kết thúc
-            const start = bData.start_date || `${targetYear}-${targetMonth}-01`;
-            const end =
-              bData.end_date ||
-              `${targetYear}-${targetMonth}-${new Date(targetYear, targetMonth, 0).getDate()}`;
+            // Xử lý ngày bắt đầu/kết thúc (chuyển sang kiểu datetime)
+            const start = bData.start_date
+              ? new Date(bData.start_date)
+              : new Date(targetYear, targetMonth - 1, 1, 0, 0, 0, 0);
+            const lastDay = new Date(targetYear, targetMonth, 0).getDate();
+            const end = bData.end_date
+              ? new Date(bData.end_date)
+              : new Date(targetYear, targetMonth - 1, lastDay, 23, 59, 59, 999);
 
             console.log(
-              `📦 [BUDGET] Đang xử lý mục: "${finalCatName}" | Số tiền: ${finalAmount}đ | Thời gian: ${start} đến ${end}`,
+              `📦 [BUDGET] Đang xử lý mục: "${finalCatName}" | Số tiền: ${finalAmount}đ | Thời gian: ${start.toISOString()} đến ${end.toISOString()}`,
             );
 
-            // 2. Tìm hoặc tạo danh mục (Dùng finalCatName đã làm sạch)
-            let catRes = await pool.query(
-              `SELECT category_id FROM category_service.categories WHERE category_name ILIKE $1 AND user_id = $2 LIMIT 1`,
-              [finalCatName, currentUserId],
-            );
+            // 2. Tìm hoặc tạo danh mục qua category-service API.
+            const cat = await findOrCreateCategoryByName(currentUserId, finalCatName, {
+              type: 'expense',
+              color: 'orange',
+            });
+            const categoryId = cat?.category_id || cat?.categoryId;
 
-            let categoryId;
-            if (catRes.rows.length > 0) {
-              categoryId = catRes.rows[0].category_id;
-            } else {
-              console.log('✨ [BUDGET] Tạo danh mục mới cho ngân sách...');
-              const newCat = await pool.query(
-                "INSERT INTO category_service.categories (user_id, category_name, type, icon_id, color) VALUES ($1, $2, 'expense', 'f1995874-297d-460c-882d-136585918831', 'orange') RETURNING category_id",
-                [currentUserId, finalCatName],
-              );
-              categoryId = newCat.rows[0].category_id;
-            }
+            // 3. Upsert budget qua budget-service API.
+            const upserted = await upsertBudget(currentUserId, {
+              title: finalCatName,
+              categoryId,
+              type: 'limit',
+              amountLimit: Number(finalAmount),
+              dateStart: start.toISOString(),
+              dateEnd: end.toISOString(),
+              month: targetMonth,
+              year: targetYear,
+            });
 
-            // 3. Lưu vào bảng budgets
-            const budgetQuery = await pool.query(
-              `INSERT INTO budgets_service.budgets 
-                (user_id, category_id, amount_limit, title, date_start, date_end, month, year, date, updated_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()) 
-               ON CONFLICT ON CONSTRAINT unique_budget_per_month 
-               DO UPDATE SET 
-                  amount_limit = EXCLUDED.amount_limit,
-                  title = EXCLUDED.title,
-                  date_start = EXCLUDED.date_start,
-                  date_end = EXCLUDED.date_end,
-                  updated_at = NOW()
-               RETURNING *`,
-              [
-                currentUserId,
-                categoryId,
-                finalAmount,
-                finalCatName, // title
-                start, // date_start
-                end, // date_end
-                targetMonth,
-                targetYear,
-              ],
-            );
-
-            console.log('💎 [BUDGET] DB cập nhật thành công:', budgetQuery.rows[0]);
+            console.log('💎 [BUDGET] Upsert qua API thành công:', upserted);
 
             // 🔥 4. LỆNH "ẢO THUẬT": Bắn socket để màn hình Web tự load lại số
             io.emit('money-guard-sync'); // Lệnh này cực quan trọng để Dashboard nhảy số ngay
@@ -2069,35 +2509,44 @@ app.post('/chat', upload.single('image'), async (req, res) => {
           }
         }
 
-        // --- LOGIC XỬ LÝ QUẢN LÝ DANH MỤC (CRUD CATEGORY) ---
+        // --- LOGIC XỬ LÝ QUẢN LÝ DANH MỤC (CRUD CATEGORY qua API) ---
         const manageCatMatch = reply.match(/<manage_category>(.*?)<\/manage_category>/s);
         if (manageCatMatch) {
           console.log('📂 [CATEGORY] Tìm thấy yêu cầu quản lý danh mục!');
           try {
             const data = JSON.parse(manageCatMatch[1].trim());
-            let sql = '';
-            let params = [];
+            let touched = false;
 
             if (data.action === 'create') {
-              sql = `INSERT INTO category_service.categories (user_id, category_name, type, icon_id, color) 
-             VALUES ($1, $2, 'expense', 'f1995874-297d-460c-882d-136585918831', 'blue') 
-             ON CONFLICT DO NOTHING`;
-              params = [currentUserId, data.category_name];
+              const exists = await findCategoryByName(currentUserId, data.category_name);
+              if (!exists) {
+                await createCategoryApi(currentUserId, {
+                  category_name: data.category_name,
+                  type: 'expense',
+                  icon: '💰',
+                  color: 'blue',
+                });
+              }
+              touched = true;
             } else if (data.action === 'update') {
-              sql = `UPDATE category_service.categories 
-                     SET category_name = $1 
-                     WHERE user_id = $2 AND category_name ILIKE $3`;
-              params = [data.new_name, currentUserId, data.old_name];
+              const target = await findCategoryByName(currentUserId, data.old_name);
+              if (target) {
+                await updateCategoryApi(currentUserId, target.category_id, {
+                  ...target,
+                  category_name: data.new_name,
+                });
+                touched = true;
+              }
             } else if (data.action === 'delete') {
-              sql = `DELETE FROM category_service.categories WHERE user_id = $1 AND category_name ILIKE $2`;
-              params = [currentUserId, data.category_name];
+              const target = await findCategoryByName(currentUserId, data.category_name);
+              if (target) {
+                await deleteCategoryApi(currentUserId, target.category_id);
+                touched = true;
+              }
             }
 
-            if (sql) {
-              await pool.query(sql, params);
-              console.log('✅ [CATEGORY] DB cập nhật thành công!');
-
-              // Bắn socket để giao diện tự cập nhật danh sách
+            if (touched) {
+              console.log('✅ [CATEGORY] Cập nhật qua API thành công!');
               io.emit('money-guard-sync');
 
               await addNotification(
@@ -2108,7 +2557,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
               );
             }
           } catch (e) {
-            console.error('❌ [CATEGORY] Lỗi xử lý:', e.message);
+            console.error('❌ [CATEGORY] Lỗi xử lý qua API:', e.response?.data || e.message);
           }
         }
 
@@ -2214,33 +2663,37 @@ app.post('/chat', upload.single('image'), async (req, res) => {
                     : 'f1995874-297d-460c-882d-136585918831'; // UUID icon mặc định (Bills)
 
                 // Nếu tạo danh mục mới, phải tạo đúng loại (income/expense)
-                const newCat = await pool.query(
-                  'INSERT INTO category_service.categories (user_id, category_name, type, icon_id, color) VALUES ($1, $2, $3, $4, $5) RETURNING category_id',
-                  [userId, data.category_name, transactionType, finalIconId, 'blue'],
-                );
+                // const newCat = await pool.query(
+                //   'INSERT INTO category_service.categories (user_id, category_name, type, icon_id, color) VALUES ($1, $2, $3, $4, $5) RETURNING category_id',
+                //   [userId, data.category_name, transactionType, finalIconId, 'blue'],
+                // );
+                const newCat = await findOrCreateCategoryByName(userId, data.category_name, {
+                  type: transactionType,
+                  icon_id: finalIconId,
+                  color: 'blue',
+                });
                 categoryId = newCat.rows[0].category_id;
-                console.log(`✨ Tạo danh mục mới: ${catNameFromAI}`);
+                console.log(`✨ Tạo danh mục mới: ${data.category_name}`);
               }
 
-              // 2. LƯU GIAO DỊCH
-              const insertQuery = `
-                INSERT INTO transaction_service.transactions (user_id, account_id, category_id, amount, transaction_type, description, date, note)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-              `;
-              const values = [
-                currentUserId,
-                'd4ffbef0-8bcc-445e-9ea3-7bc854e2ad76',
-                categoryId,
-                finalAmount,
-                transactionType,
-                data.description,
-                // finalDate,
-                transactionDate,
-                data.note || '',
-              ];
+              // 2. LẤY ACCOUNT MẶC ĐỊNH (thay cho UUID hardcode trước đây).
+              const acc = await getOrCreateDefaultAccount(userId, 'Tài khoản mặc định');
+              const accountId = acc?.account_id || acc?.accountId;
 
-              await pool.query(insertQuery, values);
-              console.log(`✅ Đã lưu ${transactionType}: ${data.description}`);
+              // 3. TẠO GIAO DỊCH QUA TRANSACTION-SERVICE API.
+              await createTransactionApi(currentUserId, {
+                account_id: accountId,
+                category_id: categoryId,
+                amount: Number(finalAmount),
+                transaction_type: transactionType === 'income' ? 'Income' : 'Expense',
+                description: data.description,
+                date:
+                  transactionDate instanceof Date
+                    ? transactionDate.toISOString()
+                    : new Date(transactionDate).toISOString(),
+                note: data.note || '',
+              });
+              console.log(`✅ Đã lưu ${transactionType} qua API: ${data.description}`);
 
               // ============================================================
               // GỬI TIN SANG N8N ĐỂ KIỂM TRA HẠN MỨC (CHỈ KHI TIÊU TIỀN)

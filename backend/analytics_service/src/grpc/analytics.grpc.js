@@ -89,8 +89,8 @@ const validateTransactionContext = async ({ account_id, category_id, user_id, tr
 
     const [accountRes, categoryRes, budgetRes] = await Promise.all(tasks);
 
-    if (!accountRes.exists)                          throw new Error(`Account không hợp lệ: ${accountRes.message}`);
-    if (!categoryRes.valid)                          throw new Error(`Category không hợp lệ: ${categoryRes.message}`);
+    if (!accountRes.exists) throw new Error(`Account không hợp lệ: ${accountRes.message}`);
+    if (!categoryRes.valid) throw new Error(`Category không hợp lệ: ${categoryRes.message}`);
     if (budget_id && budgetRes && !budgetRes.exists) throw new Error(`Budget không tồn tại: ${budgetRes.message}`);
 
     return { accountRes, categoryRes, budgetRes: budgetRes || null };

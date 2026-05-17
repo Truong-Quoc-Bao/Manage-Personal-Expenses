@@ -570,7 +570,7 @@ export function Transactions() {
                           <button
                             type="button"
                             onClick={() => navigate(`/transactions/${transaction.transId}`)}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-100 px-2.5 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-200"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-xs font-semibold text-sky-800 transition hover:bg-sky-100"
                             title="Xem chi tiết"
                           >
                             <Eye className="h-3.5 w-3.5" />
@@ -580,7 +580,7 @@ export function Transactions() {
                           <button
                             type="button"
                             onClick={() => setEditingTransaction(transaction)}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-amber-100 px-2.5 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-200"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-2.5 py-1.5 text-xs font-semibold text-orange-800 transition hover:bg-orange-100"
                             title="Chỉnh sửa"
                           >
                             <Pencil className="h-3.5 w-3.5" />
@@ -590,7 +590,7 @@ export function Transactions() {
                           <button
                             type="button"
                             onClick={() => setDeletingTransaction(transaction)}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-red-100 px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-200"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100"
                             title="Xóa"
                           >
                             <Trash2 className="h-3.5 w-3.5" />

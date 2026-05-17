@@ -165,15 +165,32 @@ const repo = {
     return await category_summary.deleteMany({ user_id: userId });
   },
 
+  // Cleanup category_summary theo account_id (khi account bị xoá)
+  deleteCategorySummaryByAccountId: async (accountId) => {
+    return await category_summary.deleteMany({ account_id: accountId });
+  },
+
+  // Tìm tất cả category_summary của user trong (category_id, year, month) trên tất cả account
+  findCategorySummariesByUserCategoryMonth: async (userId, categoryId, year, month) => {
+    return await category_summary.find({
+      user_id: userId,
+      category_id: categoryId,
+      year,
+      month,
+    }).lean();
+  },
+
   createManyCategorySummary: async (dataArray) => {
     return await category_summary.insertMany(dataArray);
   },
 
   findDashboardCacheByuserId: async (userId) => {
-    return await dashboard_cache.findOne({
-      user_id: userId,
-      // expires_at: { $gt: new Date() },
-    }).lean();
+    // Mỗi user có N dashboard_cache documents (unique theo account_id),
+    // trả về ARRAY để frontend cộng dồn tổng số dư / thu / chi của tất cả ví.
+    return await dashboard_cache
+      .find({ user_id: userId })
+      .sort({ account_id: 1 })
+      .lean();
   },
 
   findDashboardCacheByAccountId: async (accountId) => {
@@ -193,7 +210,21 @@ const repo = {
   },
 
   invalidateDashboardCache: async (userId) => {
-    return await dashboard_cache.deleteOne({ user_id: userId });
+    // Xoá tất cả cache của user (mọi account_id), không chỉ 1 doc.
+    return await dashboard_cache.deleteMany({ user_id: userId });
+  },
+
+  // Cập nhật field top_account_id đồng nhất cho tất cả dashboard_cache của user
+  updateDashboardCacheTopAccount: async (userId, topAccountId) => {
+    return await dashboard_cache.updateMany(
+      { user_id: userId },
+      { $set: { top_account_id: topAccountId } }
+    );
+  },
+
+  // Cleanup dashboard_cache theo account_id (khi account bị xoá)
+  deleteDashboardCacheByAccountId: async (accountId) => {
+    return await dashboard_cache.deleteMany({ account_id: accountId });
   },
 
   findMonthlyReportByuserId: async (userId) => {
@@ -258,6 +289,11 @@ const repo = {
     return await spending_trends.findOne({ user_id: userId, category_id: categoryId }).lean();
   },
 
+  // Tìm theo unique index (account_id, category_id)
+  findSpendingTrendByAccountCategory: async (accountId, categoryId) => {
+    return await spending_trends.findOne({ account_id: accountId, category_id: categoryId }).lean();
+  },
+
   findSpendingTrendById: async (id) => {
     return await spending_trends.findById(id).lean();
   },
@@ -272,6 +308,20 @@ const repo = {
       { $set: { ...data, updated_at: new Date() } },
       { new: true, upsert: true, runValidators: true }
     ).lean();
+  },
+
+  // Upsert theo unique index (account_id, category_id); raw update payload (đã wrap $set)
+  upsertSpendingTrendByAccountCategory: async (accountId, categoryId, updatePayload) => {
+    return await spending_trends.findOneAndUpdate(
+      { account_id: accountId, category_id: categoryId },
+      updatePayload,
+      { new: true, upsert: true, runValidators: true }
+    ).lean();
+  },
+
+  // Cleanup spending_trends theo account_id (khi account bị xoá)
+  deleteSpendingTrendsByAccountId: async (accountId) => {
+    return await spending_trends.deleteMany({ account_id: accountId });
   },
 
   updateSpendingTrendById: async (id, updateData) => {

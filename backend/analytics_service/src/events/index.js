@@ -2,6 +2,7 @@ const rabbitMQClient = require("../../../shared/rabbitmq-client");
 const transactionConsumer = require("./consumers/transaction-events.consumer");
 const accountConsumer = require("./consumers/account-events.consumer");
 const categoryConsumer = require("./consumers/category-events.consumer");
+const budgetConsumer = require("./consumers/budget-events.consumer");
 
 async function startRabbitMQ() {
     try {
@@ -45,10 +46,26 @@ async function startRabbitMQ() {
             "category.updated",
             categoryConsumer.handleCategoryUpdated
         );
-        await rabbitMQClient.consume(
+         await rabbitMQClient.consume(
             "analytics.category.deleted.queue",
             "category.deleted",
             categoryConsumer.handleCategoryDeleted
+        );
+
+         await rabbitMQClient.consume(
+            "analytics.budget.created.queue",
+            "budget.created",
+            budgetConsumer.handleBudgetCreated
+        );
+        await rabbitMQClient.consume(
+            "analytics.budget.updated.queue",
+            "budget.updated",
+            budgetConsumer.handleBudgetUpdated
+        );
+        await rabbitMQClient.consume(
+            "analytics.budget.deleted.queue",
+            "budget.deleted",
+            budgetConsumer.handleBudgetDeleted
         );
 
         console.log("[Analytics] All event consumers registered");

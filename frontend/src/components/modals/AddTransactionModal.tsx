@@ -17,6 +17,7 @@ interface AccountOption {
 interface CategoryOption {
   category_id: string;
   category_name: string;
+  type?: string | null;
 }
 
 interface AddTransactionModalProps {
@@ -139,7 +140,10 @@ export function AddTransactionModal({
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
-                onClick={() => setTransactionType("Expense")}
+                onClick={() => {
+                  setTransactionType("Expense");
+                  setFormData((prev) => ({ ...prev, categoryId: "" }));
+                }}
                 className={`rounded-2xl px-4 py-4 font-semibold transition ${
                   transactionType === "Expense"
                     ? "!bg-gradient-to-r !from-orange-400 !to-rose-400 text-white shadow-lg"
@@ -150,7 +154,10 @@ export function AddTransactionModal({
               </button>
               <button
                 type="button"
-                onClick={() => setTransactionType("Income")}
+                onClick={() => {
+                  setTransactionType("Income");
+                  setFormData((prev) => ({ ...prev, categoryId: "" }));
+                }}
                 className={`rounded-2xl px-4 py-4 font-semibold transition ${
                   transactionType === "Income"
                     ? "!bg-gradient-to-r !from-green-400 !to-emerald-500 text-white shadow-lg"
@@ -203,11 +210,17 @@ export function AddTransactionModal({
               className={selectClass}
             >
               <option value="">— Không chọn danh mục —</option>
-              {categories.map((cat) => (
-                <option key={cat.category_id} value={cat.category_id}>
-                  {cat.category_name}
-                </option>
-              ))}
+              {categories
+                .filter(
+                  (cat) =>
+                    !cat.type ||
+                    cat.type.toLowerCase() === transactionType.toLowerCase(),
+                )
+                .map((cat) => (
+                  <option key={cat.category_id} value={cat.category_id}>
+                    {cat.category_name}
+                  </option>
+                ))}
             </select>
           </div>
 
