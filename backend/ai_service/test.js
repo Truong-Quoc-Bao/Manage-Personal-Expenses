@@ -40,3 +40,14 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil(clients.openWindow(url));
 });
+
+// ... đoạn code hiện tại của bạn ...
+io.emit('bank_notification', { message: finalMsg });
+console.log('📡 [PROACTIVE]: Đã bắn Socket cảnh báo về Web.');
+
+// THÊM DÒNG NÀY VÀO:
+io.emit('money-guard-sync');
+console.log('🔄 [SYNC]: Đã gửi lệnh làm mới dữ liệu cho giao diện.');
+
+await addNotification(finalMsg, userId);
+// ...

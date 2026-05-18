@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   PieChart,
   Pie,
@@ -11,7 +11,7 @@ import {
   YAxis,
   CartesianGrid,
   Legend,
-} from "recharts";
+} from 'recharts';
 import {
   TrendingUp,
   TrendingDown,
@@ -33,10 +33,10 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Star,
-} from "lucide-react";
-import { analyticsApi, type DashboardCache } from "../api/analytics.api";
-import { accountApi } from "../api/account.api";
-import { formatDateTime } from "../utils/format";
+} from 'lucide-react';
+import { analyticsApi, type DashboardCache } from '../api/analytics.api';
+import { accountApi } from '../api/account.api';
+import { formatDateTime } from '../utils/format';
 
 type CategoryBreakdown = {
   category_id: string;
@@ -72,7 +72,7 @@ type MonthlyReport = {
   top_expenses?: TopExpense[];
   comparison?: Record<string, unknown>;
   ai_report?: { generated?: boolean; content?: string | null };
-  status?: "generated" | "pending" | "failed";
+  status?: 'generated' | 'pending' | 'failed';
   generated_at?: string | null;
   updated_at?: string | null;
 };
@@ -89,7 +89,7 @@ type UserAnalyticsGoal = {
   target_amount: number;
   current_amount: number;
   deadline?: string | null;
-  status: "in_progress" | "completed" | "exceeded" | "failed";
+  status: 'in_progress' | 'completed' | 'exceeded' | 'failed';
   note?: string | null;
 };
 
@@ -99,7 +99,7 @@ type BudgetAlertItem = {
   budget_limit: number;
   current_spent: number;
   percent_used: number;
-  status: "ok" | "warning" | "critical" | "exceeded";
+  status: 'ok' | 'warning' | 'critical' | 'exceeded';
   alerted_at?: string | null;
 };
 
@@ -156,29 +156,11 @@ type CategorySummaryItem = {
   updated_at?: string | null;
 };
 
-const EXPENSE_COLORS = [
-  "#f97316",
-  "#ef4444",
-  "#ec4899",
-  "#f59e0b",
-  "#fb7185",
-  "#f43f5e",
-];
+const EXPENSE_COLORS = ['#f97316', '#ef4444', '#ec4899', '#f59e0b', '#fb7185', '#f43f5e'];
 
-const INCOME_COLORS = [
-  "#06b6d4",
-  "#3b82f6",
-  "#14b8a6",
-  "#0ea5e9",
-  "#10b981",
-  "#22c55e",
-];
+const INCOME_COLORS = ['#06b6d4', '#3b82f6', '#14b8a6', '#0ea5e9', '#10b981', '#22c55e'];
 
-type TabId =
-  | "monthly"
-  | "user_analytics"
-  | "category_summary"
-  | "account_overview";
+type TabId = 'monthly' | 'user_analytics' | 'category_summary' | 'account_overview';
 
 type AccountInfo = {
   account_id: string;
@@ -189,21 +171,20 @@ type AccountInfo = {
 };
 
 const ACCOUNT_TYPE_ICON: Record<string, string> = {
-  cash: "💵",
-  bank: "🏦",
-  ewallet: "📱",
-  credit: "💳",
-  saving: "🏧",
+  cash: '💵',
+  bank: '🏦',
+  ewallet: '📱',
+  credit: '💳',
+  saving: '🏧',
 };
 
-const accountIconOf = (type: string) =>
-  ACCOUNT_TYPE_ICON[type?.toLowerCase()] ?? "💼";
+const accountIconOf = (type: string) => ACCOUNT_TYPE_ICON[type?.toLowerCase()] ?? '💼';
 
 export function Statistics() {
-  const [activeTab, setActiveTab] = useState<TabId>("monthly");
-  const [period, setPeriod] = useState<"month" | "quarter" | "year">("month");
-  const [view, setView] = useState<"category" | "trend">("category");
-  const [chartType, setChartType] = useState<"expense" | "income">("expense");
+  const [activeTab, setActiveTab] = useState<TabId>('monthly');
+  const [period, setPeriod] = useState<'month' | 'quarter' | 'year'>('month');
+  const [view, setView] = useState<'category' | 'trend'>('category');
+  const [chartType, setChartType] = useState<'expense' | 'income'>('expense');
   const [reports, setReports] = useState<MonthlyReport[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -219,6 +200,24 @@ export function Statistics() {
   const [accountStatsLoading, setAccountStatsLoading] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
 
+  // bắn socket
+  useEffect(() => {
+    const handleSync = () => {
+      console.log('📊 Statistics: Đang làm mới báo cáo...');
+      // Gọi lại các hàm load dữ liệu tùy theo tab đang mở
+      if (activeTab === 'monthly')
+        analyticsApi.getMonthlyReports().then((res) => setReports(res.data?.data || []));
+      if (activeTab === 'user_analytics')
+        analyticsApi.getUserAnalytics().then((res) => setUserAnalytics(res.data?.data || null));
+      if (activeTab === 'category_summary')
+        analyticsApi.getCategorySummary().then((res) => setCategorySummary(res.data?.data || []));
+    };
+
+    window.addEventListener('money-guard-sync', handleSync);
+    return () => window.removeEventListener('money-guard-sync', handleSync);
+  }, [activeTab]); // Lắng nghe theo tab để refresh đúng chỗ
+
+  //
   useEffect(() => {
     const fetchReports = async () => {
       try {
@@ -226,7 +225,7 @@ export function Statistics() {
         const res = await analyticsApi.getMonthlyReports();
         setReports(res.data?.data || []);
       } catch (error) {
-        console.error("Get monthly reports failed:", error);
+        console.error('Get monthly reports failed:', error);
       } finally {
         setLoading(false);
       }
@@ -235,38 +234,38 @@ export function Statistics() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === "user_analytics" && !userAnalytics) {
+    if (activeTab === 'user_analytics' && !userAnalytics) {
       setUserAnalyticsLoading(true);
       analyticsApi
         .getUserAnalytics()
         .then((res) => setUserAnalytics(res.data?.data || null))
-        .catch((err) => console.error("Get user analytics failed:", err))
+        .catch((err) => console.error('Get user analytics failed:', err))
         .finally(() => setUserAnalyticsLoading(false));
     }
   }, [activeTab, userAnalytics]);
 
   useEffect(() => {
-    if (activeTab === "category_summary" && categorySummary.length === 0) {
+    if (activeTab === 'category_summary' && categorySummary.length === 0) {
       setCategorySummaryLoading(true);
       analyticsApi
         .getCategorySummary()
         .then((res) => setCategorySummary(res.data?.data || []))
-        .catch((err) => console.error("Get category summary failed:", err))
+        .catch((err) => console.error('Get category summary failed:', err))
         .finally(() => setCategorySummaryLoading(false));
     }
   }, [activeTab, categorySummary.length]);
 
   useEffect(() => {
-    if (activeTab !== "account_overview" || accountCaches.length > 0) return;
+    if (activeTab !== 'account_overview' || accountCaches.length > 0) return;
 
     setAccountStatsLoading(true);
     Promise.all([
       analyticsApi.getDashboardCache().catch((err) => {
-        console.warn("Get dashboard_cache failed:", err?.message);
+        console.warn('Get dashboard_cache failed:', err?.message);
         return { data: { data: [] } };
       }),
       accountApi.getAccounts().catch((err) => {
-        console.warn("Get accounts failed:", err?.message);
+        console.warn('Get accounts failed:', err?.message);
         return { data: { data: [] } };
       }),
     ])
@@ -304,7 +303,7 @@ export function Statistics() {
         acc.savings += c.summary?.monthly_savings ?? 0;
         return acc;
       },
-      { balance: 0, income: 0, expense: 0, savings: 0 }
+      { balance: 0, income: 0, expense: 0, savings: 0 },
     );
   }, [accountCaches]);
 
@@ -320,19 +319,14 @@ export function Statistics() {
   }, [accountCaches]);
 
   const selectedCache = useMemo(
-    () =>
-      accountCaches.find((c) => c.account_id === selectedAccountId) ??
-      accountCaches[0] ??
-      null,
-    [accountCaches, selectedAccountId]
+    () => accountCaches.find((c) => c.account_id === selectedAccountId) ?? accountCaches[0] ?? null,
+    [accountCaches, selectedAccountId],
   );
 
   const selectedReports = useMemo(() => {
-    const sorted = [...reports].sort(
-      (a, b) => b.year * 12 + b.month - (a.year * 12 + a.month)
-    );
-    if (period === "month") return sorted.slice(0, 1);
-    if (period === "quarter") return sorted.slice(0, 3);
+    const sorted = [...reports].sort((a, b) => b.year * 12 + b.month - (a.year * 12 + a.month));
+    if (period === 'month') return sorted.slice(0, 1);
+    if (period === 'quarter') return sorted.slice(0, 3);
     return sorted.slice(0, 12);
   }, [reports, period]);
 
@@ -345,7 +339,7 @@ export function Statistics() {
         totalExpense: acc.totalExpense + report.summary.total_expense,
         savings: acc.savings + report.summary.savings,
       }),
-      { totalIncome: 0, totalExpense: 0, savings: 0 }
+      { totalIncome: 0, totalExpense: 0, savings: 0 },
     );
   }, [selectedReports]);
 
@@ -369,13 +363,13 @@ export function Statistics() {
     return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
   }, [selectedReports]);
 
-  const displayData = chartType === "expense" ? categoryData : incomeCategoryData;
+  const displayData = chartType === 'expense' ? categoryData : incomeCategoryData;
   const totalExpense = categoryData.reduce((sum, item) => sum + item.value, 0);
   const totalIncome = incomeCategoryData.reduce((sum, item) => sum + item.value, 0);
-  const totalDisplay = chartType === "expense" ? totalExpense : totalIncome;
+  const totalDisplay = chartType === 'expense' ? totalExpense : totalIncome;
 
   const trendData = useMemo(() => {
-    if (period === "month" && currentReport) {
+    if (period === 'month' && currentReport) {
       return currentReport.weekly_trend.map((item) => ({
         month: `Tuần ${item.week}`,
         income: item.income,
@@ -403,34 +397,29 @@ export function Statistics() {
   const avgSaving = avgIncome - avgExpense;
 
   const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount);
+    new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
 
   const tabButtonClass = (active: boolean) =>
     `rounded-xl px-4 py-2 font-medium transition ${
       active
-        ? "!bg-gradient-to-r !from-orange-400 !to-rose-400 !text-white shadow-md"
-        : "!bg-gray-100 !text-gray-700 hover:!bg-gray-200"
+        ? '!bg-gradient-to-r !from-orange-400 !to-rose-400 !text-white shadow-md'
+        : '!bg-gray-100 !text-gray-700 hover:!bg-gray-200'
     }`;
 
   const latestCategorySummary = useMemo(() => {
     if (!categorySummary.length) return [];
-    const maxPeriod = categorySummary.reduce(
-      (max, item) => {
-        const val = item.year * 12 + item.month;
-        return val > max ? val : max;
-      },
-      0
-    );
-    return categorySummary.filter(
-      (item) => item.year * 12 + item.month === maxPeriod
-    );
+    const maxPeriod = categorySummary.reduce((max, item) => {
+      const val = item.year * 12 + item.month;
+      return val > max ? val : max;
+    }, 0);
+    return categorySummary.filter((item) => item.year * 12 + item.month === maxPeriod);
   }, [categorySummary]);
 
   const expenseCategories = latestCategorySummary.filter(
-    (c) => c.category_type === "Expense" || c.category_type === "expense"
+    (c) => c.category_type === 'Expense' || c.category_type === 'expense',
   );
   const incomeCategories = latestCategorySummary.filter(
-    (c) => c.category_type === "Income" || c.category_type === "income"
+    (c) => c.category_type === 'Income' || c.category_type === 'income',
   );
 
   if (loading) {
@@ -455,32 +444,38 @@ export function Statistics() {
       <div className="mb-6 flex flex-wrap gap-2">
         <button
           type="button"
-          onClick={() => setActiveTab("monthly")}
-          className={`inline-flex items-center gap-2 ${tabButtonClass(activeTab === "monthly")}`}
+          onClick={() => setActiveTab('monthly')}
+          className={`inline-flex items-center gap-2 ${tabButtonClass(activeTab === 'monthly')}`}
         >
           <BarChart3 className="h-4 w-4" />
           Báo cáo tháng
         </button>
         <button
           type="button"
-          onClick={() => setActiveTab("user_analytics")}
-          className={`inline-flex items-center gap-2 ${tabButtonClass(activeTab === "user_analytics")}`}
+          onClick={() => setActiveTab('user_analytics')}
+          className={`inline-flex items-center gap-2 ${tabButtonClass(
+            activeTab === 'user_analytics',
+          )}`}
         >
           <User className="h-4 w-4" />
           Tổng quan cá nhân
         </button>
         <button
           type="button"
-          onClick={() => setActiveTab("category_summary")}
-          className={`inline-flex items-center gap-2 ${tabButtonClass(activeTab === "category_summary")}`}
+          onClick={() => setActiveTab('category_summary')}
+          className={`inline-flex items-center gap-2 ${tabButtonClass(
+            activeTab === 'category_summary',
+          )}`}
         >
           <Tag className="h-4 w-4" />
           Danh mục chi tiêu
         </button>
         <button
           type="button"
-          onClick={() => setActiveTab("account_overview")}
-          className={`inline-flex items-center gap-2 ${tabButtonClass(activeTab === "account_overview")}`}
+          onClick={() => setActiveTab('account_overview')}
+          className={`inline-flex items-center gap-2 ${tabButtonClass(
+            activeTab === 'account_overview',
+          )}`}
         >
           <Briefcase className="h-4 w-4" />
           Theo tài khoản
@@ -488,7 +483,7 @@ export function Statistics() {
       </div>
 
       {/* ====== TAB: Monthly Reports ====== */}
-      {activeTab === "monthly" && (
+      {activeTab === 'monthly' && (
         <>
           {!currentReport ? (
             <div className="flex items-center justify-center py-20 text-gray-500">
@@ -533,13 +528,25 @@ export function Statistics() {
                       Khoảng thời gian
                     </label>
                     <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => setPeriod("month")} className={tabButtonClass(period === "month")}>
+                      <button
+                        type="button"
+                        onClick={() => setPeriod('month')}
+                        className={tabButtonClass(period === 'month')}
+                      >
                         Tháng gần nhất
                       </button>
-                      <button type="button" onClick={() => setPeriod("quarter")} className={tabButtonClass(period === "quarter")}>
+                      <button
+                        type="button"
+                        onClick={() => setPeriod('quarter')}
+                        className={tabButtonClass(period === 'quarter')}
+                      >
                         3 tháng gần nhất
                       </button>
-                      <button type="button" onClick={() => setPeriod("year")} className={tabButtonClass(period === "year")}>
+                      <button
+                        type="button"
+                        onClick={() => setPeriod('year')}
+                        className={tabButtonClass(period === 'year')}
+                      >
                         12 tháng gần nhất
                       </button>
                     </div>
@@ -547,10 +554,18 @@ export function Statistics() {
                   <div className="flex-1">
                     <label className="mb-2 block text-sm font-medium text-gray-700">Xem theo</label>
                     <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => setView("category")} className={tabButtonClass(view === "category")}>
+                      <button
+                        type="button"
+                        onClick={() => setView('category')}
+                        className={tabButtonClass(view === 'category')}
+                      >
                         Theo danh mục
                       </button>
-                      <button type="button" onClick={() => setView("trend")} className={tabButtonClass(view === "trend")}>
+                      <button
+                        type="button"
+                        onClick={() => setView('trend')}
+                        className={tabButtonClass(view === 'trend')}
+                      >
                         Xu hướng
                       </button>
                     </div>
@@ -558,32 +573,32 @@ export function Statistics() {
                 </div>
               </div>
 
-              {view === "category" ? (
+              {view === 'category' ? (
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                   <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-lg">
                     <div className="mb-6 flex items-center justify-between">
                       <h2 className="text-xl font-semibold text-gray-900">
-                        {chartType === "expense" ? "Phân bổ chi tiêu" : "Phân bổ thu nhập"}
+                        {chartType === 'expense' ? 'Phân bổ chi tiêu' : 'Phân bổ thu nhập'}
                       </h2>
                       <div className="flex rounded-xl bg-gray-100 p-1">
                         <button
                           type="button"
-                          onClick={() => setChartType("expense")}
+                          onClick={() => setChartType('expense')}
                           className={`rounded-lg px-3 py-1.5 text-sm transition ${
-                            chartType === "expense"
-                              ? "bg-gradient-to-r from-orange-400 to-rose-400 text-white shadow"
-                              : "text-gray-600"
+                            chartType === 'expense'
+                              ? 'bg-gradient-to-r from-orange-400 to-rose-400 text-white shadow'
+                              : 'text-gray-600'
                           }`}
                         >
                           Chi tiêu
                         </button>
                         <button
                           type="button"
-                          onClick={() => setChartType("income")}
+                          onClick={() => setChartType('income')}
                           className={`rounded-lg px-3 py-1.5 text-sm transition ${
-                            chartType === "income"
-                              ? "bg-gradient-to-r from-cyan-400 to-blue-500 text-white shadow"
-                              : "text-gray-600"
+                            chartType === 'income'
+                              ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white shadow'
+                              : 'text-gray-600'
                           }`}
                         >
                           Thu nhập
@@ -608,7 +623,7 @@ export function Statistics() {
                             <Cell
                               key={index}
                               fill={
-                                chartType === "expense"
+                                chartType === 'expense'
                                   ? EXPENSE_COLORS[index % EXPENSE_COLORS.length]
                                   : INCOME_COLORS[index % INCOME_COLORS.length]
                               }
@@ -622,11 +637,11 @@ export function Statistics() {
                     <div className="mt-4 border-t border-gray-200 pt-4">
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-gray-800">
-                          {chartType === "expense" ? "Tổng chi tiêu" : "Tổng thu nhập"}
+                          {chartType === 'expense' ? 'Tổng chi tiêu' : 'Tổng thu nhập'}
                         </span>
                         <span
                           className={`text-xl font-semibold ${
-                            chartType === "expense" ? "text-red-600" : "text-cyan-600"
+                            chartType === 'expense' ? 'text-red-600' : 'text-cyan-600'
                           }`}
                         >
                           {formatCurrency(totalDisplay)}
@@ -637,7 +652,7 @@ export function Statistics() {
 
                   <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-lg">
                     <h2 className="mb-6 text-xl font-semibold text-gray-900">
-                      {chartType === "expense" ? "Chi tiết chi tiêu" : "Chi tiết thu nhập"}
+                      {chartType === 'expense' ? 'Chi tiết chi tiêu' : 'Chi tiết thu nhập'}
                     </h2>
                     <div className="space-y-4">
                       {displayData.map((category, index) => {
@@ -648,9 +663,7 @@ export function Statistics() {
                             <div className="mb-2 flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 {index < 3 && (
-                                  <span className="text-sm">
-                                    {["🥇", "🥈", "🥉"][index]}
-                                  </span>
+                                  <span className="text-sm">{['🥇', '🥈', '🥉'][index]}</span>
                                 )}
                                 <span className="text-sm font-medium text-gray-800">
                                   {category.name}
@@ -667,7 +680,7 @@ export function Statistics() {
                                   style={{
                                     width: `${percentage}%`,
                                     backgroundColor:
-                                      chartType === "expense"
+                                      chartType === 'expense'
                                         ? EXPENSE_COLORS[index % EXPENSE_COLORS.length]
                                         : INCOME_COLORS[index % INCOME_COLORS.length],
                                   }}
@@ -685,9 +698,7 @@ export function Statistics() {
                 </div>
               ) : (
                 <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-lg">
-                  <h2 className="mb-6 text-xl font-semibold text-gray-900">
-                    Xu hướng thu chi
-                  </h2>
+                  <h2 className="mb-6 text-xl font-semibold text-gray-900">Xu hướng thu chi</h2>
                   <ResponsiveContainer width="100%" height={400}>
                     <BarChart data={trendData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -727,7 +738,7 @@ export function Statistics() {
               )}
 
               {/* Daily Cashflow Chart (only when viewing single month) */}
-              {period === "month" &&
+              {period === 'month' &&
                 currentReport?.daily_cashflow &&
                 currentReport.daily_cashflow.length > 0 && (
                   <div className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-lg">
@@ -788,11 +799,9 @@ export function Statistics() {
                           </div>
                           <div>
                             <p className="text-sm font-medium text-gray-800">
-                              {tx.description || "(Không có mô tả)"}
+                              {tx.description || '(Không có mô tả)'}
                             </p>
-                            <p className="text-xs text-gray-500">
-                              Mã: {tx.trans_id.slice(0, 8)}…
-                            </p>
+                            <p className="text-xs text-gray-500">Mã: {tx.trans_id.slice(0, 8)}…</p>
                           </div>
                         </div>
                         <span className="text-base font-bold text-rose-600">
@@ -805,34 +814,28 @@ export function Statistics() {
               )}
 
               {/* Comparison vs previous month */}
-              {currentReport?.comparison &&
-                Object.keys(currentReport.comparison).length > 0 && (
-                  <div className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-lg">
-                    <div className="mb-4 flex items-center gap-2">
-                      <BarChart3 className="h-5 w-5 text-indigo-500" />
-                      <h2 className="text-xl font-semibold text-gray-900">
-                        So sánh với tháng trước
-                      </h2>
-                    </div>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      {Object.entries(currentReport.comparison).map(([key, value]) => (
-                        <div
-                          key={key}
-                          className="rounded-xl border border-gray-100 bg-gray-50 p-3"
-                        >
-                          <p className="text-xs uppercase tracking-wider text-gray-500">
-                            {key.replace(/_/g, " ")}
-                          </p>
-                          <p className="mt-1 text-sm font-semibold text-gray-800">
-                            {typeof value === "number"
-                              ? value.toLocaleString("vi-VN")
-                              : String(value)}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
+              {currentReport?.comparison && Object.keys(currentReport.comparison).length > 0 && (
+                <div className="mt-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-lg">
+                  <div className="mb-4 flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5 text-indigo-500" />
+                    <h2 className="text-xl font-semibold text-gray-900">So sánh với tháng trước</h2>
                   </div>
-                )}
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {Object.entries(currentReport.comparison).map(([key, value]) => (
+                      <div key={key} className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                        <p className="text-xs uppercase tracking-wider text-gray-500">
+                          {key.replace(/_/g, ' ')}
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-gray-800">
+                          {typeof value === 'number'
+                            ? value.toLocaleString('vi-VN')
+                            : String(value)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* AI Report */}
               {currentReport?.ai_report?.content && (
@@ -847,18 +850,18 @@ export function Statistics() {
                     {currentReport.status && (
                       <span
                         className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          currentReport.status === "generated"
-                            ? "bg-green-100 text-green-700"
-                            : currentReport.status === "pending"
-                            ? "bg-amber-100 text-amber-700"
-                            : "bg-red-100 text-red-700"
+                          currentReport.status === 'generated'
+                            ? 'bg-green-100 text-green-700'
+                            : currentReport.status === 'pending'
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-red-100 text-red-700'
                         }`}
                       >
-                        {currentReport.status === "generated"
-                          ? "Đã tạo"
-                          : currentReport.status === "pending"
-                          ? "Đang chờ"
-                          : "Thất bại"}
+                        {currentReport.status === 'generated'
+                          ? 'Đã tạo'
+                          : currentReport.status === 'pending'
+                          ? 'Đang chờ'
+                          : 'Thất bại'}
                       </span>
                     )}
                   </div>
@@ -869,8 +872,7 @@ export function Statistics() {
                   </div>
                   {currentReport.generated_at && (
                     <p className="mt-3 text-right text-xs text-gray-400">
-                      Tạo lúc{" "}
-                      {new Date(currentReport.generated_at).toLocaleString("vi-VN")}
+                      Tạo lúc {new Date(currentReport.generated_at).toLocaleString('vi-VN')}
                     </p>
                   )}
                 </div>
@@ -881,7 +883,7 @@ export function Statistics() {
       )}
 
       {/* ====== TAB: User Analytics ====== */}
-      {activeTab === "user_analytics" && (
+      {activeTab === 'user_analytics' && (
         <>
           {userAnalyticsLoading ? (
             <div className="flex items-center justify-center py-20">
@@ -905,9 +907,7 @@ export function Statistics() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-white/80">Xin chào</p>
-                      <p className="text-xl font-bold text-white">
-                        {userAnalytics.display_name}
-                      </p>
+                      <p className="text-xl font-bold text-white">{userAnalytics.display_name}</p>
                       {userAnalytics.account_id && userAnalytics.account_id.length > 0 && (
                         <p className="text-xs text-white/70 mt-0.5">
                           {userAnalytics.account_id.length} tài khoản đang theo dõi
@@ -981,7 +981,7 @@ export function Statistics() {
                           {formatCurrency(userAnalytics.current_month.savings || 0)}
                         </span>
                       </div>
-                      {typeof userAnalytics.current_month.savings_rate === "number" && (
+                      {typeof userAnalytics.current_month.savings_rate === 'number' && (
                         <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
                           <div className="mb-2 flex items-center justify-between">
                             <span className="text-sm font-medium text-gray-700">
@@ -997,7 +997,7 @@ export function Statistics() {
                               style={{
                                 width: `${Math.min(
                                   Math.max(userAnalytics.current_month.savings_rate, 0),
-                                  100
+                                  100,
                                 )}%`,
                               }}
                             />
@@ -1023,7 +1023,7 @@ export function Statistics() {
                           {userAnalytics.streak.saving_months || 0}
                         </p>
                         <p className="pb-2 text-sm text-gray-500">
-                          {userAnalytics.streak.unit || "tháng"} liên tiếp dương
+                          {userAnalytics.streak.unit || 'tháng'} liên tiếp dương
                         </p>
                       </div>
                     </div>
@@ -1042,41 +1042,41 @@ export function Statistics() {
                           </div>
                           {userAnalytics.budget_alert.last_checked && (
                             <span className="text-xs text-gray-400">
-                              {new Date(
-                                userAnalytics.budget_alert.last_checked
-                              ).toLocaleDateString("vi-VN")}
+                              {new Date(userAnalytics.budget_alert.last_checked).toLocaleDateString(
+                                'vi-VN',
+                              )}
                             </span>
                           )}
                         </div>
                         <div className="space-y-3">
                           {userAnalytics.budget_alert.alerts.slice(0, 4).map((alert) => {
                             const styleByStatus: Record<
-                              BudgetAlertItem["status"],
+                              BudgetAlertItem['status'],
                               { bg: string; text: string; bar: string; label: string }
                             > = {
                               ok: {
-                                bg: "bg-green-50 border-green-100",
-                                text: "text-green-700",
-                                bar: "bg-green-400",
-                                label: "An toàn",
+                                bg: 'bg-green-50 border-green-100',
+                                text: 'text-green-700',
+                                bar: 'bg-green-400',
+                                label: 'An toàn',
                               },
                               warning: {
-                                bg: "bg-amber-50 border-amber-100",
-                                text: "text-amber-700",
-                                bar: "bg-amber-400",
-                                label: "Cảnh báo",
+                                bg: 'bg-amber-50 border-amber-100',
+                                text: 'text-amber-700',
+                                bar: 'bg-amber-400',
+                                label: 'Cảnh báo',
                               },
                               critical: {
-                                bg: "bg-orange-50 border-orange-100",
-                                text: "text-orange-700",
-                                bar: "bg-orange-500",
-                                label: "Sắp vượt",
+                                bg: 'bg-orange-50 border-orange-100',
+                                text: 'text-orange-700',
+                                bar: 'bg-orange-500',
+                                label: 'Sắp vượt',
                               },
                               exceeded: {
-                                bg: "bg-red-50 border-red-100",
-                                text: "text-red-700",
-                                bar: "bg-red-500",
-                                label: "Đã vượt",
+                                bg: 'bg-red-50 border-red-100',
+                                text: 'text-red-700',
+                                bar: 'bg-red-500',
+                                label: 'Đã vượt',
                               },
                             };
                             const s = styleByStatus[alert.status];
@@ -1097,7 +1097,7 @@ export function Statistics() {
                                 </div>
                                 <div className="mb-1.5 flex items-center justify-between text-xs text-gray-600">
                                   <span>
-                                    {formatCurrency(alert.current_spent)} /{" "}
+                                    {formatCurrency(alert.current_spent)} /{' '}
                                     {formatCurrency(alert.budget_limit)}
                                   </span>
                                   <span className="font-semibold">
@@ -1137,8 +1137,7 @@ export function Statistics() {
                           <div
                             className="flex h-8 w-8 items-center justify-center rounded-lg text-white text-xs font-bold"
                             style={{
-                              backgroundColor:
-                                EXPENSE_COLORS[idx % EXPENSE_COLORS.length],
+                              backgroundColor: EXPENSE_COLORS[idx % EXPENSE_COLORS.length],
                             }}
                           >
                             {idx + 1}
@@ -1162,16 +1161,12 @@ export function Statistics() {
                   <div className="mb-4 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Brain className="h-5 w-5 text-purple-500" />
-                      <h2 className="text-lg font-semibold text-gray-900">
-                        Phân tích từ AI
-                      </h2>
+                      <h2 className="text-lg font-semibold text-gray-900">Phân tích từ AI</h2>
                     </div>
                     {userAnalytics.ai_insights.generated_at && (
                       <span className="text-xs text-gray-400">
-                        Tạo lúc{" "}
-                        {new Date(
-                          userAnalytics.ai_insights.generated_at
-                        ).toLocaleString("vi-VN")}
+                        Tạo lúc{' '}
+                        {new Date(userAnalytics.ai_insights.generated_at).toLocaleString('vi-VN')}
                       </span>
                     )}
                   </div>
@@ -1189,9 +1184,7 @@ export function Statistics() {
                   <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-lg">
                     <div className="flex items-center gap-2 mb-4">
                       <Target className="h-5 w-5 text-orange-500" />
-                      <h2 className="text-lg font-semibold text-gray-900">
-                        Mục tiêu tài chính
-                      </h2>
+                      <h2 className="text-lg font-semibold text-gray-900">Mục tiêu tài chính</h2>
                     </div>
                     <div className="space-y-5">
                       {userAnalytics.goal_tracking.goals.map((goal) => {
@@ -1200,27 +1193,27 @@ export function Statistics() {
                             ? Math.min((goal.current_amount / goal.target_amount) * 100, 100)
                             : 0;
                         const statusBadge: Record<
-                          UserAnalyticsGoal["status"],
+                          UserAnalyticsGoal['status'],
                           { color: string; label: string; icon: React.ReactNode }
                         > = {
                           in_progress: {
-                            color: "bg-blue-100 text-blue-700",
-                            label: "Đang thực hiện",
+                            color: 'bg-blue-100 text-blue-700',
+                            label: 'Đang thực hiện',
                             icon: <Target className="h-3 w-3" />,
                           },
                           completed: {
-                            color: "bg-green-100 text-green-700",
-                            label: "Hoàn thành",
+                            color: 'bg-green-100 text-green-700',
+                            label: 'Hoàn thành',
                             icon: <CheckCircle2 className="h-3 w-3" />,
                           },
                           exceeded: {
-                            color: "bg-emerald-100 text-emerald-700",
-                            label: "Vượt mục tiêu",
+                            color: 'bg-emerald-100 text-emerald-700',
+                            label: 'Vượt mục tiêu',
                             icon: <TrendingUp className="h-3 w-3" />,
                           },
                           failed: {
-                            color: "bg-red-100 text-red-700",
-                            label: "Thất bại",
+                            color: 'bg-red-100 text-red-700',
+                            label: 'Thất bại',
                             icon: <AlertTriangle className="h-3 w-3" />,
                           },
                         };
@@ -1229,13 +1222,10 @@ export function Statistics() {
                           <div key={goal.goal_id}>
                             <div className="mb-2 flex items-start justify-between gap-3">
                               <div>
-                                <p className="text-sm font-semibold text-gray-800">
-                                  {goal.title}
-                                </p>
+                                <p className="text-sm font-semibold text-gray-800">{goal.title}</p>
                                 {goal.deadline && (
                                   <p className="mt-0.5 text-xs text-gray-500">
-                                    Hạn:{" "}
-                                    {new Date(goal.deadline).toLocaleDateString("vi-VN")}
+                                    Hạn: {new Date(goal.deadline).toLocaleDateString('vi-VN')}
                                   </p>
                                 )}
                               </div>
@@ -1248,7 +1238,7 @@ export function Statistics() {
                             </div>
                             <div className="mb-1 flex items-center justify-between text-xs text-gray-500">
                               <span>
-                                {formatCurrency(goal.current_amount)} /{" "}
+                                {formatCurrency(goal.current_amount)} /{' '}
                                 {formatCurrency(goal.target_amount)}
                               </span>
                               <span className="font-semibold text-gray-700">
@@ -1262,9 +1252,7 @@ export function Statistics() {
                               />
                             </div>
                             {goal.note && (
-                              <p className="mt-2 text-xs italic text-gray-500">
-                                “{goal.note}”
-                              </p>
+                              <p className="mt-2 text-xs italic text-gray-500">“{goal.note}”</p>
                             )}
                           </div>
                         );
@@ -1278,7 +1266,7 @@ export function Statistics() {
       )}
 
       {/* ====== TAB: Category Summary ====== */}
-      {activeTab === "category_summary" && (
+      {activeTab === 'category_summary' && (
         <>
           {categorySummaryLoading ? (
             <div className="flex items-center justify-center py-20">
@@ -1349,12 +1337,11 @@ export function Statistics() {
                               <tr
                                 className={`transition ${
                                   hasBreakdown
-                                    ? "cursor-pointer hover:bg-gray-50"
-                                    : "hover:bg-gray-50"
+                                    ? 'cursor-pointer hover:bg-gray-50'
+                                    : 'hover:bg-gray-50'
                                 }`}
                                 onClick={() =>
-                                  hasBreakdown &&
-                                  setExpandedCategoryId(isOpen ? null : cat._id)
+                                  hasBreakdown && setExpandedCategoryId(isOpen ? null : cat._id)
                                 }
                               >
                                 <td className="px-4 py-3">
@@ -1384,9 +1371,7 @@ export function Statistics() {
                                   </span>
                                 </td>
                                 <td className="px-4 py-3 text-right text-sm text-gray-600">
-                                  {cat.budget_limit
-                                    ? formatCurrency(cat.budget_limit)
-                                    : "—"}
+                                  {cat.budget_limit ? formatCurrency(cat.budget_limit) : '—'}
                                 </td>
                                 <td className="px-4 py-3 text-center">
                                   {cat.is_over_budget ? (
@@ -1418,9 +1403,9 @@ export function Statistics() {
                                           <div
                                             key={d.day}
                                             className="rounded-lg border border-gray-200 bg-white p-2 text-center"
-                                            title={`${
-                                              d.trans_id?.length || 0
-                                            } giao dịch ngày ${d.day}`}
+                                            title={`${d.trans_id?.length || 0} giao dịch ngày ${
+                                              d.day
+                                            }`}
                                           >
                                             <p className="text-[10px] uppercase tracking-wider text-gray-400">
                                               Ngày {d.day}
@@ -1520,10 +1505,7 @@ export function Statistics() {
                         dataKey="value"
                       >
                         {expenseCategories.map((_, index) => (
-                          <Cell
-                            key={index}
-                            fill={EXPENSE_COLORS[index % EXPENSE_COLORS.length]}
-                          />
+                          <Cell key={index} fill={EXPENSE_COLORS[index % EXPENSE_COLORS.length]} />
                         ))}
                       </Pie>
                       <Tooltip formatter={(value) => formatCurrency(Number(value ?? 0))} />
@@ -1537,7 +1519,7 @@ export function Statistics() {
       )}
 
       {/* ====== TAB: Account Overview (per-account dashboard_cache) ====== */}
-      {activeTab === "account_overview" && (
+      {activeTab === 'account_overview' && (
         <>
           {accountStatsLoading ? (
             <div className="flex items-center justify-center py-20">
@@ -1562,9 +1544,7 @@ export function Statistics() {
                   <p className="text-xl font-bold text-blue-600">
                     {formatCurrency(accountAggregate.balance)}
                   </p>
-                  <p className="mt-1 text-xs text-gray-400">
-                    {accountCaches.length} tài khoản
-                  </p>
+                  <p className="mt-1 text-xs text-gray-400">{accountCaches.length} tài khoản</p>
                 </div>
                 <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-lg border-t-4 border-t-green-500">
                   <div className="flex items-center gap-2 mb-1">
@@ -1591,7 +1571,7 @@ export function Statistics() {
                   </div>
                   <p
                     className={`text-xl font-bold ${
-                      accountAggregate.savings >= 0 ? "text-cyan-600" : "text-red-600"
+                      accountAggregate.savings >= 0 ? 'text-cyan-600' : 'text-red-600'
                     }`}
                   >
                     {formatCurrency(accountAggregate.savings)}
@@ -1612,8 +1592,7 @@ export function Statistics() {
                     const isActive = cache.account_id === selectedCache?.account_id;
                     const expRatio =
                       accountAggregate.expense > 0
-                        ? (cache.summary?.monthly_expense ?? 0) /
-                          accountAggregate.expense
+                        ? (cache.summary?.monthly_expense ?? 0) / accountAggregate.expense
                         : 0;
                     return (
                       <button
@@ -1622,8 +1601,8 @@ export function Statistics() {
                         onClick={() => setSelectedAccountId(cache.account_id)}
                         className={`relative text-left rounded-2xl border p-4 transition ${
                           isActive
-                            ? "border-orange-300 bg-gradient-to-br from-orange-50 to-rose-50 shadow-md"
-                            : "border-gray-100 bg-gray-50 hover:bg-gray-100"
+                            ? 'border-orange-300 bg-gradient-to-br from-orange-50 to-rose-50 shadow-md'
+                            : 'border-gray-100 bg-gray-50 hover:bg-gray-100'
                         }`}
                       >
                         {isTop && (
@@ -1633,11 +1612,9 @@ export function Statistics() {
                           </span>
                         )}
                         <div className="flex items-center gap-2 mb-2">
-                          <span className="text-xl">
-                            {accountIconOf(info?.type ?? "")}
-                          </span>
+                          <span className="text-xl">{accountIconOf(info?.type ?? '')}</span>
                           <span className="font-bold text-gray-800 truncate">
-                            {info?.account_name ?? cache.account_id.slice(0, 8) + "…"}
+                            {info?.account_name ?? cache.account_id.slice(0, 8) + '…'}
                           </span>
                         </div>
                         <p className="text-lg font-black text-slate-900 mb-2">
@@ -1681,18 +1658,14 @@ export function Statistics() {
                   <div className="mb-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">
-                        {accountIconOf(
-                          accountById.get(selectedCache.account_id)?.type ?? ""
-                        )}
+                        {accountIconOf(accountById.get(selectedCache.account_id)?.type ?? '')}
                       </span>
                       <div>
                         <h2 className="text-lg font-bold text-gray-900">
                           {accountById.get(selectedCache.account_id)?.account_name ??
                             `Tài khoản ${selectedCache.account_id.slice(0, 8)}…`}
                         </h2>
-                        <p className="text-xs text-gray-500">
-                          Chi tiết thống kê theo tài khoản
-                        </p>
+                        <p className="text-xs text-gray-500">Chi tiết thống kê theo tài khoản</p>
                       </div>
                     </div>
                     <div className="text-right">
@@ -1722,8 +1695,8 @@ export function Statistics() {
                       <p
                         className={`mt-1 text-base font-bold ${
                           (selectedCache.summary?.monthly_savings ?? 0) >= 0
-                            ? "text-blue-600"
-                            : "text-red-600"
+                            ? 'text-blue-600'
+                            : 'text-red-600'
                         }`}
                       >
                         {formatCurrency(selectedCache.summary?.monthly_savings ?? 0)}
@@ -1744,8 +1717,8 @@ export function Statistics() {
                       <p className="text-sm text-gray-700">
                         <span className="font-bold text-orange-600">
                           {selectedCache.streak.saving_months ?? 0}
-                        </span>{" "}
-                        {selectedCache.streak.unit ?? "tháng"} tiết kiệm dương liên tiếp
+                        </span>{' '}
+                        {selectedCache.streak.unit ?? 'tháng'} tiết kiệm dương liên tiếp
                       </p>
                     </div>
                   )}
@@ -1761,7 +1734,7 @@ export function Statistics() {
                           {selectedCache.top_categories.map((cat, idx) => {
                             const total = selectedCache.top_categories.reduce(
                               (s, c) => s + (c.total_amount ?? 0),
-                              0
+                              0,
                             );
                             const pct = total > 0 ? (cat.total_amount / total) * 100 : 0;
                             return (
@@ -1790,8 +1763,7 @@ export function Statistics() {
                                     className="h-full rounded-full"
                                     style={{
                                       width: `${pct}%`,
-                                      backgroundColor:
-                                        EXPENSE_COLORS[idx % EXPENSE_COLORS.length],
+                                      backgroundColor: EXPENSE_COLORS[idx % EXPENSE_COLORS.length],
                                     }}
                                   />
                                 </div>
@@ -1800,9 +1772,7 @@ export function Statistics() {
                           })}
                         </div>
                       ) : (
-                        <p className="text-sm text-gray-400 italic">
-                          Chưa có dữ liệu danh mục.
-                        </p>
+                        <p className="text-sm text-gray-400 italic">Chưa có dữ liệu danh mục.</p>
                       )}
                     </div>
 
@@ -1825,12 +1795,12 @@ export function Statistics() {
                                 <div className="flex items-center gap-3">
                                   <div
                                     className={`flex h-9 w-9 items-center justify-center rounded-full ${
-                                      t.type === "expense"
-                                        ? "bg-red-100 text-red-500"
-                                        : "bg-green-100 text-green-500"
+                                      t.type === 'expense'
+                                        ? 'bg-red-100 text-red-500'
+                                        : 'bg-green-100 text-green-500'
                                     }`}
                                   >
-                                    {t.type === "expense" ? (
+                                    {t.type === 'expense' ? (
                                       <ArrowUpRight className="h-4 w-4" />
                                     ) : (
                                       <ArrowDownRight className="h-4 w-4" />
@@ -1838,7 +1808,7 @@ export function Statistics() {
                                   </div>
                                   <div>
                                     <p className="text-sm font-semibold text-gray-700 line-clamp-1">
-                                      {t.description || "(Không có mô tả)"}
+                                      {t.description || '(Không có mô tả)'}
                                     </p>
                                     <p className="text-xs text-gray-400">
                                       {formatDateTime(t.date)}
@@ -1847,21 +1817,17 @@ export function Statistics() {
                                 </div>
                                 <span
                                   className={`text-sm font-bold ${
-                                    t.type === "expense"
-                                      ? "text-red-600"
-                                      : "text-green-600"
+                                    t.type === 'expense' ? 'text-red-600' : 'text-green-600'
                                   }`}
                                 >
-                                  {t.type === "expense" ? "-" : "+"}
+                                  {t.type === 'expense' ? '-' : '+'}
                                   {formatCurrency(t.amount)}
                                 </span>
                               </div>
                             ))}
                         </div>
                       ) : (
-                        <p className="text-sm text-gray-400 italic">
-                          Chưa có giao dịch nào.
-                        </p>
+                        <p className="text-sm text-gray-400 italic">Chưa có giao dịch nào.</p>
                       )}
                     </div>
                   </div>
@@ -1895,9 +1861,7 @@ export function Statistics() {
                               />
                             ))}
                           </Pie>
-                          <Tooltip
-                            formatter={(value) => formatCurrency(Number(value ?? 0))}
-                          />
+                          <Tooltip formatter={(value) => formatCurrency(Number(value ?? 0))} />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
@@ -1915,8 +1879,7 @@ export function Statistics() {
                     <BarChart
                       data={accountCaches.map((c) => ({
                         name:
-                          accountById.get(c.account_id)?.account_name ??
-                          c.account_id.slice(0, 8),
+                          accountById.get(c.account_id)?.account_name ?? c.account_id.slice(0, 8),
                         income: c.summary?.monthly_income ?? 0,
                         expense: c.summary?.monthly_expense ?? 0,
                       }))}
@@ -1927,22 +1890,10 @@ export function Statistics() {
                         stroke="#6b7280"
                         tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
                       />
-                      <Tooltip
-                        formatter={(value) => formatCurrency(Number(value ?? 0))}
-                      />
+                      <Tooltip formatter={(value) => formatCurrency(Number(value ?? 0))} />
                       <Legend />
-                      <Bar
-                        dataKey="income"
-                        name="Thu nhập"
-                        fill="#10b981"
-                        radius={[6, 6, 0, 0]}
-                      />
-                      <Bar
-                        dataKey="expense"
-                        name="Chi tiêu"
-                        fill="#ef4444"
-                        radius={[6, 6, 0, 0]}
-                      />
+                      <Bar dataKey="income" name="Thu nhập" fill="#10b981" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="expense" name="Chi tiêu" fill="#ef4444" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

@@ -87,6 +87,25 @@ export function MainLayout() {
     localStorage.removeItem('user');
   };
 
+  useEffect(() => {
+    socketService.connect();
+
+    // Lấy instance socket ra
+    const socket = socketService.getSocket();
+
+    if (socket) {
+      // 📡 Khi server phát lệnh 'money-guard-sync'
+      socket.on('money-guard-sync', () => {
+        console.log('📢 [Socket] Nhận lệnh làm mới từ AI Service');
+
+        // Chuyển tiếp tín hiệu này tới Dashboard.tsx
+        window.dispatchEvent(new Event('money-guard-sync'));
+      });
+    }
+
+    // ... giữ nguyên code fetchUserProfile cũ của bạn ...
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50">
       {sidebarOpen && (

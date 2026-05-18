@@ -747,6 +747,11 @@ app.post('/webhook/bank-transfer', async (req, res) => {
     io.emit('bank_notification', { message: finalMsg });
     console.log('📡 [PROACTIVE]: Đã bắn Socket cảnh báo về Web.');
 
+    setTimeout(() => {
+      io.emit('money-guard-sync');
+      console.log('🔄 [SYNC] Đã báo hiệu cho FE cập nhật lại biểu đồ Thống kê');
+    }, 1500);
+
     await addNotification(finalMsg, userId);
 
     if (typeof sendPushNotification === 'function') {
@@ -2002,7 +2007,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
               if (queryData.category) params.push(`%${queryData.category}%`);
             }
 
-            // 10. XÓA NGÂN SÁCH — qua API budget-service
+            // 9. XÓA NGÂN SÁCH — qua API budget-service
             // Dùng khi: "Xóa ngân sách tiền điện tháng này đi"
             else if (queryData.type === 'budget_delete') {
               console.log('🔍 [budget_delete qua API] queryData:', queryData);
@@ -2022,7 +2027,9 @@ app.post('/chat', upload.single('image'), async (req, res) => {
                     );
                   } else {
                     console.log(
-                      `ℹ️ [budget_delete qua API] không tìm thấy budget của "${queryData.category}" tháng ${queryData.month || currentMonth}/${queryData.year || currentYear}`,
+                      `ℹ️ [budget_delete qua API] không tìm thấy budget của "${
+                        queryData.category
+                      }" tháng ${queryData.month || currentMonth}/${queryData.year || currentYear}`,
                     );
                   }
                 }
@@ -2033,7 +2040,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
               params = [];
             }
 
-            // 9. THÊM HOẶC CẬP NHẬT NGÂN SÁCH (Upsert) — qua API budget-service
+            // 10. THÊM HOẶC CẬP NHẬT NGÂN SÁCH (Upsert) — qua API budget-service
             // Dùng khi: "Đặt ngân sách ăn uống tháng này 5 triệu"
             else if (queryData.type === 'budget_upsert') {
               const start = queryData.start_date || `${currentYear}-${currentMonth}-01`;
@@ -2069,7 +2076,6 @@ app.post('/chat', upload.single('image'), async (req, res) => {
               sql = '';
               params = [];
             }
-
 
             // 11. DANH SÁCH TẤT CẢ NGÂN SÁCH (Budget Summary)
             // Dùng khi: "Tháng này tôi đã chi tiêu thế nào so với ngân sách?"
@@ -2412,11 +2418,12 @@ app.post('/chat', upload.single('image'), async (req, res) => {
               rawCatId !== undefined
                 ? rawCatId
                 : rawCatIdCamel !== undefined
-                  ? rawCatIdCamel
-                  : existingCategoryId ?? null;
+                ? rawCatIdCamel
+                : existingCategoryId ?? null;
 
-            const mergedType = String(rawType ?? rawTypeCamel ?? existingType ?? 'expense')
-              .toLowerCase();
+            const mergedType = String(
+              rawType ?? rawTypeCamel ?? existingType ?? 'expense',
+            ).toLowerCase();
             const normalizedType = mergedType === 'income' ? 'Income' : 'Expense';
 
             const payload = {
@@ -2695,6 +2702,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
               });
               console.log(`✅ Đã lưu ${transactionType} qua API: ${data.description}`);
 
+              io.emit('money-guard-sync');
               // ============================================================
               // GỬI TIN SANG N8N ĐỂ KIỂM TRA HẠN MỨC (CHỈ KHI TIÊU TIỀN)
               // ============================================================
