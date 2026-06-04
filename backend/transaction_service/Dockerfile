@@ -10,6 +10,7 @@ COPY ["backend/transaction_service/src/TransactionService.Infrastructure/Transac
 RUN dotnet restore "backend/transaction_service/src/TransactionService.API/TransactionService.API.csproj"
 
 COPY backend/shared/dotnet-shared/ ./backend/shared/dotnet-shared/
+COPY backend/shared/protos/ ./backend/shared/protos/
 COPY backend/transaction_service/ ./backend/transaction_service/
 
 WORKDIR "/app/backend/transaction_service/src/TransactionService.API"

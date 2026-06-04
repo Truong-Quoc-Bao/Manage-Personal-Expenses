@@ -10,6 +10,7 @@ COPY ["backend/auth_service/src/AuthService.Infrastructure/AuthService.Infrastru
 RUN dotnet restore "backend/auth_service/src/AuthService.API/AuthService.API.csproj"
 
 COPY backend/shared/dotnet-shared/ ./backend/shared/dotnet-shared/
+COPY backend/shared/protos/ ./backend/shared/protos/
 COPY backend/auth_service/ ./backend/auth_service/
 
 WORKDIR "/app/backend/auth_service/src/AuthService.API"
