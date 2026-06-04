@@ -2,8 +2,8 @@ import dotenv from 'dotenv';
 import axios from 'axios';
 
 // 1. Load cấu hình từ file .env
-dotenv.config();
-
+// dotenv.config();
+dotenv.config({ path: '../.env' });
 async function createNewCompany() {
   console.log('🚀 Bắt đầu quá trình tạo Công ty mới...');
 

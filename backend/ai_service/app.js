@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
-// dotenv.config();
-dotenv.config({ override: false });
+dotenv.config();
+// dotenv.config({ override: false });
 
 import validator from 'validator';
 import express from 'express';
@@ -1917,6 +1917,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
                 AND t.transaction_type = 'expense'`;
               params.push(queryData.month || currentMonth);
             }
+            
             // 4. Tổng thu nhập tháng
             else if (queryData.type === 'total_spending') {
               sql = `

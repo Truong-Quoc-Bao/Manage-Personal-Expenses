@@ -51,3 +51,29 @@ console.log('🔄 [SYNC]: Đã gửi lệnh làm mới dữ liệu cho giao di�
 
 await addNotification(finalMsg, userId);
 // ...
+
+
+
+const handleSend = async (textOverride?: string) => {
+  // Ưu tiên: Gợi ý > Ô nhập liệu (đã gồm voice)
+  const text = (textOverride || inputValue).trim(); 
+  
+  if ((!text && !selectedImage) || isLoading) return;
+
+  const userMsg: Message = {
+    id: Date.now(),
+    role: 'user',
+    content: text,
+    image: imagePreview || undefined,
+    timestamp: new Date(),
+  };
+  setMessages((prev) => [...prev, userMsg]);
+
+  // RESET TOÀN BỘ TRẠNG THÁI TẠI ĐÂY
+  setInputValue('');
+  setVoiceTranscript('');    // Xóa chữ thu âm cũ
+  setShowVoicePreview(false); // Ẩn khung vàng
+  setSelectedImage(null);
+  setImagePreview(null);
+  setIsLoading(true);
+  // ... phần try/catch gọi API giữ nguyên
