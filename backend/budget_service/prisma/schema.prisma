@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  schemas   = ["budgets_service"]
+}
+
+model Budget {
+  budget_id      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id        String?  @db.Uuid
+  category_id    String?  @db.Uuid
+
+  title          String?
+  type           BudgetType @default(limit)
+  current_amount Decimal  @default(0) @db.Decimal(15, 2)
+  amount_limit   Decimal  @db.Decimal(15, 2)
+
+  date           DateTime @db.Date
+  date_start     DateTime? @db.Date
+  date_end       DateTime? @db.Date
+  month   Int?
+  year   Int?
+
+  status         Status?   
+  status_active  Boolean?
+
+  note           String?
+  created_at     DateTime @default(now())
+  updated_at     DateTime?
+
+  @@unique([user_id, category_id, month, year], map: "unique_budget_per_month")
+  @@map("budgets")
+  @@schema("budgets_service")
+}
+
+enum BudgetType {
+  limit
+  plan
+
+  @@schema("budgets_service")
+}
+
+enum Status {
+  warning
+  completed
+  goal 
+
+  @@schema("budgets_service")
+}

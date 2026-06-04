@@ -1,0 +1,12 @@
+/app/backend/auth_service/src/AuthService.Core/bin/Debug/net8.0/AuthService.Core.deps.json
+/app/backend/auth_service/src/AuthService.Core/bin/Debug/net8.0/AuthService.Core.dll
+/app/backend/auth_service/src/AuthService.Core/bin/Debug/net8.0/AuthService.Core.pdb
+/app/backend/auth_service/src/AuthService.Core/obj/Debug/net8.0/AuthService.Core.csproj.AssemblyReference.cache
+/app/backend/auth_service/src/AuthService.Core/obj/Debug/net8.0/AuthService.Core.GeneratedMSBuildEditorConfig.editorconfig
+/app/backend/auth_service/src/AuthService.Core/obj/Debug/net8.0/AuthService.Core.AssemblyInfoInputs.cache
+/app/backend/auth_service/src/AuthService.Core/obj/Debug/net8.0/AuthService.Core.AssemblyInfo.cs
+/app/backend/auth_service/src/AuthService.Core/obj/Debug/net8.0/AuthService.Core.csproj.CoreCompileInputs.cache
+/app/backend/auth_service/src/AuthService.Core/obj/Debug/net8.0/AuthService.Core.dll
+/app/backend/auth_service/src/AuthService.Core/obj/Debug/net8.0/refint/AuthService.Core.dll
+/app/backend/auth_service/src/AuthService.Core/obj/Debug/net8.0/AuthService.Core.pdb
+/app/backend/auth_service/src/AuthService.Core/obj/Debug/net8.0/ref/AuthService.Core.dll

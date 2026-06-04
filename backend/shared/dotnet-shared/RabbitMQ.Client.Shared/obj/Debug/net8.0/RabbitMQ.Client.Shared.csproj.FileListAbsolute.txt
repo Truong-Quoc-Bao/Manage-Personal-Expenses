@@ -1,0 +1,12 @@
+/app/backend/shared/dotnet-shared/RabbitMQ.Client.Shared/bin/Debug/net8.0/RabbitMQ.Client.Shared.deps.json
+/app/backend/shared/dotnet-shared/RabbitMQ.Client.Shared/bin/Debug/net8.0/RabbitMQ.Client.Shared.dll
+/app/backend/shared/dotnet-shared/RabbitMQ.Client.Shared/bin/Debug/net8.0/RabbitMQ.Client.Shared.pdb
+/app/backend/shared/dotnet-shared/RabbitMQ.Client.Shared/obj/Debug/net8.0/RabbitMQ.Client.Shared.csproj.AssemblyReference.cache
+/app/backend/shared/dotnet-shared/RabbitMQ.Client.Shared/obj/Debug/net8.0/RabbitMQ.Client.Shared.GeneratedMSBuildEditorConfig.editorconfig
+/app/backend/shared/dotnet-shared/RabbitMQ.Client.Shared/obj/Debug/net8.0/RabbitMQ.Client.Shared.AssemblyInfoInputs.cache
+/app/backend/shared/dotnet-shared/RabbitMQ.Client.Shared/obj/Debug/net8.0/RabbitMQ.Client.Shared.AssemblyInfo.cs
+/app/backend/shared/dotnet-shared/RabbitMQ.Client.Shared/obj/Debug/net8.0/RabbitMQ.Client.Shared.csproj.CoreCompileInputs.cache
+/app/backend/shared/dotnet-shared/RabbitMQ.Client.Shared/obj/Debug/net8.0/RabbitMQ.Client.Shared.dll
+/app/backend/shared/dotnet-shared/RabbitMQ.Client.Shared/obj/Debug/net8.0/refint/RabbitMQ.Client.Shared.dll
+/app/backend/shared/dotnet-shared/RabbitMQ.Client.Shared/obj/Debug/net8.0/RabbitMQ.Client.Shared.pdb
+/app/backend/shared/dotnet-shared/RabbitMQ.Client.Shared/obj/Debug/net8.0/ref/RabbitMQ.Client.Shared.dll

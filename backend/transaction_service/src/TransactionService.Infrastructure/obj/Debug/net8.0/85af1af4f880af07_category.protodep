@@ -1,0 +1,2 @@
+obj/Debug/net8.0/Category.cs \
+obj/Debug/net8.0/CategoryGrpc.cs: ../../../shared/protos/category.proto

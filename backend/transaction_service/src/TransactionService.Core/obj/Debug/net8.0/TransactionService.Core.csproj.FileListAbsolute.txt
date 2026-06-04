@@ -1,0 +1,11 @@
+/app/backend/transaction_service/src/TransactionService.Core/bin/Debug/net8.0/TransactionService.Core.deps.json
+/app/backend/transaction_service/src/TransactionService.Core/bin/Debug/net8.0/TransactionService.Core.dll
+/app/backend/transaction_service/src/TransactionService.Core/bin/Debug/net8.0/TransactionService.Core.pdb
+/app/backend/transaction_service/src/TransactionService.Core/obj/Debug/net8.0/TransactionService.Core.GeneratedMSBuildEditorConfig.editorconfig
+/app/backend/transaction_service/src/TransactionService.Core/obj/Debug/net8.0/TransactionService.Core.AssemblyInfoInputs.cache
+/app/backend/transaction_service/src/TransactionService.Core/obj/Debug/net8.0/TransactionService.Core.AssemblyInfo.cs
+/app/backend/transaction_service/src/TransactionService.Core/obj/Debug/net8.0/TransactionService.Core.csproj.CoreCompileInputs.cache
+/app/backend/transaction_service/src/TransactionService.Core/obj/Debug/net8.0/TransactionService.Core.dll
+/app/backend/transaction_service/src/TransactionService.Core/obj/Debug/net8.0/refint/TransactionService.Core.dll
+/app/backend/transaction_service/src/TransactionService.Core/obj/Debug/net8.0/TransactionService.Core.pdb
+/app/backend/transaction_service/src/TransactionService.Core/obj/Debug/net8.0/ref/TransactionService.Core.dll
