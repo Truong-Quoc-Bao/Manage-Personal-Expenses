@@ -1,13 +1,10 @@
-import React, { useState, useEffect } from "react";
-import { X, Wallet, Tag } from "lucide-react";
-import { toast } from "sonner";
-import { transactionsApi } from "@/api/transaction.api";
-import { accountApi } from "@/api/account.api";
-import { categoryApi } from "@/api/category.api";
-import type {
-  TransactionType,
-  CreateTransactionRequest,
-} from "@/types/transaction";
+import React, { useState, useEffect } from 'react';
+import { X, Wallet, Tag } from 'lucide-react';
+import { toast } from 'sonner';
+import { transactionsApi } from '@/api/transaction.api';
+import { accountApi } from '@/api/account.api';
+import { categoryApi } from '@/api/category.api';
+import type { TransactionType, CreateTransactionRequest } from '@/types/transaction';
 
 interface AccountOption {
   account_id: string;
@@ -25,24 +22,20 @@ interface AddTransactionModalProps {
   onCreated: () => void;
 }
 
-export function AddTransactionModal({
-  onClose,
-  onCreated,
-}: AddTransactionModalProps) {
+export function AddTransactionModal({ onClose, onCreated }: AddTransactionModalProps) {
   const [loading, setLoading] = useState(false);
-  const [transactionType, setTransactionType] =
-    useState<TransactionType>("Expense");
+  const [transactionType, setTransactionType] = useState<TransactionType>('Expense');
 
   const [accounts, setAccounts] = useState<AccountOption[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
 
   const [formData, setFormData] = useState({
-    accountId: "",
-    categoryId: "",
-    amount: "",
-    date: new Date().toISOString().split("T")[0],
-    description: "",
-    note: "",
+    accountId: '',
+    categoryId: '',
+    amount: '',
+    date: new Date().toISOString().split('T')[0],
+    description: '',
+    note: '',
   });
 
   useEffect(() => {
@@ -61,27 +54,27 @@ export function AddTransactionModal({
   }, []);
 
   const fieldClass =
-    "h-14 w-full rounded-2xl border border-gray-300 bg-white px-4 text-base text-gray-900 placeholder:text-gray-400 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100";
+    'h-14 w-full rounded-2xl border border-gray-300 bg-white px-4 text-base text-gray-900 placeholder:text-gray-400 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100';
 
   const selectClass =
-    "h-14 w-full rounded-2xl border border-gray-300 bg-white px-4 text-base text-gray-900 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100 appearance-none cursor-pointer";
+    'h-14 w-full rounded-2xl border border-gray-300 bg-white px-4 text-base text-gray-900 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100 appearance-none cursor-pointer';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.accountId) {
-      toast.error("Vui lòng chọn tài khoản");
+      toast.error('Vui lòng chọn tài khoản');
       return;
     }
 
     const amount = parseFloat(formData.amount);
     if (!formData.amount || isNaN(amount) || amount <= 0) {
-      toast.error("Vui lòng nhập số tiền hợp lệ (lớn hơn 0)");
+      toast.error('Vui lòng nhập số tiền hợp lệ (lớn hơn 0)');
       return;
     }
 
     if (!formData.date) {
-      toast.error("Vui lòng chọn ngày giao dịch");
+      toast.error('Vui lòng chọn ngày giao dịch');
       return;
     }
 
@@ -99,14 +92,13 @@ export function AddTransactionModal({
       };
 
       await transactionsApi.createTransaction(request);
-      toast.success("Đã thêm giao dịch thành công!");
+      toast.success('Đã thêm giao dịch thành công!');
+      window.dispatchEvent(new Event('dashboard_refresh'));
       onCreated();
     } catch (err: any) {
       const message =
-        err?.response?.data?.message ||
-        err?.response?.data ||
-        "Có lỗi xảy ra. Vui lòng thử lại!";
-      toast.error(typeof message === "string" ? message : "Tạo giao dịch thất bại");
+        err?.response?.data?.message || err?.response?.data || 'Có lỗi xảy ra. Vui lòng thử lại!';
+      toast.error(typeof message === 'string' ? message : 'Tạo giao dịch thất bại');
     } finally {
       setLoading(false);
     }
@@ -116,9 +108,7 @@ export function AddTransactionModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
       <div className="max-h-[88vh] w-full max-w-[560px] overflow-hidden rounded-3xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-gray-100 px-8 py-6">
-          <h2 className="text-2xl font-semibold text-gray-900">
-            Thêm giao dịch
-          </h2>
+          <h2 className="text-2xl font-semibold text-gray-900">Thêm giao dịch</h2>
           <button
             type="button"
             onClick={onClose}
@@ -141,13 +131,13 @@ export function AddTransactionModal({
               <button
                 type="button"
                 onClick={() => {
-                  setTransactionType("Expense");
-                  setFormData((prev) => ({ ...prev, categoryId: "" }));
+                  setTransactionType('Expense');
+                  setFormData((prev) => ({ ...prev, categoryId: '' }));
                 }}
                 className={`rounded-2xl px-4 py-4 font-semibold transition ${
-                  transactionType === "Expense"
-                    ? "!bg-gradient-to-r !from-orange-400 !to-rose-400 text-white shadow-lg"
-                    : "!bg-gray-100 text-gray-700 hover:!bg-gray-200"
+                  transactionType === 'Expense'
+                    ? '!bg-gradient-to-r !from-orange-400 !to-rose-400 text-white shadow-lg'
+                    : '!bg-gray-100 text-gray-700 hover:!bg-gray-200'
                 }`}
               >
                 Chi tiêu
@@ -155,13 +145,13 @@ export function AddTransactionModal({
               <button
                 type="button"
                 onClick={() => {
-                  setTransactionType("Income");
-                  setFormData((prev) => ({ ...prev, categoryId: "" }));
+                  setTransactionType('Income');
+                  setFormData((prev) => ({ ...prev, categoryId: '' }));
                 }}
                 className={`rounded-2xl px-4 py-4 font-semibold transition ${
-                  transactionType === "Income"
-                    ? "!bg-gradient-to-r !from-green-400 !to-emerald-500 text-white shadow-lg"
-                    : "!bg-gray-100 text-gray-700 hover:!bg-gray-200"
+                  transactionType === 'Income'
+                    ? '!bg-gradient-to-r !from-green-400 !to-emerald-500 text-white shadow-lg'
+                    : '!bg-gray-100 text-gray-700 hover:!bg-gray-200'
                 }`}
               >
                 Thu nhập
@@ -179,9 +169,7 @@ export function AddTransactionModal({
             </label>
             <select
               value={formData.accountId}
-              onChange={(e) =>
-                setFormData({ ...formData, accountId: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, accountId: e.target.value })}
               className={selectClass}
               required
             >
@@ -204,17 +192,13 @@ export function AddTransactionModal({
             </label>
             <select
               value={formData.categoryId}
-              onChange={(e) =>
-                setFormData({ ...formData, categoryId: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
               className={selectClass}
             >
               <option value="">— Không chọn danh mục —</option>
               {categories
                 .filter(
-                  (cat) =>
-                    !cat.type ||
-                    cat.type.toLowerCase() === transactionType.toLowerCase(),
+                  (cat) => !cat.type || cat.type.toLowerCase() === transactionType.toLowerCase(),
                 )
                 .map((cat) => (
                   <option key={cat.category_id} value={cat.category_id}>
@@ -232,9 +216,7 @@ export function AddTransactionModal({
             <input
               type="number"
               value={formData.amount}
-              onChange={(e) =>
-                setFormData({ ...formData, amount: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
               className={fieldClass}
               placeholder="Nhập số tiền (VD: 50000)"
               min="0.01"
@@ -251,9 +233,7 @@ export function AddTransactionModal({
             <input
               type="date"
               value={formData.date}
-              onChange={(e) =>
-                setFormData({ ...formData, date: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
               className={fieldClass}
               required
             />
@@ -261,15 +241,11 @@ export function AddTransactionModal({
 
           {/* Description */}
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">
-              Mô tả
-            </label>
+            <label className="mb-2 block text-sm font-medium text-gray-700">Mô tả</label>
             <input
               type="text"
               value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               className={fieldClass}
               placeholder="VD: Ăn trưa với bạn"
             />
@@ -282,9 +258,7 @@ export function AddTransactionModal({
             </label>
             <textarea
               value={formData.note}
-              onChange={(e) =>
-                setFormData({ ...formData, note: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, note: e.target.value })}
               className={`${fieldClass} h-24 resize-none py-4`}
               placeholder="Thêm ghi chú..."
             />
@@ -305,7 +279,7 @@ export function AddTransactionModal({
               disabled={loading}
               className="rounded-2xl !bg-gradient-to-r !from-orange-400 !to-rose-400 px-6 py-4 font-semibold text-white shadow-lg transition hover:!from-orange-500 hover:!to-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loading ? "Đang lưu..." : "Lưu giao dịch"}
+              {loading ? 'Đang lưu...' : 'Lưu giao dịch'}
             </button>
           </div>
         </form>

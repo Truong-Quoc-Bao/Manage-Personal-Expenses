@@ -144,5 +144,6 @@ app.get('/api/health', (req, res) => {
 
 app.listen(PORT, () => {
   console.log('Transaction service is running on ' + process.env.TRANSACTION_SERVICE_URL);
+  console.log('GATEWAY JWT SECRET:', process.env.JWT_SECRET);
   console.log(`Gateway is running on port ${PORT}`);
 });

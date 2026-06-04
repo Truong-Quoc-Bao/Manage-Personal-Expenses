@@ -200,12 +200,13 @@ export function FinanceAIChatbox() {
         setVoiceTranscript('Đang nghe...');
       };
       rec.onresult = (e: any) => {
-        setVoiceTranscript(
-          Array.from(e.results)
-            .map((r: any) => r[0].transcript)
-            .join(''),
-        );
+        const result = Array.from(e.results)
+          .map((r: any) => r[0].transcript)
+          .join('');
+        setVoiceTranscript(result);
+        setInputValue(result);
       };
+
       rec.onend = () => setIsRecording(false);
       recognitionRef.current = rec;
     }
@@ -227,6 +228,7 @@ export function FinanceAIChatbox() {
     setInputValue('');
     setSelectedImage(null);
     setImagePreview(null);
+    setVoiceTranscript('');
     setShowVoicePreview(false);
     setIsLoading(true);
 
@@ -574,7 +576,7 @@ export function FinanceAIChatbox() {
                 Hủy
               </button>
               <button
-                onClick={() => handleSend()}
+                onClick={() => handleSend(voiceTranscript)}
                 className="text-[10px] font-bold text-orange-600 uppercase underline decoration-2"
               >
                 Xác nhận & Gửi
@@ -652,7 +654,7 @@ export function FinanceAIChatbox() {
             onClick={() => fileInputRef.current?.click()}
             className="p-2 rounded-lg !bg-gradient-to-r !from-orange-400 !to-rose-400  hover:bg-orange-50 hover:text-orange-600 transition-all"
           >
-            <Camera size={20} />
+            <Camera className="text-white" size={20} />
           </button>
           <button
             onClick={() =>
@@ -672,11 +674,11 @@ export function FinanceAIChatbox() {
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
             placeholder="Nói hoặc nhập chi tiêu..."
-            className="flex-1 bg-transparent px-2 text-sm outline-none text-gray-800 placeholder:text-gray-400"
+            className="flex-1 !bg-transparent !border-none !shadow-none focus:!ring-0 px-2 text-sm outline-none text-gray-800 placeholder:text-gray-400"
             disabled={isLoading}
           />
           <button
-            onClick={() => handleSend()}
+            onClick={() => handleSend(voiceTranscript)}
             disabled={isLoading}
             className="p-2.5 bg-gradient-to-r from-orange-400 to-rose-400 text-white rounded-xl hover:from-orange-500 hover:to-rose-500 shadow-md transition-all active:scale-95 disabled:opacity-40"
           >

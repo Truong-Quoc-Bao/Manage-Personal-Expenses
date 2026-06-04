@@ -1,6 +1,5 @@
 import dotenv from 'dotenv';
-// dotenv.config();
-dotenv.config({ override: false });
+dotenv.config();
 
 import validator from 'validator';
 import express from 'express';
