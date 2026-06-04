@@ -7,10 +7,10 @@ envVarGroups:
         value: D8F9G0H1J2K3L4M5N6B7V8C9X0Z1Q2W3E4R5T6Y7U8I9O0P1A2S3D4F5G6H7J8K9L0M1N2B3V4C5X6Z7Q8W9E0R1T2Y3U4I5O6P7A8S9D0F1G2H3J4K5L6M7N8B9V0C1X2Z3Q4W5E6R7T8Y9U0I1O2P3A4S5D6F7G8H9J0K1L2M3N4B5V6C7X8Z9Q0W1E2R3T4Y5U6I7O8P9A0S1D2F3G4H5J6K7L8Z9X0C1V2B3N4M5Q6W7
       - key: REFRESH_TOKEN_SECRET
         value: klkasfaxcsafsafnsanc245asf123
-      # Biến cho các service Node.js
+      # Dùng chung cho các service Node.js
       - key: RABBITMQ_URL
         sync: false
-      # Biến cho các service .NET (Bạn sẽ dán cùng một URL RabbitMQ vào đây khi Render hỏi)
+      # Dùng chung cho các service .NET (Dán cùng URL Rabbit vào đây khi Render hỏi)
       - key: ConnectionStrings__RabbitMQConnection
         sync: false
       - key: REDIS_URL
@@ -117,13 +117,12 @@ services:
       - key: PORT
         value: 3005
 
-  # 7. AUTH SERVICE (.NET)
+  # 7. AUTH SERVICE (.NET 8)
   - type: web
     name: auth-service
     runtime: docker
     dockerContext: .
     dockerfilePath: backend/auth_service/Dockerfile
-    dockerTarget: runtime # QUAN TRỌNG: Ép chạy stage runtime để không bị hết RAM
     plan: free
     envVars:
       - fromGroup: common-secrets
@@ -132,13 +131,12 @@ services:
       - key: ConnectionStrings__DefaultConnection
         value: Host=aws-1-ap-southeast-1.pooler.supabase.com;Port=5432;Database=postgres;Username=postgres.mdzmjrxpntwapuiyhqdo;Password=datletan16072004;SearchPath=auth_service;Trust Server Certificate=true
 
-  # 8. TRANSACTION SERVICE (.NET)
+  # 8. TRANSACTION SERVICE (.NET 8)
   - type: web
     name: transaction-service
     runtime: docker
     dockerContext: .
     dockerfilePath: backend/transaction_service/Dockerfile
-    dockerTarget: runtime # QUAN TRỌNG: Ép chạy stage runtime
     plan: free
     envVars:
       - fromGroup: common-secrets
@@ -146,7 +144,7 @@ services:
         value: 3007
       - key: ConnectionStrings__DefaultConnection
         value: Host=aws-1-ap-southeast-1.pooler.supabase.com;Port=5432;Database=postgres;Username=postgres.mdzmjrxpntwapuiyhqdo;Password=datletan16072004;SearchPath=transaction_service;Trust Server Certificate=true
-
+        
   # 9. BUDGET SERVICE
   - type: web
     name: budget-service
