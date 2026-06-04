@@ -97,6 +97,8 @@ app.use(
     target: process.env.AUTH_SERVICE_URL,
     changeOrigin: true,
     logLevel: 'debug',
+    proxyTimeout: 120000, // Chờ service con trong 120 giây (2 phút)
+    timeout: 120000, // Tổng thời gian chờ kết nối
     onError: proxyOnError('auth'),
   }),
 );
