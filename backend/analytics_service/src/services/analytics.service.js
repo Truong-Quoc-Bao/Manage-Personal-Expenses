@@ -3,8 +3,38 @@
 const repo = require('../repositories/analytics.repository.js');
 
 const service = {
+  // getUserAnalytics: async (userId) => {
+  //   return await repo.findUserAnalyticsByuserId(userId);
+  // },
+
   getUserAnalytics: async (userId) => {
-    return await repo.findUserAnalyticsByuserId(userId);
+    let ua = await repo.findUserAnalyticsByuserId(userId);
+    if (!ua) return null;
+
+    // --- THÊM ĐOẠN NÀY ĐỂ TỰ NHẢY THÁNG ---
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+
+    if (
+      ua.current_month &&
+      (ua.current_month.month !== currentMonth || ua.current_month.year !== currentYear)
+    ) {
+      const freshMonth = {
+        year: currentYear,
+        month: currentMonth,
+        income: 0,
+        expense: 0,
+        savings: 0,
+        savings_rate: 0,
+      };
+      // Lưu vào DB luôn
+      await repo.updateUserAnalyticsByuserId(userId, { $set: { current_month: freshMonth } });
+      ua.current_month = freshMonth; // Gán lại để trả về giao diện
+    }
+    // --------------------------------------
+
+    return ua;
   },
 
   getAllUserAnalytics: async () => {
@@ -16,7 +46,6 @@ const service = {
     if (!data) throw new Error('Data is required');
 
     const formattedData = {
-
       user_id: userId,
       display_name: data.display_name || null,
       total_income: Number(data.total_income) || 0,
@@ -49,12 +78,7 @@ const service = {
       const value = obj[key];
       const newKey = parent ? `${parent}.${key}` : key;
 
-      if (
-        value &&
-        typeof value === 'object' &&
-        !Array.isArray(value) &&
-        !(value instanceof Date)
-      ) {
+      if (value && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
         this.flattenObject(value, newKey, res);
       } else {
         // ✅ array + primitive đều vào đây
@@ -95,11 +119,11 @@ const service = {
         userId,
         {
           $set: setData,
-          $currentDate: { updated_at: true }
+          $currentDate: { updated_at: true },
         },
         {
-          arrayFilters: [{ 'elem.goal_id': goal_id }]
-        }
+          arrayFilters: [{ 'elem.goal_id': goal_id }],
+        },
       );
     }
 
@@ -113,24 +137,23 @@ const service = {
       specialSet['account_id'] = data.account_id;
     }
 
-     if (data.top_categories) {
+    if (data.top_categories) {
       if (!Array.isArray(data.top_categories)) {
         throw new Error('top_categories must be array');
       }
       specialSet['top_categories'] = data.top_categories;
     }
 
-     if (data.goal_tracking?.goals) {
+    if (data.goal_tracking?.goals) {
       if (!Array.isArray(data.goal_tracking.goals)) {
         throw new Error('goals must be array');
       }
       specialSet['goal_tracking.goals'] = data.goal_tracking.goals;
     }
 
-     if (data.budget_alert) {
+    if (data.budget_alert) {
       specialSet['budget_alert'] = data.budget_alert;
     }
- 
 
     const safeData = {};
 
@@ -147,7 +170,7 @@ const service = {
 
     const finalSet = {
       ...normalSet,
-      ...specialSet
+      ...specialSet,
     };
 
     if (Object.keys(finalSet).length === 0) {
@@ -161,10 +184,9 @@ const service = {
     }
     return await repo.updateUserAnalyticsByuserId(userId, {
       $set: finalSet,
-      $currentDate: { updated_at: true }
+      $currentDate: { updated_at: true },
     });
   },
-
 
   deleteUserAnalytics: async (userId) => {
     if (!userId) throw new Error('userId is required');
@@ -172,7 +194,7 @@ const service = {
     if (!result) throw new Error('User analytics not found');
     return result;
   },
- 
+
   getAnomalyLogs: async (userId) => {
     return await repo.findAnomalyLogsByuserId(userId);
   },
@@ -195,7 +217,13 @@ const service = {
     if (!userId) throw new Error('userId is required');
     if (!data) throw new Error('Data is required');
 
-    const VALID_TYPES = ['unusual_amount', 'unusual_frequency', 'category_spike', 'income_drop', 'recurring_missed'];
+    const VALID_TYPES = [
+      'unusual_amount',
+      'unusual_frequency',
+      'category_spike',
+      'income_drop',
+      'recurring_missed',
+    ];
     const VALID_SEVERITIES = ['low', 'medium', 'high'];
 
     if (!data.type || !VALID_TYPES.includes(data.type)) {
@@ -227,7 +255,14 @@ const service = {
     if (!logId) throw new Error('logId is required');
     if (!data) throw new Error('Data is required');
 
-    const allowedFields = ['severity', 'description', 'is_read', 'is_dismissed', 'amount_flagged', 'expected_range'];
+    const allowedFields = [
+      'severity',
+      'description',
+      'is_read',
+      'is_dismissed',
+      'amount_flagged',
+      'expected_range',
+    ];
     const updateData = {};
     for (const key of allowedFields) {
       if (data[key] !== undefined) updateData[key] = data[key];
@@ -261,13 +296,18 @@ const service = {
     if (!userId) throw new Error('userId is required');
     return await repo.deleteAllAnomalyLogsByuserId(userId);
   },
- 
+
   getCategorySummary: async (userId) => {
     return await repo.findCategorySummaryByuserId(userId);
   },
 
   getCategorySummaryByMonth: async (userId, category_id, year, month) => {
-    return await repo.findCategorySummaryByAccountMonth(userId, category_id, Number(year), Number(month));
+    return await repo.findCategorySummaryByAccountMonth(
+      userId,
+      category_id,
+      Number(year),
+      Number(month),
+    );
   },
 
   getCategorySummaryById: async (id) => {
@@ -305,7 +345,7 @@ const service = {
 
     return await repo.createCategorySummary(formattedData);
   },
- 
+
   upsertCategorySummary: async function (userId, data) {
     if (!userId) throw new Error('userId is required');
 
@@ -317,21 +357,18 @@ const service = {
 
     const specialSet = {};
 
-     if (data.daily_breakdown) {
+    if (data.daily_breakdown) {
       if (!Array.isArray(data.daily_breakdown)) {
         throw new Error('daily_breakdown must be array');
       }
 
       specialSet['daily_breakdown'] = data.daily_breakdown;
     }
- 
+
     const safeData = {};
 
     for (const key in data) {
-      if (
-        !blockedFields.includes(key) &&
-        !['daily_breakdown'].includes(key)
-      ) {
+      if (!blockedFields.includes(key) && !['daily_breakdown'].includes(key)) {
         safeData[key] = data[key];
       }
     }
@@ -340,7 +377,7 @@ const service = {
 
     const finalSet = {
       ...normalSet,
-      ...specialSet
+      ...specialSet,
     };
 
     if (Object.keys(finalSet).length === 0) {
@@ -376,11 +413,11 @@ const service = {
       Number(data.month),
       {
         $set: finalSet,
-        $currentDate: { updated_at: true }
-      }
+        $currentDate: { updated_at: true },
+      },
     );
   },
-  
+
   deleteCategorySummary: async (id) => {
     if (!id) throw new Error('id is required');
     const result = await repo.deleteCategorySummaryById(id);
@@ -421,7 +458,7 @@ const service = {
 
     const specialSet = {};
 
-     if (data.top_categories) {
+    if (data.top_categories) {
       if (!Array.isArray(data.top_categories)) {
         throw new Error('top_categories must be array');
       }
@@ -435,7 +472,7 @@ const service = {
       specialSet['recent_transactions'] = data.recent_transactions;
     }
 
-     if (data.summary) {
+    if (data.summary) {
       specialSet['summary'] = data.summary;
     }
 
@@ -443,7 +480,7 @@ const service = {
       specialSet['streak'] = data.streak;
     }
 
-     if (data.top_account_id) {
+    if (data.top_account_id) {
       specialSet['top_account_id'] = data.top_account_id;
     }
 
@@ -458,7 +495,7 @@ const service = {
           'recent_transactions',
           'streak',
           'top_account_id',
-          'ttl_ms'
+          'ttl_ms',
         ].includes(key)
       ) {
         safeData[key] = data[key];
@@ -467,10 +504,9 @@ const service = {
 
     const normalSet = this.flattenObject(safeData);
 
-
     const finalSet = {
       ...normalSet,
-      ...specialSet
+      ...specialSet,
     };
 
     if (Object.keys(finalSet).length === 0) {
@@ -487,11 +523,7 @@ const service = {
       }
     }
 
-    return await repo.upsertDashboardCache(
-      userId,
-      finalSet,
-      TTL_MS
-    );
+    return await repo.upsertDashboardCache(userId, finalSet, TTL_MS);
   },
 
   invalidateDashboardCache: async (userId) => {
@@ -563,7 +595,7 @@ const service = {
       'expense_by_category',
       'weekly_trend',
       'daily_cashflow',
-      'top_expenses'
+      'top_expenses',
     ];
 
     for (const field of arrayFields) {
@@ -598,7 +630,7 @@ const service = {
           'comparison',
           // 'ai_report',
           // 'status',
-          'generated_at'
+          'generated_at',
         ].includes(key)
       ) {
         safeData[key] = data[key];
@@ -609,7 +641,7 @@ const service = {
 
     const finalSet = {
       ...normalSet,
-      ...specialSet
+      ...specialSet,
     };
 
     if (Object.keys(finalSet).length === 0) {
@@ -622,12 +654,7 @@ const service = {
       }
     }
 
-    return await repo.upsertMonthlyReport(
-      userId,
-      Number(data.year),
-      Number(data.month),
-      finalSet
-    );
+    return await repo.upsertMonthlyReport(userId, Number(data.year), Number(data.month), finalSet);
   },
 
   deleteMonthlyReport: async (id) => {
@@ -780,7 +807,14 @@ const service = {
     if (!transId) throw new Error('transId is required');
     if (!data) throw new Error('Data is required');
 
-    const allowedFields = ['category_id', 'amount', 'transaction_type', 'description', 'date', 'note'];
+    const allowedFields = [
+      'category_id',
+      'amount',
+      'transaction_type',
+      'description',
+      'date',
+      'note',
+    ];
     const updateData = {};
     for (const key of allowedFields) {
       if (data[key] !== undefined) updateData[key] = data[key];
@@ -820,10 +854,14 @@ const service = {
     let ua = await repo.findUserAnalyticsByuserId(user_id);
     if (!ua) {
       if (sign < 0) {
-        console.warn(`[_updateUserAnalytics] sign=-1 but no user_analytics for user_id: ${user_id} -> skip reverse`);
+        console.warn(
+          `[_updateUserAnalytics] sign=-1 but no user_analytics for user_id: ${user_id} -> skip reverse`,
+        );
         return null;
       }
-      console.log(`[_updateUserAnalytics] user_analytics not found, creating new for user_id: ${user_id}`);
+      console.log(
+        `[_updateUserAnalytics] user_analytics not found, creating new for user_id: ${user_id}`,
+      );
       ua = await repo.createUserAnalytics({
         user_id,
         total_income: 0,
@@ -849,23 +887,46 @@ const service = {
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1;
 
-    const newTotalIncome = isIncome ? Math.max(0, (ua.total_income || 0) + amt) : (ua.total_income || 0);
-    const newTotalExpense = isExpense ? Math.max(0, (ua.total_expense || 0) + amt) : (ua.total_expense || 0);
+    const newTotalIncome = isIncome
+      ? Math.max(0, (ua.total_income || 0) + amt)
+      : ua.total_income || 0;
+    const newTotalExpense = isExpense
+      ? Math.max(0, (ua.total_expense || 0) + amt)
+      : ua.total_expense || 0;
     const newBalance = newTotalIncome - newTotalExpense;
 
     let currentMonthUpdate = { ...ua.current_month };
+
+    if (currentMonthUpdate.month !== currentMonth || currentMonthUpdate.year !== currentYear) {
+      currentMonthUpdate = {
+        year: currentYear,
+        month: currentMonth,
+        income: 0,
+        expense: 0,
+        savings: 0,
+        savings_rate: 0,
+      };
+    }
+
     if (txYear === currentYear && txMonth === currentMonth) {
-      if (isIncome) currentMonthUpdate.income = Math.max(0, (ua.current_month?.income || 0) + amt);
-      if (isExpense) currentMonthUpdate.expense = Math.max(0, (ua.current_month?.expense || 0) + amt);
-      currentMonthUpdate.savings = (currentMonthUpdate.income || 0) - (currentMonthUpdate.expense || 0);
-      currentMonthUpdate.savings_rate = currentMonthUpdate.income > 0
-        ? parseFloat(((currentMonthUpdate.savings / currentMonthUpdate.income) * 100).toFixed(2))
-        : 0;
+      if (isIncome) {
+        currentMonthUpdate.income = Math.max(0, (currentMonthUpdate.income || 0) + amt);
+      }
+      if (isExpense) {
+        currentMonthUpdate.expense = Math.max(0, (currentMonthUpdate.expense || 0) + amt);
+      }
+
+      currentMonthUpdate.savings =
+        (currentMonthUpdate.income || 0) - (currentMonthUpdate.expense || 0);
+      currentMonthUpdate.savings_rate =
+        currentMonthUpdate.income > 0
+          ? parseFloat(((currentMonthUpdate.savings / currentMonthUpdate.income) * 100).toFixed(2))
+          : 0;
     }
 
     let topCategories = ua.top_categories ? [...ua.top_categories] : [];
     if (isExpense && transaction.category_id) {
-      const idx = topCategories.findIndex(c => c.category_id === transaction.category_id);
+      const idx = topCategories.findIndex((c) => c.category_id === transaction.category_id);
       if (idx >= 0) {
         const newAmount = (topCategories[idx].total_amount || 0) + amt;
         if (newAmount <= 0) {
@@ -877,7 +938,7 @@ const service = {
         topCategories.push({
           category_id: transaction.category_id,
           category_name: transaction.category_name || '',
-          total_amount: amt
+          total_amount: amt,
         });
       }
       topCategories.sort((a, b) => b.total_amount - a.total_amount);
@@ -891,18 +952,23 @@ const service = {
         current_month: currentMonthUpdate,
         top_categories: topCategories,
       },
-      $currentDate: { updated_at: true }
+      $currentDate: { updated_at: true },
     });
 
-    console.log(`[_updateUserAnalytics] sign=${sign} user=${user_id} type=${transaction_type} amt=${rawAmt} -> total_income=${updated?.total_income}, total_expense=${updated?.total_expense}, balance=${updated?.current_balance}`);
+    console.log(
+      `[_updateUserAnalytics] sign=${sign} user=${user_id} type=${transaction_type} amt=${rawAmt} -> total_income=${updated?.total_income}, total_expense=${updated?.total_expense}, balance=${updated?.current_balance}`,
+    );
     return updated;
   },
 
   _updateCategorySummary: async function (transaction, sign = 1) {
-    const { user_id, account_id, category_id, amount, transaction_type, date, trans_id } = transaction;
+    const { user_id, account_id, category_id, amount, transaction_type, date, trans_id } =
+      transaction;
 
     if (!category_id) {
-      console.warn(`[_updateCategorySummary] sign=${sign} no category_id for trans_id=${trans_id}, skip`);
+      console.warn(
+        `[_updateCategorySummary] sign=${sign} no category_id for trans_id=${trans_id}, skip`,
+      );
       return null;
     }
 
@@ -923,7 +989,8 @@ const service = {
 
     const amt = rawAmt * sign;
 
-    const existingArr = await repo.findCategorySummaryByAccountMonth2(user_id, category_id, account_id, year, month)
+    const existingArr = await repo
+      .findCategorySummaryByAccountMonth2(user_id, category_id, account_id, year, month)
       .catch(() => null);
     const existing = existingArr?.[0] || null;
 
@@ -933,14 +1000,16 @@ const service = {
       const budgetLimit = existing.budget_limit || 0;
       const isOverBudget = budgetLimit > 0 ? newTotal > budgetLimit : false;
 
-      const breakdown = existing.daily_breakdown ? existing.daily_breakdown.map(d => ({ ...d, trans_id: [...(d.trans_id || [])] })) : [];
-      const dayIdx = breakdown.findIndex(d => d.day === day);
+      const breakdown = existing.daily_breakdown
+        ? existing.daily_breakdown.map((d) => ({ ...d, trans_id: [...(d.trans_id || [])] }))
+        : [];
+      const dayIdx = breakdown.findIndex((d) => d.day === day);
       if (sign > 0) {
         if (dayIdx >= 0) {
           breakdown[dayIdx] = {
             ...breakdown[dayIdx],
             amount: (breakdown[dayIdx].amount || 0) + amt,
-            trans_id: [...(breakdown[dayIdx].trans_id || []), trans_id]
+            trans_id: [...(breakdown[dayIdx].trans_id || []), trans_id],
           };
         } else {
           breakdown.push({ day, amount: amt, trans_id: [trans_id] });
@@ -948,14 +1017,16 @@ const service = {
         }
       } else if (dayIdx >= 0) {
         const newDayAmount = Math.max(0, (breakdown[dayIdx].amount || 0) + amt);
-        const newTransIds = (breakdown[dayIdx].trans_id || []).filter(id => id !== trans_id);
+        const newTransIds = (breakdown[dayIdx].trans_id || []).filter((id) => id !== trans_id);
         if (newTransIds.length === 0 || newDayAmount === 0) {
           breakdown.splice(dayIdx, 1);
         } else {
           breakdown[dayIdx] = { ...breakdown[dayIdx], amount: newDayAmount, trans_id: newTransIds };
         }
       } else {
-        console.warn(`[_updateCategorySummary] sign=-1 but day=${day} not found in breakdown for trans_id=${trans_id}`);
+        console.warn(
+          `[_updateCategorySummary] sign=-1 but day=${day} not found in breakdown for trans_id=${trans_id}`,
+        );
       }
 
       const result = await repo.upsertCategorySummary(
@@ -971,16 +1042,20 @@ const service = {
             is_over_budget: isOverBudget,
             daily_breakdown: breakdown,
           },
-          $currentDate: { updated_at: true }
-        }
+          $currentDate: { updated_at: true },
+        },
       );
 
-      console.log(`[_updateCategorySummary] sign=${sign} cat=${category_id} ${year}/${month} -> total=${result?.total_amount}, count=${result?.transaction_count}, days=${result?.daily_breakdown?.length}`);
+      console.log(
+        `[_updateCategorySummary] sign=${sign} cat=${category_id} ${year}/${month} -> total=${result?.total_amount}, count=${result?.transaction_count}, days=${result?.daily_breakdown?.length}`,
+      );
       return result;
     }
 
     if (sign < 0) {
-      console.warn(`[_updateCategorySummary] sign=-1 but no existing summary for cat=${category_id} ${year}/${month}, skip reverse`);
+      console.warn(
+        `[_updateCategorySummary] sign=-1 but no existing summary for cat=${category_id} ${year}/${month}, skip reverse`,
+      );
       return null;
     }
 
@@ -1005,16 +1080,29 @@ const service = {
       account_id,
       year,
       month,
-      { $set: newDoc, $currentDate: { updated_at: true } }
+      { $set: newDoc, $currentDate: { updated_at: true } },
     );
-    console.log(`[_updateCategorySummary] sign=${sign} CREATE cat=${category_id} ${year}/${month} -> total=${created?.total_amount}`);
+    console.log(
+      `[_updateCategorySummary] sign=${sign} CREATE cat=${category_id} ${year}/${month} -> total=${created?.total_amount}`,
+    );
     return created;
   },
 
   _updateDashboardCache: async function (transaction, sign = 1) {
-    const { user_id, account_id, trans_id, amount, transaction_type, description, date, category_id } = transaction;
+    const {
+      user_id,
+      account_id,
+      trans_id,
+      amount,
+      transaction_type,
+      description,
+      date,
+      category_id,
+    } = transaction;
     if (!account_id) {
-      console.warn(`[_updateDashboardCache] sign=${sign} no account_id for trans_id=${trans_id}, skip`);
+      console.warn(
+        `[_updateDashboardCache] sign=${sign} no account_id for trans_id=${trans_id}, skip`,
+      );
       return null;
     }
 
@@ -1031,10 +1119,14 @@ const service = {
     let isNewCache = false;
     if (!cache) {
       if (sign < 0) {
-        console.warn(`[_updateDashboardCache] sign=-1 but no cache for account_id=${account_id}, skip reverse`);
+        console.warn(
+          `[_updateDashboardCache] sign=-1 but no cache for account_id=${account_id}, skip reverse`,
+        );
         return null;
       }
-      console.log(`[_updateDashboardCache] dashboard_cache not found, creating new for account_id: ${account_id}`);
+      console.log(
+        `[_updateDashboardCache] dashboard_cache not found, creating new for account_id: ${account_id}`,
+      );
       isNewCache = true;
       cache = {
         user_id,
@@ -1062,14 +1154,15 @@ const service = {
       summary.monthly_income = Math.max(0, (summary.monthly_income || 0) + amt);
     }
     summary.monthly_savings = (summary.monthly_income || 0) - (summary.monthly_expense || 0);
-    summary.savings_rate = summary.monthly_income > 0
-      ? parseFloat(((summary.monthly_savings / summary.monthly_income) * 100).toFixed(2))
-      : 0;
+    summary.savings_rate =
+      summary.monthly_income > 0
+        ? parseFloat(((summary.monthly_savings / summary.monthly_income) * 100).toFixed(2))
+        : 0;
 
     // Recompute top_categories (expense-only, all-time cumulative)
-    let topCategories = cache.top_categories ? cache.top_categories.map(c => ({ ...c })) : [];
+    let topCategories = cache.top_categories ? cache.top_categories.map((c) => ({ ...c })) : [];
     if (isExpense && category_id) {
-      const idx = topCategories.findIndex(c => c.category_id === category_id);
+      const idx = topCategories.findIndex((c) => c.category_id === category_id);
       if (idx >= 0) {
         const newAmount = (topCategories[idx].total_amount || 0) + amt;
         if (newAmount <= 0) {
@@ -1096,11 +1189,14 @@ const service = {
         amount: rawAmt,
         type: transaction_type ? transaction_type.toLowerCase() : 'expense',
         date: date ? date.toString().slice(0, 10) : new Date().toISOString().slice(0, 10),
-        category_id: category_id || null
+        category_id: category_id || null,
       };
-      recent = [newTx, ...(cache.recent_transactions || []).filter(t => t.trans_id !== trans_id)].slice(0, 5);
+      recent = [
+        newTx,
+        ...(cache.recent_transactions || []).filter((t) => t.trans_id !== trans_id),
+      ].slice(0, 5);
     } else {
-      recent = (cache.recent_transactions || []).filter(t => t.trans_id !== trans_id);
+      recent = (cache.recent_transactions || []).filter((t) => t.trans_id !== trans_id);
     }
 
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
@@ -1116,7 +1212,7 @@ const service = {
         top_account_id: cache.top_account_id,
         expires_at: expiresAt,
       },
-      15 * 60 * 1000
+      15 * 60 * 1000,
     );
 
     // Recompute top_account_id across all user's dashboard caches.
@@ -1142,12 +1238,21 @@ const service = {
       console.warn(`[_updateDashboardCache] recompute top_account_id failed:`, err.message);
     }
 
-    console.log(`[_updateDashboardCache] sign=${sign} account=${account_id} type=${transaction_type} amt=${rawAmt} -> balance=${result?.summary?.current_balance}, monthly_inc=${result?.summary?.monthly_income}, monthly_exp=${result?.summary?.monthly_expense}, recent=${result?.recent_transactions?.length}, top_cats=${result?.top_categories?.length}, top_account=${result?.top_account_id}${isNewCache ? ' (NEW)' : ''}`);
+    console.log(
+      `[_updateDashboardCache] sign=${sign} account=${account_id} type=${transaction_type} amt=${rawAmt} -> balance=${
+        result?.summary?.current_balance
+      }, monthly_inc=${result?.summary?.monthly_income}, monthly_exp=${
+        result?.summary?.monthly_expense
+      }, recent=${result?.recent_transactions?.length}, top_cats=${
+        result?.top_categories?.length
+      }, top_account=${result?.top_account_id}${isNewCache ? ' (NEW)' : ''}`,
+    );
     return result;
   },
 
   _updateMonthlyReport: async function (transaction, sign = 1) {
-    const { user_id, trans_id, amount, transaction_type, description, date, category_id } = transaction;
+    const { user_id, trans_id, amount, transaction_type, description, date, category_id } =
+      transaction;
     if (!date) {
       console.warn(`[_updateMonthlyReport] sign=${sign} no date for trans_id=${trans_id}, skip`);
       return null;
@@ -1177,10 +1282,14 @@ const service = {
     let report = await repo.findMonthlyReportByAccountMonth(user_id, year, month).catch(() => null);
     if (!report) {
       if (sign < 0) {
-        console.warn(`[_updateMonthlyReport] sign=-1 but no report for user=${user_id} ${year}/${month}, skip reverse`);
+        console.warn(
+          `[_updateMonthlyReport] sign=-1 but no report for user=${user_id} ${year}/${month}, skip reverse`,
+        );
         return null;
       }
-      console.log(`[_updateMonthlyReport] monthly_report not found, creating new for user_id: ${user_id}, ${year}/${month}`);
+      console.log(
+        `[_updateMonthlyReport] monthly_report not found, creating new for user_id: ${user_id}, ${year}/${month}`,
+      );
       report = {
         user_id,
         year,
@@ -1209,15 +1318,16 @@ const service = {
       summary.total_expense = Math.max(0, (summary.total_expense || 0) + amt);
     }
     summary.savings = (summary.total_income || 0) - (summary.total_expense || 0);
-    summary.savings_rate = summary.total_income > 0
-      ? parseFloat(((summary.savings / summary.total_income) * 100).toFixed(2))
-      : 0;
+    summary.savings_rate =
+      summary.total_income > 0
+        ? parseFloat(((summary.savings / summary.total_income) * 100).toFixed(2))
+        : 0;
     summary.transaction_count = Math.max(0, (summary.transaction_count || 0) + sign);
 
     const targetCatArray = isIncome ? 'income_by_category' : 'expense_by_category';
     const catArray = report[targetCatArray] ? [...report[targetCatArray]] : [];
     if (category_id) {
-      const catIdx = catArray.findIndex(c => c.category_id === category_id);
+      const catIdx = catArray.findIndex((c) => c.category_id === category_id);
       if (catIdx >= 0) {
         const newAmount = (catArray[catIdx].amount || 0) + amt;
         if (newAmount <= 0) {
@@ -1230,16 +1340,20 @@ const service = {
         catArray.push({
           category_id,
           category_name: transaction.category_name || categoryInfo?.category_name || 'Unknown',
-          amount: amt
+          amount: amt,
         });
       }
     }
 
     const weeklyTrend = report.weekly_trend ? [...report.weekly_trend] : [];
-    const wIdx = weeklyTrend.findIndex(w => w.week === week);
+    const wIdx = weeklyTrend.findIndex((w) => w.week === week);
     if (wIdx >= 0) {
-      const newIncome = isIncome ? Math.max(0, (weeklyTrend[wIdx].income || 0) + amt) : (weeklyTrend[wIdx].income || 0);
-      const newExpense = isExpense ? Math.max(0, (weeklyTrend[wIdx].expense || 0) + amt) : (weeklyTrend[wIdx].expense || 0);
+      const newIncome = isIncome
+        ? Math.max(0, (weeklyTrend[wIdx].income || 0) + amt)
+        : weeklyTrend[wIdx].income || 0;
+      const newExpense = isExpense
+        ? Math.max(0, (weeklyTrend[wIdx].expense || 0) + amt)
+        : weeklyTrend[wIdx].expense || 0;
       if (newIncome === 0 && newExpense === 0) {
         weeklyTrend.splice(wIdx, 1);
       } else {
@@ -1255,10 +1369,14 @@ const service = {
     }
 
     const dailyCashflow = report.daily_cashflow ? [...report.daily_cashflow] : [];
-    const dIdx = dailyCashflow.findIndex(d => d.day === day);
+    const dIdx = dailyCashflow.findIndex((d) => d.day === day);
     if (dIdx >= 0) {
-      const newIncome = isIncome ? Math.max(0, (dailyCashflow[dIdx].income || 0) + amt) : (dailyCashflow[dIdx].income || 0);
-      const newExpense = isExpense ? Math.max(0, (dailyCashflow[dIdx].expense || 0) + amt) : (dailyCashflow[dIdx].expense || 0);
+      const newIncome = isIncome
+        ? Math.max(0, (dailyCashflow[dIdx].income || 0) + amt)
+        : dailyCashflow[dIdx].income || 0;
+      const newExpense = isExpense
+        ? Math.max(0, (dailyCashflow[dIdx].expense || 0) + amt)
+        : dailyCashflow[dIdx].expense || 0;
       if (newIncome === 0 && newExpense === 0) {
         dailyCashflow.splice(dIdx, 1);
       } else {
@@ -1276,7 +1394,7 @@ const service = {
     let topExpenses = report.top_expenses ? [...report.top_expenses] : [];
     if (isExpense && trans_id) {
       if (sign > 0) {
-        topExpenses = topExpenses.filter(t => t.trans_id !== trans_id);
+        topExpenses = topExpenses.filter((t) => t.trans_id !== trans_id);
         topExpenses.push({
           trans_id,
           description: description || '',
@@ -1286,30 +1404,27 @@ const service = {
         topExpenses.sort((a, b) => b.amount - a.amount);
         topExpenses = topExpenses.slice(0, 5);
       } else {
-        topExpenses = topExpenses.filter(t => t.trans_id !== trans_id);
+        topExpenses = topExpenses.filter((t) => t.trans_id !== trans_id);
       }
     }
 
-    const result = await repo.upsertMonthlyReport(
-      user_id,
-      year,
-      month,
-      {
-        $set: {
-          summary,
-          [targetCatArray]: catArray,
-          weekly_trend: weeklyTrend,
-          daily_cashflow: dailyCashflow,
-          top_expenses: topExpenses,
-          status: 'generated',
-        },
-        // Chỉ set khi insert mới, các update kế tiếp giữ nguyên timestamp tạo đầu tiên
-        $setOnInsert: { generated_at: new Date() },
-        $currentDate: { updated_at: true }
-      }
-    );
+    const result = await repo.upsertMonthlyReport(user_id, year, month, {
+      $set: {
+        summary,
+        [targetCatArray]: catArray,
+        weekly_trend: weeklyTrend,
+        daily_cashflow: dailyCashflow,
+        top_expenses: topExpenses,
+        status: 'generated',
+      },
+      // Chỉ set khi insert mới, các update kế tiếp giữ nguyên timestamp tạo đầu tiên
+      $setOnInsert: { generated_at: new Date() },
+      $currentDate: { updated_at: true },
+    });
 
-    console.log(`[_updateMonthlyReport] sign=${sign} user=${user_id} ${year}/${month} type=${transaction_type} amt=${rawAmt} -> total_inc=${result?.summary?.total_income}, total_exp=${result?.summary?.total_expense}, count=${result?.summary?.transaction_count}, generated_at=${result?.generated_at}`);
+    console.log(
+      `[_updateMonthlyReport] sign=${sign} user=${user_id} ${year}/${month} type=${transaction_type} amt=${rawAmt} -> total_inc=${result?.summary?.total_income}, total_exp=${result?.summary?.total_expense}, count=${result?.summary?.transaction_count}, generated_at=${result?.generated_at}`,
+    );
     return result;
   },
 
@@ -1318,14 +1433,19 @@ const service = {
    * Mỗi document chứa lịch sử chi/thu theo tháng -> dùng tính avg & xu hướng.
    */
   _updateSpendingTrend: async function (transaction, sign = 1) {
-    const { user_id, account_id, category_id, amount, transaction_type, date, trans_id } = transaction;
+    const { user_id, account_id, category_id, amount, transaction_type, date, trans_id } =
+      transaction;
 
     if (!category_id) {
-      console.warn(`[_updateSpendingTrend] sign=${sign} no category_id for trans_id=${trans_id}, skip`);
+      console.warn(
+        `[_updateSpendingTrend] sign=${sign} no category_id for trans_id=${trans_id}, skip`,
+      );
       return null;
     }
     if (!account_id) {
-      console.warn(`[_updateSpendingTrend] sign=${sign} no account_id for trans_id=${trans_id}, skip`);
+      console.warn(
+        `[_updateSpendingTrend] sign=${sign} no account_id for trans_id=${trans_id}, skip`,
+      );
       return null;
     }
 
@@ -1346,11 +1466,15 @@ const service = {
     const amt = rawAmt * sign;
     const categoryTypeNormalized = transaction_type === 'Income' ? 'income' : 'expense';
 
-    let trend = await repo.findSpendingTrendByAccountCategory(account_id, category_id).catch(() => null);
+    let trend = await repo
+      .findSpendingTrendByAccountCategory(account_id, category_id)
+      .catch(() => null);
 
     if (!trend) {
       if (sign < 0) {
-        console.warn(`[_updateSpendingTrend] sign=-1 but no trend for account=${account_id} cat=${category_id}, skip reverse`);
+        console.warn(
+          `[_updateSpendingTrend] sign=-1 but no trend for account=${account_id} cat=${category_id}, skip reverse`,
+        );
         return null;
       }
       trend = {
@@ -1369,9 +1493,9 @@ const service = {
 
     // Cập nhật monthly_data theo (year, month)
     const monthlyData = Array.isArray(trend.monthly_data)
-      ? trend.monthly_data.map(m => ({ ...m }))
+      ? trend.monthly_data.map((m) => ({ ...m }))
       : [];
-    const mIdx = monthlyData.findIndex(m => m.year === year && m.month === month);
+    const mIdx = monthlyData.findIndex((m) => m.year === year && m.month === month);
     if (mIdx >= 0) {
       const newAmt = Math.max(0, (monthlyData[mIdx].amount || 0) + amt);
       if (newAmt === 0) {
@@ -1381,9 +1505,11 @@ const service = {
       }
     } else if (sign > 0) {
       monthlyData.push({ year, month, amount: amt });
-      monthlyData.sort((a, b) => (a.year - b.year) || (a.month - b.month));
+      monthlyData.sort((a, b) => a.year - b.year || a.month - b.month);
     } else {
-      console.warn(`[_updateSpendingTrend] sign=-1 but ${year}/${month} not in monthly_data for cat=${category_id}, skip`);
+      console.warn(
+        `[_updateSpendingTrend] sign=-1 but ${year}/${month} not in monthly_data for cat=${category_id}, skip`,
+      );
     }
 
     const totalMonths = monthlyData.length;
@@ -1401,27 +1527,25 @@ const service = {
       else direction = 'stable';
     }
 
-    const result = await repo.upsertSpendingTrendByAccountCategory(
-      account_id,
-      category_id,
-      {
-        $set: {
-          user_id,
-          account_id,
-          category_id,
-          category_name: trend.category_name,
-          category_type: trend.category_type || categoryTypeNormalized,
-          monthly_data: monthlyData,
-          avg_monthly: avgMonthly,
-          trend: direction,
-          total_months: totalMonths,
-          total_transactions: newTotalTransactions,
-          updated_at: new Date(),
-        }
-      }
-    );
+    const result = await repo.upsertSpendingTrendByAccountCategory(account_id, category_id, {
+      $set: {
+        user_id,
+        account_id,
+        category_id,
+        category_name: trend.category_name,
+        category_type: trend.category_type || categoryTypeNormalized,
+        monthly_data: monthlyData,
+        avg_monthly: avgMonthly,
+        trend: direction,
+        total_months: totalMonths,
+        total_transactions: newTotalTransactions,
+        updated_at: new Date(),
+      },
+    });
 
-    console.log(`[_updateSpendingTrend] sign=${sign} user=${user_id} account=${account_id} cat=${category_id} -> months=${totalMonths}, total_tx=${newTotalTransactions}, avg=${avgMonthly}, trend=${direction}`);
+    console.log(
+      `[_updateSpendingTrend] sign=${sign} user=${user_id} account=${account_id} cat=${category_id} -> months=${totalMonths}, total_tx=${newTotalTransactions}, avg=${avgMonthly}, trend=${direction}`,
+    );
     return result;
   },
 
@@ -1446,7 +1570,7 @@ const service = {
     // Lấy budget_limit lớn nhất trong các account (budget thường set per-category, không per-account)
     const budgetLimit = (summaries || []).reduce(
       (mx, s) => Math.max(mx, Number(s?.budget_limit || 0)),
-      0
+      0,
     );
 
     // Không có budget -> đảm bảo không còn alert cho category này
@@ -1455,22 +1579,19 @@ const service = {
         $pull: { 'budget_alert.alerts': { category_id } },
         $set: { 'budget_alert.last_checked': new Date() },
       });
-      console.log(`[_updateBudgetAlerts] user=${user_id} cat=${category_id} no budget -> alert pulled`);
+      console.log(
+        `[_updateBudgetAlerts] user=${user_id} cat=${category_id} no budget -> alert pulled`,
+      );
       return cleared;
     }
 
-    const currentSpent = (summaries || []).reduce(
-      (s, x) => s + Number(x?.total_amount || 0),
-      0
-    );
+    const currentSpent = (summaries || []).reduce((s, x) => s + Number(x?.total_amount || 0), 0);
     const categoryName =
-      (summaries || []).map(s => s?.category_name).find(Boolean) ||
+      (summaries || []).map((s) => s?.category_name).find(Boolean) ||
       transaction.category_name ||
       '';
     const percentUsed =
-      budgetLimit > 0
-        ? Math.round((currentSpent / budgetLimit) * 100 * 100) / 100
-        : 0;
+      budgetLimit > 0 ? Math.round((currentSpent / budgetLimit) * 100 * 100) / 100 : 0;
 
     let status = 'ok';
     if (percentUsed > 100) status = 'exceeded';
@@ -1497,11 +1618,12 @@ const service = {
       $set: { 'budget_alert.last_checked': new Date() },
     });
 
-    console.log(`[_updateBudgetAlerts] user=${user_id} cat=${category_id} spent=${currentSpent}/${budgetLimit} (${percentUsed}%) -> ${status}`);
+    console.log(
+      `[_updateBudgetAlerts] user=${user_id} cat=${category_id} spent=${currentSpent}/${budgetLimit} (${percentUsed}%) -> ${status}`,
+    );
     return updated;
   },
 
-  
   handleTransactionCreated: async function (message) {
     console.log(`[handleTransactionCreated] Received message:`, message);
     const transaction = message;
@@ -1509,7 +1631,6 @@ const service = {
 
     console.log(`[handleTransactionCreated] Processing trans_id: ${trans_id}, user_id: ${user_id}`);
     try {
-
       // Phase 1: cập nhật song song các collection chính
       const [uaResult, csResult, dcResult, mrResult, stResult] = await Promise.allSettled([
         this._updateUserAnalytics(transaction),
@@ -1519,11 +1640,16 @@ const service = {
         this._updateSpendingTrend(transaction),
       ]);
 
-      if (uaResult.status === 'rejected') console.error(`[handleTransactionCreated] user_analytics error:`, uaResult.reason);
-      if (csResult?.status === 'rejected') console.error(`[handleTransactionCreated] category_summary error:`, csResult.reason);
-      if (dcResult?.status === 'rejected') console.error(`[handleTransactionCreated] dashboard_cache error:`, dcResult.reason);
-      if (mrResult?.status === 'rejected') console.error(`[handleTransactionCreated] monthly_report error:`, mrResult.reason);
-      if (stResult?.status === 'rejected') console.error(`[handleTransactionCreated] spending_trends error:`, stResult.reason);
+      if (uaResult.status === 'rejected')
+        console.error(`[handleTransactionCreated] user_analytics error:`, uaResult.reason);
+      if (csResult?.status === 'rejected')
+        console.error(`[handleTransactionCreated] category_summary error:`, csResult.reason);
+      if (dcResult?.status === 'rejected')
+        console.error(`[handleTransactionCreated] dashboard_cache error:`, dcResult.reason);
+      if (mrResult?.status === 'rejected')
+        console.error(`[handleTransactionCreated] monthly_report error:`, mrResult.reason);
+      if (stResult?.status === 'rejected')
+        console.error(`[handleTransactionCreated] spending_trends error:`, stResult.reason);
 
       // Phase 2: budget alerts (đọc category_summary vừa cập nhật ở phase 1)
       try {
@@ -1541,7 +1667,13 @@ const service = {
   },
 
   _logPhaseResults: function (prefix, results) {
-    const names = ['user_analytics', 'category_summary', 'dashboard_cache', 'monthly_report', 'spending_trends'];
+    const names = [
+      'user_analytics',
+      'category_summary',
+      'dashboard_cache',
+      'monthly_report',
+      'spending_trends',
+    ];
     const report = { ok: 0, skipped: 0, failed: 0, details: {} };
     results.forEach((r, i) => {
       const name = names[i];
@@ -1558,7 +1690,11 @@ const service = {
       } else {
         report.failed++;
         report.details[name] = `ERROR: ${r.reason?.message || r.reason}`;
-        console.error(`${prefix} ${name}: ERROR ->`, r.reason?.message || r.reason, r.reason?.stack);
+        console.error(
+          `${prefix} ${name}: ERROR ->`,
+          r.reason?.message || r.reason,
+          r.reason?.stack,
+        );
       }
     });
     return report;
@@ -1566,21 +1702,36 @@ const service = {
 
   handleTransactionUpdated: async function (message) {
     const {
-      trans_id, user_id, account_id,
+      trans_id,
+      user_id,
+      account_id,
       account_id_update,
       category_id,
-      amount, amount_update,
-      transaction_type, transaction_type_update,
-      category_name, account_name,
-      description, date, note,
+      amount,
+      amount_update,
+      transaction_type,
+      transaction_type_update,
+      category_name,
+      account_name,
+      description,
+      date,
+      note,
     } = message;
 
     console.log(`[handleTransactionUpdated] Processing trans_id: ${trans_id}, user_id: ${user_id}`);
-    console.log(`[handleTransactionUpdated] OLD -> account=${account_id}, amount=${amount}, type=${transaction_type}, category=${category_id}`);
-    console.log(`[handleTransactionUpdated] NEW -> account=${account_id_update ?? account_id}, amount=${amount_update ?? amount}, type=${transaction_type_update ?? transaction_type}, category=${category_id}`);
+    console.log(
+      `[handleTransactionUpdated] OLD -> account=${account_id}, amount=${amount}, type=${transaction_type}, category=${category_id}`,
+    );
+    console.log(
+      `[handleTransactionUpdated] NEW -> account=${account_id_update ?? account_id}, amount=${
+        amount_update ?? amount
+      }, type=${transaction_type_update ?? transaction_type}, category=${category_id}`,
+    );
 
     if (account_id_update && account_id_update !== account_id) {
-      console.warn(`[handleTransactionUpdated] account_id changed (${account_id} -> ${account_id_update}). Reverse will hit OLD account, apply will hit NEW account.`);
+      console.warn(
+        `[handleTransactionUpdated] account_id changed (${account_id} -> ${account_id_update}). Reverse will hit OLD account, apply will hit NEW account.`,
+      );
     }
 
     try {
@@ -1620,7 +1771,10 @@ const service = {
         this._updateMonthlyReport(oldTransaction, -1),
         this._updateSpendingTrend(oldTransaction, -1),
       ]);
-      const reverseReport = this._logPhaseResults(`[handleTransactionUpdated][REVERSE]`, reverseResults);
+      const reverseReport = this._logPhaseResults(
+        `[handleTransactionUpdated][REVERSE]`,
+        reverseResults,
+      );
 
       console.log(`[handleTransactionUpdated] === Phase 2: APPLY new transaction (sign=+1) ===`);
       const applyResults = await Promise.allSettled([
@@ -1636,7 +1790,10 @@ const service = {
       try {
         await this._updateBudgetAlerts(newTransaction);
         // Nếu category thay đổi giữa old/new thì recompute cả category cũ
-        if (oldTransaction.category_id && oldTransaction.category_id !== newTransaction.category_id) {
+        if (
+          oldTransaction.category_id &&
+          oldTransaction.category_id !== newTransaction.category_id
+        ) {
           await this._updateBudgetAlerts(oldTransaction);
         }
       } catch (err) {
@@ -1645,7 +1802,11 @@ const service = {
 
       const allOk = reverseReport.failed === 0 && applyReport.failed === 0;
       const summary = `reverse(ok=${reverseReport.ok}, skip=${reverseReport.skipped}, fail=${reverseReport.failed}) apply(ok=${applyReport.ok}, skip=${applyReport.skipped}, fail=${applyReport.failed})`;
-      console.log(`[handleTransactionUpdated] Done for trans_id: ${trans_id} | ${summary} | overall=${allOk ? 'OK' : 'PARTIAL/FAIL'}`);
+      console.log(
+        `[handleTransactionUpdated] Done for trans_id: ${trans_id} | ${summary} | overall=${
+          allOk ? 'OK' : 'PARTIAL/FAIL'
+        }`,
+      );
 
       if (!allOk) return null;
       return { account_id: account_id_update ?? account_id, trans_id, reverseReport, applyReport };
@@ -1657,14 +1818,23 @@ const service = {
 
   handleTransactionDeleted: async function (message) {
     const {
-      trans_id, user_id, account_id,
-      category_id, amount, transaction_type,
-      category_name, account_name,
-      description, date, note,
+      trans_id,
+      user_id,
+      account_id,
+      category_id,
+      amount,
+      transaction_type,
+      category_name,
+      account_name,
+      description,
+      date,
+      note,
     } = message;
 
     console.log(`[handleTransactionDeleted] Processing trans_id: ${trans_id}, user_id: ${user_id}`);
-    console.log(`[handleTransactionDeleted] account=${account_id}, amount=${amount}, type=${transaction_type}, category=${category_id}`);
+    console.log(
+      `[handleTransactionDeleted] account=${account_id}, amount=${amount}, type=${transaction_type}, category=${category_id}`,
+    );
 
     try {
       const oldTransaction = {
@@ -1698,19 +1868,25 @@ const service = {
         console.error(`[handleTransactionDeleted] budget_alerts error:`, err.message);
       }
 
-      const delResult = await repo.deleteTransactionByTransId(trans_id).catch(err => {
+      const delResult = await repo.deleteTransactionByTransId(trans_id).catch((err) => {
         console.error(`[handleTransactionDeleted] deleteTransaction error:`, err);
         return null;
       });
       if (delResult) {
         console.log(`[handleTransactionDeleted] local transaction record deleted: ${trans_id}`);
       } else {
-        console.warn(`[handleTransactionDeleted] local transaction record not found or already deleted: ${trans_id}`);
+        console.warn(
+          `[handleTransactionDeleted] local transaction record not found or already deleted: ${trans_id}`,
+        );
       }
 
       const allOk = report.failed === 0;
       const summary = `reverse(ok=${report.ok}, skip=${report.skipped}, fail=${report.failed})`;
-      console.log(`[handleTransactionDeleted] Done for trans_id: ${trans_id} | ${summary} | overall=${allOk ? 'OK' : 'PARTIAL/FAIL'}`);
+      console.log(
+        `[handleTransactionDeleted] Done for trans_id: ${trans_id} | ${summary} | overall=${
+          allOk ? 'OK' : 'PARTIAL/FAIL'
+        }`,
+      );
 
       if (!allOk) return null;
       return { account_id, trans_id, report };
@@ -1718,10 +1894,7 @@ const service = {
       console.error(`[handleTransactionDeleted] Fatal error:`, err);
       return null;
     }
-  }
-
-
-
+  },
 };
 
 module.exports = service;
