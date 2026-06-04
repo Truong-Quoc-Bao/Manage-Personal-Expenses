@@ -169,3 +169,8 @@ services:
         value: 4005
       - key: GEMINI_API_KEY
         value: AIzaSyB70wYdWt5jp57ltXuD9HflCs0EbDRYoCk
+      # BỔ SUNG 2 DÒNG NÀY (Lấy giá trị từ file .env của bạn)
+      - key: PUBLIC_VAPID_KEY
+        value: BLbswT5YhhDfRMT54tR3s5yuZeezIBPkfPLT41MTzmw2Cl3H87V0oY2Fbm71qFJnraMn5A6-QkQ2X9erwdS0LZQ
+      - key: PRIVATE_VAPID_KEY
+        value: ABpKOu8cq2KflyhdWeDKIq05Uu5m04mdI5qbe--vbmE
