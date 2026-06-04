@@ -26,11 +26,25 @@ services:
       - fromGroup: common-secrets
       - key: PORT
         value: 3000
-      # Link gọi các service nội bộ
+      # PHẢI KHAI BÁO ĐỦ CÁC TARGET Ở ĐÂY:
       - key: USER_SERVICE_URL
         value: http://user-service:3001
+      - key: ACCOUNT_SERVICE_URL
+        value: http://account-service:3002
+      - key: CATEGORY_SERVICE_URL
+        value: http://category-service:3003
+      - key: ANALYTICS_SERVICE_URL
+        value: http://analytics-service:3004
+      - key: NOTIFICATION_SERVICE_URL
+        value: http://notification-service:3005
       - key: AUTH_SERVICE_URL
         value: http://auth-service:3006
+      - key: TRANSACTION_SERVICE_URL
+        value: http://transaction-service:3007
+      - key: BUDGET_SERVICE_URL
+        value: http://budget-service:3008
+      - key: AI_SERVICE_URL
+        value: http://ai-service:4005
 
   # 2. USER SERVICE
   - type: web
