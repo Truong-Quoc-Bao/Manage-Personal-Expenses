@@ -1,0 +1,13 @@
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /app
+COPY ["backend/shared/dotnet-shared/RabbitMQ.Client.Shared/RabbitMQ.Client.Shared.csproj", "backend/shared/dotnet-shared/RabbitMQ.Client.Shared/"]
+# ... (Copy tất cả các csproj và chạy restore như cũ)
+COPY . . 
+RUN dotnet publish "backend/auth_service/src/AuthService.API/AuthService.API.csproj" -c Release -o /app/publish
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+WORKDIR /app
+COPY --from=build /app/publish .
+EXPOSE 3006
+ENV ASPNETCORE_URLS=http://+:3006
+ENTRYPOINT ["dotnet", "AuthService.API.dll"]
