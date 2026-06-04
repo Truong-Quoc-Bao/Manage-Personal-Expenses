@@ -52,8 +52,12 @@ const startServer = async () => {
 
 startServer();
 
-// app.listen(PORT, async () => {
-//     await connectDB();
-//     await rabbitMQClient.startRabbitMQ();
-//     console.log(`Analytics service is running on port ${PORT}`);
-// });
+// Thêm một route health check đơn giản
+app.get('/', (req, res) => {
+  res.send('Analytics Service is running...');
+});
+
+// QUAN TRỌNG: Phải có dòng này để Render nhận diện được port
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Analytics Service is listening on port ${PORT}`);
+});
