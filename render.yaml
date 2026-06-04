@@ -1,57 +1,132 @@
-# 1. Định nghĩa các nhóm biến môi trường
 envVarGroups:
   - name: common-secrets
-    envVars: # Đã sửa từ 'envs' thành 'envVars'
+    envVars:
       - key: NODE_ENV
         value: production
       - key: JWT_SECRET
-        value: D8F9G0H1J2K3L4M5N6B7V8C9X0Z1Q2W3E4R5T6Y7U8I9O0P1A2S3D4F5G6H7J8K9L0M1N2B3V4C5X6Z7Q8W9E0R1T2Y3U4I5O6P7A8S9D0F1G2H3J4K5L6M7N8B9V0C1X2Z3Q4W5E6R7T8Y9U0I1O2P3A4S5D6F7G8H9J0K1L2M3N4B5V6C7X8Z9Q0W1E2R3T4Y5U6I7O8P9A0S1D2F3G4H5J6K7L8Z9X0C1V2B3N4M5Q6W7E8R9T0Y1U2I3
+        value: D8F9G0H1J2K3L4M5N6B7V8C9X0Z1Q2W3E4R5T6Y7U8I9O0P1A2S3D4F5G6H7J8K9L0M1N2B3V4C5X6Z7Q8W9E0R1T2Y3U4I5O6P7A8S9D0F1G2H3J4K5L6M7N8B9V0C1X2Z3Q4W5E6R7T8Y9U0I1O2P3A4S5D6F7G8H9J0K1L2M3N4B5V6C7X8Z9Q0W1E2R3T4Y5U6I7O8P9A0S1D2F3G4H5J6K7L8Z9X0C1V2B3N4M5Q6W7
+      - key: REFRESH_TOKEN_SECRET
+        value: klkasfaxcsafsafnsanc245asf123
       - key: RABBITMQ_URL
-        sync: false
+        sync: false # Bạn sẽ nhập URL CloudAMQP khi Render hỏi
       - key: REDIS_URL
-        sync: false
+        sync: false # Nhập URL Redis khi Render hỏi
 
-# 2. Định nghĩa các Service
 services:
-  # --- API GATEWAY ---
+  # 1. GATEWAY
   - type: web
     name: gateway
-    runtime: docker # Dùng runtime thay vì env
+    runtime: docker
     dockerContext: .
     dockerfilePath: backend/gateway/Dockerfile
     plan: free
-    # Cấu hình port thông qua envVars để tránh lỗi schema
     envVars:
       - fromGroup: common-secrets
       - key: PORT
         value: 3000
-      - key: USER_SERVICE_URL
-        value: http://user-service-app:3001
 
-  # --- USER SERVICE ---
+  # 2. USER SERVICE
   - type: web
-    name: user-service-app
+    name: user-service
     runtime: docker
     dockerContext: .
     dockerfilePath: backend/user_service/Dockerfile
     plan: free
     envVars:
       - fromGroup: common-secrets
-      - key: PORT
-        value: 3001
       - key: DATABASE_URL
         value: postgresql://postgres:datletan16072004@db.mdzmjrxpntwapuiyhqdo.supabase.co:5432/postgres?schema=user_service
 
-  # --- AUTH SERVICE ---
+  # 3. AUTH SERVICE (.NET)
   - type: web
-    name: auth-service-app
+    name: auth-service
     runtime: docker
     dockerContext: .
     dockerfilePath: backend/auth_service/Dockerfile
     plan: free
     envVars:
       - fromGroup: common-secrets
-      - key: PORT
-        value: 3006
       - key: ConnectionStrings__DefaultConnection
         value: Host=aws-1-ap-southeast-1.pooler.supabase.com;Port=5432;Database=postgres;Username=postgres.mdzmjrxpntwapuiyhqdo;Password=datletan16072004;SearchPath=auth_service;Trust Server Certificate=true
+
+  # 4. ACCOUNT SERVICE
+  - type: web
+    name: account-service
+    runtime: docker
+    dockerContext: .
+    dockerfilePath: backend/account_service/Dockerfile
+    plan: free
+    envVars:
+      - fromGroup: common-secrets
+      - key: DATABASE_URL
+        value: postgresql://postgres:datletan16072004@db.mdzmjrxpntwapuiyhqdo.supabase.co:5432/postgres?schema=account_service
+
+  # 5. TRANSACTION SERVICE (.NET)
+  - type: web
+    name: transaction-service
+    runtime: docker
+    dockerContext: .
+    dockerfilePath: backend/transaction_service/Dockerfile
+    plan: free
+    envVars:
+      - fromGroup: common-secrets
+      - key: ConnectionStrings__DefaultConnection
+        value: Host=aws-1-ap-southeast-1.pooler.supabase.com;Port=5432;Database=postgres;Username=postgres.mdzmjrxpntwapuiyhqdo;Password=datletan16072004;SearchPath=transaction_service;Trust Server Certificate=true
+
+  # 6. AI SERVICE
+  - type: web
+    name: ai-service
+    runtime: docker
+    dockerContext: .
+    dockerfilePath: backend/ai_service/Dockerfile
+    plan: free
+    envVars:
+      - fromGroup: common-secrets
+      - key: GEMINI_API_KEY
+        value: AIzaSyB70wYdWt5jp57ltXuD9HflCs0EbDRYoCk
+
+  # 7. CATEGORY SERVICE
+  - type: web
+    name: category-service
+    runtime: docker
+    dockerContext: .
+    dockerfilePath: backend/category_service/Dockerfile
+    plan: free
+    envVars:
+      - fromGroup: common-secrets
+      - key: DATABASE_URL
+        value: postgresql://postgres:datletan16072004@db.mdzmjrxpntwapuiyhqdo.supabase.co:5432/postgres?schema=category_service
+
+  # 8. BUDGET SERVICE
+  - type: web
+    name: budget-service
+    runtime: docker
+    dockerContext: .
+    dockerfilePath: backend/budget_service/Dockerfile
+    plan: free
+    envVars:
+      - fromGroup: common-secrets
+      - key: DATABASE_URL
+        value: postgresql://postgres:datletan16072004@db.mdzmjrxpntwapuiyhqdo.supabase.co:5432/postgres?schema=account_service # Sửa theo logic của bạn
+
+  # 9. NOTIFICATION SERVICE
+  - type: web
+    name: notification-service
+    runtime: docker
+    dockerContext: .
+    dockerfilePath: backend/notification_service/Dockerfile
+    plan: free
+    envVars:
+      - fromGroup: common-secrets
+
+  # 10. ANALYTICS SERVICE
+  - type: web
+    name: analytics-service
+    runtime: docker
+    dockerContext: .
+    dockerfilePath: backend/analytics_service/Dockerfile
+    plan: free
+    envVars:
+      - fromGroup: common-secrets
+      - key: MONGODB_URL
+        sync: false
