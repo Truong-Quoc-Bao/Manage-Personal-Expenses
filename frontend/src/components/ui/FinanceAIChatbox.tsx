@@ -199,12 +199,19 @@ export function FinanceAIChatbox() {
         setShowVoicePreview(true);
         setVoiceTranscript('Đang nghe...');
       };
+      // rec.onresult = (e: any) => {
+      //   setVoiceTranscript(
+      //     Array.from(e.results)
+      //       .map((r: any) => r[0].transcript)
+      //       .join(''),
+      //   );
+      // };
       rec.onresult = (e: any) => {
-        setVoiceTranscript(
-          Array.from(e.results)
-            .map((r: any) => r[0].transcript)
-            .join(''),
-        );
+        const result = Array.from(e.results)
+          .map((r: any) => r[0].transcript)
+          .join('');
+        setVoiceTranscript(result);
+        setInputValue(result);
       };
       rec.onend = () => setIsRecording(false);
       recognitionRef.current = rec;
@@ -212,7 +219,9 @@ export function FinanceAIChatbox() {
   }, []);
 
   const handleSend = async (textOverride?: string) => {
-    const text = textOverride || (showVoicePreview ? voiceTranscript : inputValue).trim();
+    const text = (textOverride || inputValue).trim();
+
+    // const text = textOverride || (showVoicePreview ? voiceTranscript : inputValue).trim();
     if ((!text && !selectedImage) || isLoading) return;
 
     const userMsg: Message = {
@@ -225,9 +234,11 @@ export function FinanceAIChatbox() {
     setMessages((prev) => [...prev, userMsg]);
 
     setInputValue('');
+    setVoiceTranscript('');
+    setShowVoicePreview(false);
+
     setSelectedImage(null);
     setImagePreview(null);
-    setShowVoicePreview(false);
     setIsLoading(true);
 
     try {
@@ -574,7 +585,7 @@ export function FinanceAIChatbox() {
                 Hủy
               </button>
               <button
-                onClick={() => handleSend()}
+                onClick={() => handleSend(voiceTranscript)}
                 className="text-[10px] font-bold text-orange-600 uppercase underline decoration-2"
               >
                 Xác nhận & Gửi
@@ -634,7 +645,7 @@ export function FinanceAIChatbox() {
         )}
 
         {/* Input Bar */}
-        <div className="flex items-center gap-1.5 p-1.5 bg-gray-50 rounded-2xl border border-gray-200 focus-within:bg-white focus-within:ring-2 focus-within:ring-orange-100 focus-within:border-orange-300 transition-all">
+        <div className="flex border-orange-300 items-center gap-1.5 p-1.5 rounded-2xl border bg-gray-50 focus-within:ring-2 focus-within:ring-orange-100 focus-within:border-orange-300 transition-all">
           <input
             type="file"
             ref={fileInputRef}
@@ -652,7 +663,7 @@ export function FinanceAIChatbox() {
             onClick={() => fileInputRef.current?.click()}
             className="p-2 rounded-lg !bg-gradient-to-r !from-orange-400 !to-rose-400  hover:bg-orange-50 hover:text-orange-600 transition-all"
           >
-            <Camera size={20} />
+            <Camera size={20} className="text-white" />
           </button>
           <button
             onClick={() =>
@@ -672,7 +683,7 @@ export function FinanceAIChatbox() {
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
             placeholder="Nói hoặc nhập chi tiêu..."
-            className="flex-1 bg-transparent px-2 text-sm outline-none text-gray-800 placeholder:text-gray-400"
+            className="flex-1 !bg-transparent !border-none !shadow-none focus:!ring-0 px-2 text-sm outline-none text-gray-800 placeholder:text-gray-400"
             disabled={isLoading}
           />
           <button

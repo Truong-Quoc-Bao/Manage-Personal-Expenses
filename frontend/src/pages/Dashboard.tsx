@@ -92,7 +92,7 @@ export function Dashboard() {
           description: t.description || 'Không có mô tả',
           account: t.account_name || '',
           date: t.created_at || t.date,
-        }))
+        })),
       );
 
       const realAccounts: RealAccount[] = Array.isArray(resAccounts?.data?.data)
@@ -101,7 +101,9 @@ export function Dashboard() {
       setAccounts(realAccounts);
 
       console.log(
-        `✅ Dashboard loaded: user_analytics ${ua ? 'OK' : 'EMPTY'}, ${realAccounts.length} account(s), ${allTx.length} transaction(s)`
+        `✅ Dashboard loaded: user_analytics ${ua ? 'OK' : 'EMPTY'}, ${
+          realAccounts.length
+        } account(s), ${allTx.length} transaction(s)`,
       );
     } catch (err) {
       console.error('Lỗi khi load dữ liệu Dashboard:', err);
@@ -114,9 +116,14 @@ export function Dashboard() {
   useEffect(() => {
     const handleSync = () => {
       console.log('📊 Dashboard: Nhận lệnh đồng bộ');
-      loadAllData();
+      setTimeout(() => {
+        loadAllData();
+      }, 500);
+
+      // loadAllData();
       toast.info('Dữ liệu tài chính đã được cập nhật!');
     };
+
     window.addEventListener('money-guard-sync', handleSync);
     window.addEventListener('dashboard_refresh', handleSync);
     return () => {
@@ -143,7 +150,7 @@ export function Dashboard() {
   const uaStreakUnit = userAnalytics?.streak?.unit || 'tháng';
   const uaTopCategories = (userAnalytics?.top_categories ?? []).slice(0, 5);
   const uaBudgetAlerts = (userAnalytics?.budget_alert?.alerts ?? []).filter(
-    (a) => a.status === 'warning' || a.status === 'critical' || a.status === 'exceeded'
+    (a) => a.status === 'warning' || a.status === 'critical' || a.status === 'exceeded',
   );
   const uaGoals = (userAnalytics?.goal_tracking?.goals ?? []).slice(0, 3);
 
@@ -159,18 +166,28 @@ export function Dashboard() {
   const fallbackMonthlyIncome = fallbackTxs
     .filter((t) => {
       const d = new Date(t.date);
-      return t.type === 'income' && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-    })
-    .reduce((s, t) => s + t.amount, 0);
-  const fallbackMonthlyExpense = fallbackTxs
-    .filter((t) => {
-      const d = new Date(t.date);
-      return t.type === 'expense' && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      return (
+        t.type === 'income' && d.getMonth() === currentMonth && d.getFullYear() === currentYear
+      );
     })
     .reduce((s, t) => s + t.amount, 0);
 
-  const headerMonth =
-    userAnalytics?.current_month?.month ?? stats?.month ?? now.getMonth() + 1;
+  const fallbackMonthlyExpense = fallbackTxs
+    .filter((t) => {
+      const d = new Date(t.date);
+      return (
+        t.type === 'expense' && d.getMonth() === currentMonth && d.getFullYear() === currentYear
+      );
+    })
+    .reduce((s, t) => s + t.amount, 0);
+
+  // 2. BIẾN HIỂN THỊ CUỐI CÙNG (Ưu tiên lấy số tính được từ mảng giao dịch/tài khoản)
+  const displayIncome = fallbackMonthlyIncome || userAnalytics?.current_month?.income || 0;
+  const displayExpense = fallbackMonthlyExpense || userAnalytics?.current_month?.expense || 0;
+  const displayBalance =
+    accounts.length > 0 ? fallbackTotalBalance : userAnalytics?.current_balance || 0;
+
+  const headerMonth = userAnalytics?.current_month?.month ?? stats?.month ?? now.getMonth() + 1;
 
   return (
     <main
@@ -222,14 +239,13 @@ export function Dashboard() {
                 Tổng số dư
               </span>
             </div>
-            <p className="mb-2 text-4xl font-bold text-gray-900">
+            {/* <p className="mb-2 text-4xl font-bold text-gray-900">
               {formatCurrency(
-                hasUA
-                  ? uaBalance
-                  : stats
-                  ? stats.income - stats.expense
-                  : fallbackTotalBalance
+                hasUA ? uaBalance : stats ? stats.income - stats.expense : fallbackTotalBalance,
               )}
+            </p> */}
+            <p className="mb-2 text-4xl font-bold text-gray-900">
+              {formatCurrency(displayBalance)}
             </p>
             <p className="text-base text-gray-500 italic">
               {hasUA
@@ -249,14 +265,11 @@ export function Dashboard() {
                 Thu nhập tháng {headerMonth}
               </span>
             </div>
+            {/* <p className="mb-2 text-4xl font-bold text-green-600">
+              {formatCurrency(hasUA ? uaMonthIncome : stats ? stats.income : fallbackMonthlyIncome)}
+            </p> */}
             <p className="mb-2 text-4xl font-bold text-green-600">
-              {formatCurrency(
-                hasUA
-                  ? uaMonthIncome
-                  : stats
-                  ? stats.income
-                  : fallbackMonthlyIncome
-              )}
+              {formatCurrency(displayIncome)}
             </p>
             <div className="flex items-center gap-1 text-base font-medium text-green-600">
               <ArrowUpRight className="h-5 w-5" />
@@ -273,15 +286,13 @@ export function Dashboard() {
                 Chi tiêu tháng {headerMonth}
               </span>
             </div>
-            <p className="mb-2 text-4xl font-bold text-red-600">
+            {/* <p className="mb-2 text-4xl font-bold text-red-600">
               {formatCurrency(
-                hasUA
-                  ? uaMonthExpense
-                  : stats
-                  ? stats.expense
-                  : fallbackMonthlyExpense
+                hasUA ? uaMonthExpense : stats ? stats.expense : fallbackMonthlyExpense,
               )}
-            </p>
+            </p> */}
+
+            <p className="mb-2 text-4xl font-bold text-red-600">{formatCurrency(displayExpense)}</p>
             <div className="flex items-center gap-1 text-base font-medium text-red-600">
               <ArrowDownRight className="h-5 w-5" />
               Đã ghi sổ {monthlyCount} giao dịch
@@ -310,9 +321,7 @@ export function Dashboard() {
               <div className="mt-3">
                 <div className="mb-1 flex items-center justify-between text-xs text-gray-500">
                   <span>Tỷ lệ tiết kiệm</span>
-                  <span className="font-semibold text-gray-700">
-                    {uaSavingsRate.toFixed(1)}%
-                  </span>
+                  <span className="font-semibold text-gray-700">{uaSavingsRate.toFixed(1)}%</span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-gray-100">
                   <div
@@ -436,9 +445,7 @@ export function Dashboard() {
                     return (
                       <div key={g.goal_id}>
                         <div className="mb-1 flex items-center justify-between">
-                          <span className="text-sm font-semibold text-gray-700">
-                            {g.title}
-                          </span>
+                          <span className="text-sm font-semibold text-gray-700">{g.title}</span>
                           <span className="text-xs font-bold text-gray-600">
                             {progress.toFixed(0)}%
                           </span>

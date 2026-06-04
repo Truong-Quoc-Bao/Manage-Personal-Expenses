@@ -280,6 +280,7 @@ export function FloatingChat() {
           final += event.results[i][0].transcript;
         }
         setVoiceTranscript(final);
+        setInputValue(final);
       };
       rec.onend = () => setIsRecording(false);
       recognitionRef.current = rec;
@@ -1039,7 +1040,8 @@ export function FloatingChat() {
   //
   const handleSend = async (textOverride?: string) => {
     // 1. Kiểm tra điều kiện gửi
-    const message = textOverride || inputValue.trim();
+    // const message = textOverride || inputValue.trim();
+    const message = textOverride || voiceTranscript || inputValue.trim();
     const file = selectedImage;
 
     // Nếu không có cả chữ lẫn ảnh, hoặc đang load thì không gửi
@@ -1057,10 +1059,13 @@ export function FloatingChat() {
     setMessages((prev) => [...prev, userMsg]);
 
     // Reset Input & Preview ngay lập tức để người dùng cảm thấy tốc độ
+
     setInputValue('');
     setSelectedImage(null);
     setImagePreview(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
+
+    setVoiceTranscript('');
     setShowVoicePreview(false);
 
     try {
@@ -1377,7 +1382,7 @@ export function FloatingChat() {
                     Hủy
                   </Button>
                   <Button
-                    onClick={() => handleSend()}
+                    onClick={() => handleSend(voiceTranscript)}
                     className="flex-1 rounded-xl !bg-gradient-to-r !from-orange-400 !to-rose-400 px-6 py-3 font-semibold text-white shadow-lg disabled:opacity-50"
                   >
                     Xác nhận & Gửi

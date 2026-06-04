@@ -140,18 +140,21 @@ export function Transactions() {
     setShowAddTransaction(false);
     fetchTransactions();
     toast.success('Tạo giao dịch thành công!', { duration: 3000 });
+    window.dispatchEvent(new Event('dashboard_refresh'));
   };
 
   const handleTransactionUpdated = () => {
     setEditingTransaction(null);
     fetchTransactions();
     toast.success('Cập nhật giao dịch thành công!', { duration: 3000 });
+    window.dispatchEvent(new Event('dashboard_refresh'));
   };
 
   const handleTransactionDeleted = () => {
     setDeletingTransaction(null);
     fetchTransactions();
     toast.success('Xóa giao dịch thành công!', { duration: 3000 });
+    window.dispatchEvent(new Event('dashboard_refresh'));
   };
 
   const formatCurrency = (amount: number) => {
