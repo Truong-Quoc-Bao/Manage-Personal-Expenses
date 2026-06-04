@@ -8,12 +8,14 @@ envVarGroups:
       - key: REFRESH_TOKEN_SECRET
         value: klkasfaxcsafsafnsanc245asf123
       - key: RABBITMQ_URL
-        sync: false # Bạn sẽ nhập URL CloudAMQP khi Render hỏi
+        sync: false # Bạn sẽ dán URL từ CloudAMQP vào đây trên web Render
       - key: REDIS_URL
-        sync: false # Nhập URL Redis khi Render hỏi
+        sync: false # Dán URL từ Upstash hoặc Redis Render vào đây
+      - key: REDIS_PASSWORD
+        value: '16072004'
 
 services:
-  # 1. GATEWAY
+  # 1. GATEWAY (Cổng chính - Công khai)
   - type: web
     name: gateway
     runtime: docker
@@ -24,6 +26,11 @@ services:
       - fromGroup: common-secrets
       - key: PORT
         value: 3000
+      # Link gọi các service nội bộ
+      - key: USER_SERVICE_URL
+        value: http://user-service:3001
+      - key: AUTH_SERVICE_URL
+        value: http://auth-service:3006
 
   # 2. USER SERVICE
   - type: web
@@ -34,22 +41,12 @@ services:
     plan: free
     envVars:
       - fromGroup: common-secrets
+      - key: PORT
+        value: 3001
       - key: DATABASE_URL
         value: postgresql://postgres:datletan16072004@db.mdzmjrxpntwapuiyhqdo.supabase.co:5432/postgres?schema=user_service
 
-  # 3. AUTH SERVICE (.NET)
-  - type: web
-    name: auth-service
-    runtime: docker
-    dockerContext: .
-    dockerfilePath: backend/auth_service/Dockerfile
-    plan: free
-    envVars:
-      - fromGroup: common-secrets
-      - key: ConnectionStrings__DefaultConnection
-        value: Host=aws-1-ap-southeast-1.pooler.supabase.com;Port=5432;Database=postgres;Username=postgres.mdzmjrxpntwapuiyhqdo;Password=datletan16072004;SearchPath=auth_service;Trust Server Certificate=true
-
-  # 4. ACCOUNT SERVICE
+  # 3. ACCOUNT SERVICE
   - type: web
     name: account-service
     runtime: docker
@@ -58,34 +55,12 @@ services:
     plan: free
     envVars:
       - fromGroup: common-secrets
+      - key: PORT
+        value: 3002
       - key: DATABASE_URL
         value: postgresql://postgres:datletan16072004@db.mdzmjrxpntwapuiyhqdo.supabase.co:5432/postgres?schema=account_service
 
-  # 5. TRANSACTION SERVICE (.NET)
-  - type: web
-    name: transaction-service
-    runtime: docker
-    dockerContext: .
-    dockerfilePath: backend/transaction_service/Dockerfile
-    plan: free
-    envVars:
-      - fromGroup: common-secrets
-      - key: ConnectionStrings__DefaultConnection
-        value: Host=aws-1-ap-southeast-1.pooler.supabase.com;Port=5432;Database=postgres;Username=postgres.mdzmjrxpntwapuiyhqdo;Password=datletan16072004;SearchPath=transaction_service;Trust Server Certificate=true
-
-  # 6. AI SERVICE
-  - type: web
-    name: ai-service
-    runtime: docker
-    dockerContext: .
-    dockerfilePath: backend/ai_service/Dockerfile
-    plan: free
-    envVars:
-      - fromGroup: common-secrets
-      - key: GEMINI_API_KEY
-        value: AIzaSyB70wYdWt5jp57ltXuD9HflCs0EbDRYoCk
-
-  # 7. CATEGORY SERVICE
+  # 4. CATEGORY SERVICE
   - type: web
     name: category-service
     runtime: docker
@@ -94,32 +69,12 @@ services:
     plan: free
     envVars:
       - fromGroup: common-secrets
+      - key: PORT
+        value: 3003
       - key: DATABASE_URL
         value: postgresql://postgres:datletan16072004@db.mdzmjrxpntwapuiyhqdo.supabase.co:5432/postgres?schema=category_service
 
-  # 8. BUDGET SERVICE
-  - type: web
-    name: budget-service
-    runtime: docker
-    dockerContext: .
-    dockerfilePath: backend/budget_service/Dockerfile
-    plan: free
-    envVars:
-      - fromGroup: common-secrets
-      - key: DATABASE_URL
-        value: postgresql://postgres:datletan16072004@db.mdzmjrxpntwapuiyhqdo.supabase.co:5432/postgres?schema=account_service # Sửa theo logic của bạn
-
-  # 9. NOTIFICATION SERVICE
-  - type: web
-    name: notification-service
-    runtime: docker
-    dockerContext: .
-    dockerfilePath: backend/notification_service/Dockerfile
-    plan: free
-    envVars:
-      - fromGroup: common-secrets
-
-  # 10. ANALYTICS SERVICE
+  # 5. ANALYTICS SERVICE
   - type: web
     name: analytics-service
     runtime: docker
@@ -128,5 +83,75 @@ services:
     plan: free
     envVars:
       - fromGroup: common-secrets
+      - key: PORT
+        value: 3004
       - key: MONGODB_URL
-        sync: false
+        sync: false # Nhập URL MongoDB Atlas khi Render hỏi
+
+  # 6. NOTIFICATION SERVICE
+  - type: web
+    name: notification-service
+    runtime: docker
+    dockerContext: .
+    dockerfilePath: backend/notification_service/Dockerfile
+    plan: free
+    envVars:
+      - fromGroup: common-secrets
+      - key: PORT
+        value: 3005
+
+  # 7. AUTH SERVICE (.NET 8)
+  - type: web
+    name: auth-service
+    runtime: docker
+    dockerContext: .
+    dockerfilePath: backend/auth_service/Dockerfile
+    plan: free
+    envVars:
+      - fromGroup: common-secrets
+      - key: PORT
+        value: 3006
+      - key: ConnectionStrings__DefaultConnection
+        value: Host=aws-1-ap-southeast-1.pooler.supabase.com;Port=5432;Database=postgres;Username=postgres.mdzmjrxpntwapuiyhqdo;Password=datletan16072004;SearchPath=auth_service;Trust Server Certificate=true
+
+  # 8. TRANSACTION SERVICE (.NET 8)
+  - type: web
+    name: transaction-service
+    runtime: docker
+    dockerContext: .
+    dockerfilePath: backend/transaction_service/Dockerfile
+    plan: free
+    envVars:
+      - fromGroup: common-secrets
+      - key: PORT
+        value: 3007
+      - key: ConnectionStrings__DefaultConnection
+        value: Host=aws-1-ap-southeast-1.pooler.supabase.com;Port=5432;Database=postgres;Username=postgres.mdzmjrxpntwapuiyhqdo;Password=datletan16072004;SearchPath=transaction_service;Trust Server Certificate=true
+
+  # 9. BUDGET SERVICE
+  - type: web
+    name: budget-service
+    runtime: docker
+    dockerContext: .
+    dockerfilePath: backend/budget_service/Dockerfile
+    plan: free
+    envVars:
+      - fromGroup: common-secrets
+      - key: PORT
+        value: 3008
+      - key: DATABASE_URL
+        value: postgresql://postgres:datletan16072004@db.mdzmjrxpntwapuiyhqdo.supabase.co:5432/postgres?schema=account_service
+
+  # 10. AI SERVICE
+  - type: web
+    name: ai-service
+    runtime: docker
+    dockerContext: .
+    dockerfilePath: backend/ai_service/Dockerfile
+    plan: free
+    envVars:
+      - fromGroup: common-secrets
+      - key: PORT
+        value: 4005
+      - key: GEMINI_API_KEY
+        value: AIzaSyB70wYdWt5jp57ltXuD9HflCs0EbDRYoCk
