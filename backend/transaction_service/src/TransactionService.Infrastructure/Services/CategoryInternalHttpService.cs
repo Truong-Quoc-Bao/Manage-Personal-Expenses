@@ -18,7 +18,8 @@ namespace TransactionService.Infrastructure.Services
             try
             {
                 var client = _httpClientFactory.CreateClient("CategoryHttp");
-                var response = await client.GetAsync($"/api/categories/internal/{categoryId}/status?userId={userId}&transactionType={transactionType}");
+                // var response = await client.GetAsync($"/api/categories/internal/{categoryId}/status?userId={userId}&transactionType={transactionType}");
+                var response = await client.GetAsync($"/internal/{categoryId}/status?userId={userId}&transactionType={transactionType}");
                 if (!response.IsSuccessStatusCode) return false;
                 var data = await response.Content.ReadFromJsonAsync<CategoryStatusResponse>();
                 return data?.Valid ?? false;
@@ -35,7 +36,8 @@ namespace TransactionService.Infrastructure.Services
             try
             {
                 var client = _httpClientFactory.CreateClient("CategoryHttp");
-                var response = await client.GetAsync($"/api/categories/internal/{categoryId}/display?userId={userId}&transactionType={transactionType}");
+                // var response = await client.GetAsync($"/api/categories/internal/{categoryId}/display?userId={userId}&transactionType={transactionType}");
+                var response = await client.GetAsync($"/internal/{categoryId}/display?userId={userId}&transactionType={transactionType}");
                 if (!response.IsSuccessStatusCode) return new CategoryDisplayDto { Found = false };
                 var data = await response.Content.ReadFromJsonAsync<CategoryDisplayDto>();
                 return data ?? new CategoryDisplayDto { Found = false };

@@ -18,7 +18,7 @@ namespace TransactionService.Infrastructure.Services
             try
             {
                 var client = _httpClientFactory.CreateClient("AccountHttp");
-                var response = await client.GetAsync($"/api/accounts/internal/{accountId}/status?userId={userId}");
+                var response = await client.GetAsync($"/internal/{accountId}/status?userId={userId}");
                 if (!response.IsSuccessStatusCode) return false;
                 var data = await response.Content.ReadFromJsonAsync<AccountStatusResponse>();
                 return data?.Exists ?? false;
@@ -35,7 +35,7 @@ namespace TransactionService.Infrastructure.Services
             try
             {
                 var client = _httpClientFactory.CreateClient("AccountHttp");
-                var response = await client.GetAsync($"/api/accounts/internal/{accountId}/display?userId={userId}");
+                var response = await client.GetAsync($"/internal/{categoryId}/status?userId={userId}&transactionType={transactionType}");
                 if (!response.IsSuccessStatusCode) return new AccountDisplayDto { Found = false };
                 var data = await response.Content.ReadFromJsonAsync<AccountDisplayDto>();
                 return data ?? new AccountDisplayDto { Found = false };
