@@ -31,12 +31,12 @@ namespace TransactionService.Infrastructure.Extensions
             {
                 options.UseNpgsql(connectionString, npgsqlOptions =>
                 {
-                    npgsqlOptions.EnableRetryOnFailure();
-                    // npgsqlOptions.EnableRetryOnFailure(
-                    //     maxRetryCount: 3,
-                    //     maxRetryDelay: TimeSpan.FromSeconds(5),
-                    //     errorCodesToAdd: null
-                    // );
+                    // npgsqlOptions.EnableRetryOnFailure();
+                    npgsqlOptions.EnableRetryOnFailure(
+                        maxRetryCount: 3,
+                        maxRetryDelay: TimeSpan.FromSeconds(5),
+                        errorCodesToAdd: null
+                    );
                     npgsqlOptions.CommandTimeout(60);
                 });
             });
