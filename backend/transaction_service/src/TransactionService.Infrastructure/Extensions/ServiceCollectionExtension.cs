@@ -31,7 +31,7 @@ namespace TransactionService.Infrastructure.Extensions
             {
                 options.UseNpgsql(connectionString, npgsqlOptions =>
                 {
-                    npgsqlOptions.EnableRetryOnFailure();
+                    // npgsqlOptions.EnableRetryOnFailure();
                     npgsqlOptions.CommandTimeout(30);
                 });
             });
