@@ -35,7 +35,7 @@ namespace TransactionService.Infrastructure.Services
             try
             {
                 var client = _httpClientFactory.CreateClient("AccountHttp");
-                var response = await client.GetAsync($"/internal/{categoryId}/status?userId={userId}&transactionType={transactionType}");
+                var response = await client.GetAsync($"/internal/{accountId}/display?userId={userId}");
                 if (!response.IsSuccessStatusCode) return new AccountDisplayDto { Found = false };
                 var data = await response.Content.ReadFromJsonAsync<AccountDisplayDto>();
                 return data ?? new AccountDisplayDto { Found = false };
