@@ -46,9 +46,36 @@ namespace TransactionService.Infrastructure.Extensions
                 options.Address = new Uri(configuration["GrpcSettings:AccountServiceUrl"]!);
             });
                 
-            services.AddScoped<IAccountInternalService, AccountInternalService>();
+            // services.AddScoped<IAccountInternalService, AccountInternalService>();
 
-            services.AddScoped<ICategoryInternalService, CategoryInternalService>();
+            // services.AddScoped<ICategoryInternalService, CategoryInternalService>();
+
+           var useHttp = configuration["USE_HTTP"] == "true";
+
+            services.AddHttpClient("AccountHttp", client =>
+            {
+                client.BaseAddress = new Uri(
+                    configuration["HttpSettings:AccountServiceUrl"] ?? "http://account-service:3002"
+                );
+            });
+            services.AddHttpClient("CategoryHttp", client =>
+            {
+                client.BaseAddress = new Uri(
+                    configuration["HttpSettings:CategoryServiceUrl"] ?? "http://category-service:3003"
+                );
+            });
+
+            if (useHttp)
+            {
+                services.AddScoped<IAccountInternalService, AccountInternalHttpService>();
+                services.AddScoped<ICategoryInternalService, CategoryInternalHttpService>();
+            }
+            else
+            {
+                services.AddScoped<IAccountInternalService, AccountInternalService>();
+                services.AddScoped<ICategoryInternalService, CategoryInternalService>();
+            }
+
 
             return services;
         }
