@@ -142,7 +142,15 @@ export function Dashboard() {
 
   const hasUA = !!userAnalytics;
 
-  const uaBalance = userAnalytics?.current_balance ?? 0;
+  // const uaBalance = userAnalytics?.current_balance ?? 0;
+
+  const uaBalance =
+    accounts.length > 0
+      ? accounts
+          .filter((a) => ['cash', 'bank', 'ewallet'].includes(a.type?.toLowerCase()))
+          .reduce((s, a) => s + Number(a.balance || 0), 0)
+      : userAnalytics?.current_balance ?? 0;
+      
   const uaMonthIncome = userAnalytics?.current_month?.income ?? 0;
   const uaMonthExpense = userAnalytics?.current_month?.expense ?? 0;
   const uaMonthSavings = userAnalytics?.current_month?.savings ?? 0;
@@ -158,9 +166,15 @@ export function Dashboard() {
   const now = new Date();
   const currentMonth = now.getMonth();
   const currentYear = now.getFullYear();
-  const monthlyCount = fallbackTxs.filter((t) => {
+
+  const expenseMonthlyCount = fallbackTxs.filter((t) => {
     const d = new Date(t.date);
-    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    return t.type === 'expense' && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+  }).length;
+
+  const incomeMonthlyCount = fallbackTxs.filter((t) => {
+    const d = new Date(t.date);
+    return t.type === 'income' && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
   }).length;
 
   const fallbackTotalBalance = accounts.reduce((s, a) => s + Number(a.balance || 0), 0);
@@ -247,7 +261,8 @@ export function Dashboard() {
             <p className="text-base text-gray-500 italic">
               {hasUA
                 ? userAnalytics?.account_id?.length
-                  ? `Tổng hợp ${userAnalytics.account_id.length} tài khoản`
+                  ? // ? `Tổng hợp ${userAnalytics.account_id.length} tài khoản`
+                    `Tổng hợp ${accounts.length} tài khoản`
                   : 'Tổng hợp toàn bộ tài khoản'
                 : 'Cập nhật thời gian thực'}
             </p>
@@ -267,7 +282,7 @@ export function Dashboard() {
             </p>
             <div className="flex items-center gap-1 text-base font-medium text-green-600">
               <ArrowUpRight className="h-5 w-5" />
-              Dòng tiền dương
+              Đã ghi sổ {incomeMonthlyCount} giao dịch tiền vào
             </div>
           </div>
 
@@ -287,7 +302,7 @@ export function Dashboard() {
             </p>
             <div className="flex items-center gap-1 text-base font-medium text-red-600">
               <ArrowDownRight className="h-5 w-5" />
-              Đã ghi sổ {monthlyCount} giao dịch
+              Đã ghi sổ {expenseMonthlyCount} giao dịch tiền ra
             </div>
           </div>
         </div>

@@ -843,8 +843,10 @@ const service = {
     const txDate = date ? new Date(date) : new Date();
     const txYear = txDate.getFullYear();
     const txMonth = txDate.getMonth() + 1;
-    const isExpense = transaction_type === 'Expense';
-    const isIncome = transaction_type === 'Income';
+    // const isExpense = transaction_type === 'Expense';
+    // const isIncome = transaction_type === 'Income';
+    const isExpense = transaction_type?.toLowerCase() === 'expense';
+    const isIncome = transaction_type?.toLowerCase() === 'income';
     const rawAmt = Number(amount);
     if (isNaN(rawAmt)) {
       console.error(`[_updateUserAnalytics] Invalid amount, skipping. amount:`, amount);
@@ -1083,7 +1085,8 @@ const service = {
       account_id: account_id || null,
       category_id,
       category_name: categoryInfo?.category_name || transaction.category_name || '',
-      category_type: transaction_type === 'Income' ? 'income' : 'expense',
+      // category_type: transaction_type === 'Income' ? 'income' : 'expense',
+      category_type: transaction_type?.toLowerCase() === 'income' ? 'income' : 'expense',
       year,
       month,
       total_amount: amt,
@@ -1130,8 +1133,11 @@ const service = {
       return null;
     }
     const amt = rawAmt * sign;
-    const isExpense = transaction_type === 'Expense';
-    const isIncome = transaction_type === 'Income';
+    // const isExpense = transaction_type === 'Expense';
+    // const isIncome = transaction_type === 'Income';
+
+    const isExpense = transaction_type?.toLowerCase() === 'expense';
+    const isIncome = transaction_type?.toLowerCase() === 'income';
 
     let cache = await repo.findDashboardCacheByAccountId(account_id).catch(() => null);
     let isNewCache = false;
@@ -1292,8 +1298,11 @@ const service = {
     }
     const amt = rawAmt * sign;
 
-    const isExpense = transaction_type === 'Expense';
-    const isIncome = transaction_type === 'Income';
+    // const isExpense = transaction_type === 'Expense';
+    // const isIncome = transaction_type === 'Income';
+
+    const isExpense = transaction_type?.toLowerCase() === 'expense';
+    const isIncome = transaction_type?.toLowerCase() === 'income';
 
     const week = Math.ceil(day / 7);
 
@@ -1482,7 +1491,10 @@ const service = {
     }
 
     const amt = rawAmt * sign;
-    const categoryTypeNormalized = transaction_type === 'Income' ? 'income' : 'expense';
+    // const categoryTypeNormalized = transaction_type === 'Income' ? 'income' : 'expense';
+
+    const categoryTypeNormalized =
+      transaction_type?.toLowerCase() === 'income' ? 'income' : 'expense';
 
     let trend = await repo
       .findSpendingTrendByAccountCategory(account_id, category_id)
