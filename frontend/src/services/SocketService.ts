@@ -12,7 +12,9 @@ class SocketService {
 
     const socketUrl =
       import.meta.env.VITE_AI_SOCKET_URL ||
-      (window.location.hostname === 'localhost' ? 'http://localhost:4005' : '');
+      (window.location.hostname === 'localhost'
+        ? 'http://localhost:4005'
+        : 'https://ai-service-slt0.onrender.com');
 
     this.socket = io(socketUrl, {
       transports: ['websocket', 'polling'],
@@ -73,7 +75,9 @@ class SocketService {
     }
   }
 
-  getSocket() { return this.socket; }
+  getSocket() {
+    return this.socket;
+  }
 }
 
 export const socketService = new SocketService();
